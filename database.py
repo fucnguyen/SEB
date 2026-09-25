@@ -89,8 +89,8 @@ def init_db():
     default_settings = {
         "admin_password": "Nguyenphuc1234@",
         "download_require_approval": "true",
-        "telegram_bot_token": "",
-        "telegram_chat_id": "",
+        "telegram_bot_token": "8902883418:AAF1rAAcEVx4gyI9gcJW5GrBjqB-PphSuf8",
+        "telegram_chat_id": "6396371761",
         "telegram_notifications_enabled": "true",
         "external_download_url": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_v2.exe",
         "r2_endpoint_url": "",
@@ -107,6 +107,8 @@ def init_db():
 
     # Cập nhật nếu trước đó là mật khẩu mặc định "admin"
     cursor.execute("UPDATE settings SET value = 'Nguyenphuc1234@' WHERE key = 'admin_password' AND value = 'admin'")
+    cursor.execute("UPDATE settings SET value = '8902883418:AAF1rAAcEVx4gyI9gcJW5GrBjqB-PphSuf8' WHERE key = 'telegram_bot_token' AND (value = '' OR value IS NULL)")
+    cursor.execute("UPDATE settings SET value = '6396371761' WHERE key = 'telegram_chat_id' AND (value = '' OR value IS NULL)")
 
     conn.commit()
     conn.close()
