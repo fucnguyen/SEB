@@ -120,7 +120,7 @@ async def process_telegram_callback(callback_query: dict):
     if action == "dl_app":
         req_id = parts[1]
         token = str(uuid.uuid4())
-        expires_at = (datetime.now() + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+        expires_at = (database.now_vn() + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
         success = database.approve_download_request(req_id, token, expires_at)
         new_text = original_text + f"\n\n👉 <b>KẾT QUẢ:</b> ✅ ĐÃ PHÊ DUYỆT CHO TẢI (Hạn link: 30 phút)"
         await send_telegram_request("editMessageText", {
@@ -150,7 +150,7 @@ async def process_telegram_callback(callback_query: dict):
             return
 
         hwid = lic["hwid"]
-        now = datetime.now()
+        now = database.now_vn()
 
         if duration == "7d":
             exp_date = now + timedelta(days=7)
@@ -202,7 +202,7 @@ async def process_telegram_callback(callback_query: dict):
 
 async def start_telegram_polling():
     last_update_id = 0
-    print("[Telegram Bot] Khởi động vòng lặp kiểm tra tin nhắn và nút bấm...")
+    print("[Telegram Bot] Polling loop started...")
     while True:
         token, _, enabled = get_bot_credentials()
         if not token or not enabled:

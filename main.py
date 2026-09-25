@@ -92,7 +92,7 @@ class ManualKeyModel(BaseModel):
     note: Optional[str] = ""
 
 def calculate_expiration(duration: str, custom_datetime: Optional[str] = None) -> datetime:
-    now = datetime.now()
+    now = database.now_vn()
     if duration == "custom" and custom_datetime:
         dt_str = custom_datetime.replace("T", " ").strip()
         if len(dt_str) == 16:
@@ -257,7 +257,7 @@ async def api_stream_local_file(token: str, request: Request):
     exp_str = row.get("token_expires_at")
     if exp_str:
         exp_time = datetime.strptime(exp_str, "%Y-%m-%d %H:%M:%S")
-        if datetime.now() > exp_time:
+        if database.now_vn() > exp_time:
             raise HTTPException(status_code=403, detail="Đường link tải này đã hết hạn (30 phút). Vui lòng gửi yêu cầu xin duyệt lại!")
 
     # 2. KIỂM TRA ĐỊA CHỈ IP (IP-Binding)
@@ -297,7 +297,7 @@ async def api_request_activation(req: ActivationRequestModel, request: Request, 
     Được gọi tự động bởi SEB_Launcher trên máy học sinh.
     Gửi thông tin mã máy HWID lên Server/Telegram để Admin duyệt.
     """
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
     request_id = "ACT_" + uuid.uuid4().hex[:10].upper()
 
     row = database.create_or_update_activation_request(
@@ -333,11 +333,11 @@ async def api_check_activation(hwid: str):
 
     status = lic["status"]
     if status == "active":
-        # Kiểm tra ngày hết hạn theo giờ UTC/Server
+        # Kiểm tra ngày hết hạn theo giờ Việt Nam (GMT+7)
         exp_str = lic["expires_at"]
         if exp_str:
             exp_date = datetime.strptime(exp_str, "%Y-%m-%d %H:%M:%S")
-            if datetime.now() >= exp_date:
+            if database.now_vn() >= exp_date:
                 database.lock_license(hwid)
                 return {"status": "expired", "message": "Bản quyền đã hết hạn sử dụng."}
 
@@ -345,7 +345,7 @@ async def api_check_activation(hwid: str):
             "status": "active",
             "license_key": lic["license_key"],
             "expires_at": lic["expires_at"],
-            "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "server_time": database.now_vn().strftime("%Y-%m-%d %H:%M:%S")
         }
 
     elif status == "locked":
@@ -384,7 +384,7 @@ async def api_admin_list_downloads():
 async def api_admin_approve_download(payload: dict):
     req_id = payload.get("request_id")
     token = str(uuid.uuid4())
-    expires_at = (datetime.now() + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+    expires_at = (database.now_vn() + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
     success = database.approve_download_request(req_id, token, expires_at)
     return {"success": success}
 
@@ -505,19 +505,26 @@ async def api_admin_test_telegram():
     })
     return {"success": res is not None}
 
-# ────────────────── Live Chat API ──────────────────
+# ────────────────── Live Chat & Client IP API ──────────────────
+
+@app.get("/api/my-ip")
+async def api_get_my_ip(request: Request):
+    """Trả về địa chỉ IP mạng thật của client hiện tại"""
+    return {"ip": get_client_ip(request)}
 
 @app.get("/api/chat/messages")
 async def api_get_chat_messages(session_id: str):
     return database.get_chat_messages(session_id)
 
 @app.post("/api/chat/send")
-async def api_send_chat_message(msg: ChatMessageModel):
+async def api_send_chat_message(msg: ChatMessageModel, request: Request):
+    client_ip = get_client_ip(request)
     res = database.add_chat_message(
         session_id=msg.session_id,
         sender=msg.sender,
         sender_name=msg.sender_name,
-        message=msg.message
+        message=msg.message,
+        ip_address=client_ip
     )
     return {"success": True, "data": res}
 

@@ -1,7 +1,13 @@
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
+
+VIETNAM_TZ = timezone(timedelta(hours=7))
+
+def now_vn() -> datetime:
+    """Trả về thời gian hiện tại chuẩn múi giờ Việt Nam (GMT+7)"""
+    return datetime.now(VIETNAM_TZ).replace(tzinfo=None)
 
 DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 DB_PATH = os.path.join(DB_DIR, "seb_portal.db")
@@ -53,7 +59,7 @@ def init_db():
     )
     """)
 
-    # 3. Bảng tin nhắn chat giữa học sinh và admin
+    # 3. Bảng tin nhắn chat giữa học sinh và admin (kèm IP máy)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS chat_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,9 +67,15 @@ def init_db():
         sender TEXT NOT NULL,          -- student, admin
         sender_name TEXT NOT NULL,
         message TEXT NOT NULL,
+        ip_address TEXT DEFAULT '',
         created_at TEXT NOT NULL
     )
     """)
+
+    try:
+        cursor.execute("ALTER TABLE chat_messages ADD COLUMN ip_address TEXT DEFAULT ''")
+    except Exception:
+        pass
 
     # 4. Bảng cấu hình hệ thống
     cursor.execute("""
@@ -102,7 +114,7 @@ def init_db():
 # ────────────────── Download Requests API ──────────────────
 
 def create_download_request(request_id: str, full_name: str, email: str, note: str, ip_address: str) -> Dict[str, Any]:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
@@ -122,7 +134,7 @@ def get_download_request(request_id: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def approve_download_request(request_id: str, token: str, expires_at: str) -> bool:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
@@ -165,7 +177,7 @@ def get_request_by_download_token(token: str) -> Optional[Dict[str, Any]]:
 def create_or_update_activation_request(
     request_id: str, hwid: str, student_name: str, email: str, machine_name: str, ip_address: str
 ) -> Dict[str, Any]:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     c = conn.cursor()
 
@@ -206,7 +218,7 @@ def get_license_by_request_id(request_id: str) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def approve_license(hwid: str, license_key: str, expires_at: str, duration_type: str) -> bool:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
@@ -247,7 +259,7 @@ def delete_license(hwid: str) -> bool:
     return affected
 
 def update_heartbeat(hwid: str) -> None:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     c = conn.cursor()
     c.execute("UPDATE licenses SET last_heartbeat = ? WHERE hwid = ?", (now, hwid.strip()))
@@ -264,14 +276,14 @@ def list_licenses(limit: int = 100) -> List[Dict[str, Any]]:
 
 # ────────────────── Live Chat API ──────────────────
 
-def add_chat_message(session_id: str, sender: str, sender_name: str, message: str) -> Dict[str, Any]:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def add_chat_message(session_id: str, sender: str, sender_name: str, message: str, ip_address: str = "") -> Dict[str, Any]:
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
-        INSERT INTO chat_messages (session_id, sender, sender_name, message, created_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (session_id, sender, sender_name, message, now))
+        INSERT INTO chat_messages (session_id, sender, sender_name, message, ip_address, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (session_id, sender, sender_name, message, ip_address, now))
     msg_id = c.lastrowid
     conn.commit()
     conn.close()
@@ -281,6 +293,7 @@ def add_chat_message(session_id: str, sender: str, sender_name: str, message: st
         "sender": sender,
         "sender_name": sender_name,
         "message": message,
+        "ip_address": ip_address,
         "created_at": now
     }
 
@@ -296,13 +309,20 @@ def list_active_chat_sessions() -> List[Dict[str, Any]]:
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
-        SELECT session_id, sender_name, MAX(created_at) as last_activity, COUNT(*) as message_count
+        SELECT session_id, 
+               MAX(CASE WHEN sender = 'student' THEN sender_name ELSE '' END) as student_sender_name,
+               MAX(sender_name) as fallback_name,
+               MAX(created_at) as last_activity, 
+               COUNT(*) as message_count,
+               MAX(CASE WHEN sender = 'student' THEN ip_address ELSE '' END) as ip_address
         FROM chat_messages
         GROUP BY session_id
         ORDER BY last_activity DESC
-        LIMIT 30
+        LIMIT 50
     """)
     rows = [dict(r) for r in c.fetchall()]
+    for r in rows:
+        r["sender_name"] = r.get("student_sender_name") or r.get("fallback_name") or "Học sinh"
     conn.close()
     return rows
 

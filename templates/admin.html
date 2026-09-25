@@ -968,12 +968,12 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex justify-between items-center">
-                            <span class="font-bold text-xs text-white truncate">${s.sender_name}</span>
+                            <span class="font-bold text-xs text-white truncate">${escapeHtml(s.sender_name)}</span>
                             <span class="text-[10px] text-slate-500 shrink-0">${timeStr}</span>
                         </div>
                         <div class="flex justify-between items-center mt-1">
-                            <span class="text-[11px] text-slate-400 truncate">${s.message_count} tin nhắn</span>
-                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span class="text-[10px] font-mono text-blue-300 truncate">🌐 ${s.ip_address || 'Chưa rõ IP'}</span>
+                            <span class="text-[10px] text-slate-400 shrink-0">${s.message_count} tin</span>
                         </div>
                     </div>
                 `;
@@ -983,9 +983,11 @@
 
         async function selectChatSession(sessionId, name) {
             currentChatSessionId = sessionId;
+            const session = allChatSessions.find(s => s.session_id === sessionId);
+            const ipDisplay = session && session.ip_address ? ` • 🌐 IP: <span class="font-mono text-blue-300 font-semibold">${session.ip_address}</span>` : '';
             document.getElementById("active-chat-title").innerText = name;
             document.getElementById("active-chat-subtitle").innerHTML = `
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Đang trực tuyến • ID: ${sessionId}
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Trực tuyến • ID: ${sessionId}${ipDisplay}
             `;
             document.getElementById("active-chat-actions").classList.remove("hidden");
             
@@ -1033,7 +1035,7 @@
                     if (match) latestStudentHWIDFound = match[0];
 
                     const isMe = m.sender === "admin";
-                    const timeStr = m.created_at ? m.created_at.split(' ')[1] : '';
+                    const timeStr = m.created_at ? (m.created_at.includes(' ') ? m.created_at.split(' ')[1] : m.created_at) : '';
 
                     const row = document.createElement("div");
 
@@ -1061,7 +1063,10 @@
                                 <div class="bg-slate-800/95 border border-slate-700/60 text-slate-100 rounded-2xl rounded-bl-xs px-4 py-2.5 shadow-md text-xs sm:text-sm leading-relaxed break-words">
                                     ${escapeHtml(m.message)}
                                 </div>
-                                <span class="text-[10px] text-slate-500 pl-1">${timeStr}</span>
+                                <div class="flex items-center gap-1.5 text-[10px] text-slate-500 pl-1">
+                                    <span>${timeStr}</span>
+                                    ${m.ip_address ? `<span class="font-mono text-blue-400/90">• 🌐 ${m.ip_address}</span>` : ''}
+                                </div>
                             </div>
                         `;
                     }

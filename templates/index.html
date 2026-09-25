@@ -197,9 +197,13 @@
                                 Hỗ Trợ Kỹ Thuật Viên SEB
                                 <i class="fa-solid fa-circle-check text-blue-400 text-xs"></i>
                             </h3>
-                            <span class="text-[11px] text-emerald-400 flex items-center gap-1">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Đang trực tuyến • Phản hồi tức thì
-                            </span>
+                            <div class="flex items-center gap-1.5 text-[11px] mt-0.5">
+                                <span class="text-emerald-400 flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Trực tuyến
+                                </span>
+                                <span class="text-slate-500">•</span>
+                                <span id="chat-user-ip-badge" class="text-slate-400 font-mono">🌐 IP: Đang tải...</span>
+                            </div>
                         </div>
                     </div>
 
@@ -503,7 +507,7 @@
 
                 msgs.forEach(m => {
                     const isMe = m.sender === "student";
-                    const timeStr = m.created_at ? m.created_at.split(' ')[1] : '';
+                    const timeStr = m.created_at ? (m.created_at.includes(' ') ? m.created_at.split(' ')[1] : m.created_at) : '';
                     const row = document.createElement("div");
 
                     if (isMe) {
@@ -589,7 +593,19 @@
             return div.innerHTML;
         }
 
-        // Tải tin nhắn lần đầu và khởi động vòng lặp thời gian thực (1.5 giây / lần)
+        async function fetchMyIp() {
+            try {
+                const res = await fetch("/api/my-ip");
+                const data = await res.json();
+                if (data.ip) {
+                    const badge = document.getElementById("chat-user-ip-badge");
+                    if (badge) badge.innerHTML = `🌐 IP: <span class="text-blue-300">${data.ip}</span>`;
+                }
+            } catch(e) {}
+        }
+
+        // Tải tin nhắn lần đầu, lấy IP và khởi động vòng lặp thời gian thực (1.5 giây / lần)
+        fetchMyIp();
         loadChatMessages();
         setInterval(() => loadChatMessages(true), 1500);
     </script>
