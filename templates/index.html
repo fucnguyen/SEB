@@ -133,15 +133,23 @@
                 <div id="request-status-section" class="hidden space-y-4">
                     
                     <!-- Chờ duyệt (Pending) -->
-                    <div id="status-pending-box" class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 sm:p-5 flex items-start gap-3.5 animate-pulse">
+                    <div id="status-pending-box" class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 sm:p-5 flex items-start gap-3.5">
                         <div class="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 text-lg">
                             <i class="fa-solid fa-hourglass-half fa-spin"></i>
                         </div>
-                        <div>
+                        <div class="flex-1">
                             <h4 class="font-bold text-amber-300 text-sm sm:text-base">Đang Chờ Quản Trị Viên Duyệt...</h4>
                             <p class="text-xs text-amber-200/80 mt-1 leading-relaxed">
                                 Yêu cầu của bạn đã được gửi đến Telegram của Quản trị viên. Hãy giữ trang này, nút tải sẽ <strong>tự động mở khóa ngay lập tức</strong> khi được duyệt!
                             </p>
+                            <div class="mt-3 flex items-center gap-2">
+                                <button onclick="checkStatus()" class="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/50 rounded-lg text-amber-200 text-xs font-semibold transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-rotate"></i> Kiểm tra lại ngay
+                                </button>
+                                <button onclick="resetDownloadRequest()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 text-xs transition">
+                                    Gửi lại thông tin khác
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -371,10 +379,6 @@
             startPollingStatus();
         }
 
-        // Tải lịch sử chat
-        loadChatMessages();
-        setInterval(loadChatMessages, 4000);
-
         async function submitDownloadRequest() {
             const name = document.getElementById("input-name").value.trim();
             const email = document.getElementById("input-email").value.trim();
@@ -446,6 +450,9 @@
                     document.getElementById("status-pending-box").classList.add("hidden");
                     document.getElementById("status-approved-box").classList.add("hidden");
                     document.getElementById("status-rejected-box").classList.remove("hidden");
+                } else if (data.status === "not_found") {
+                    // Yêu cầu không còn trên máy chủ, tự động đưa về form để học sinh gửi lại
+                    resetDownloadRequest();
                 }
             } catch (err) {}
         }
