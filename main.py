@@ -127,7 +127,12 @@ def calculate_expiration(duration: str, custom_datetime: Optional[str] = None, c
         except Exception:
             pass
 
-    if duration == "+15m": return base + timedelta(minutes=15)
+    if duration == "-15m": return base - timedelta(minutes=15)
+    elif duration == "-30m": return base - timedelta(minutes=30)
+    elif duration == "-1h": return base - timedelta(hours=1)
+    elif duration == "5m": return now + timedelta(minutes=5)
+    elif duration == "now": return now - timedelta(seconds=10)
+    elif duration == "+15m": return base + timedelta(minutes=15)
     elif duration == "+30m": return base + timedelta(minutes=30)
     elif duration == "+45m": return base + timedelta(minutes=45)
     elif duration == "+1h": return base + timedelta(hours=1)
@@ -502,6 +507,11 @@ async def api_admin_approve_activation(payload: ApproveActivationModel):
 
     dur_label = duration
     if duration == "custom": dur_label = f"Hết hạn {exp_str}"
+    elif duration == "-15m": dur_label = f"Rút ngắn -15 Phút (đến {exp_str})"
+    elif duration == "-30m": dur_label = f"Rút ngắn -30 Phút (đến {exp_str})"
+    elif duration == "-1h": dur_label = f"Rút ngắn -1 Giờ (đến {exp_str})"
+    elif duration == "5m": dur_label = f"Thu bài sau 5 phút (đến {exp_str})"
+    elif duration == "now": dur_label = "Thu hồi / Hết hạn ngay lập tức"
     elif duration == "+15m": dur_label = f"+15 Phút (đến {exp_str})"
     elif duration == "+30m": dur_label = f"+30 Phút (đến {exp_str})"
     elif duration == "+45m": dur_label = f"+45 Phút (đến {exp_str})"
