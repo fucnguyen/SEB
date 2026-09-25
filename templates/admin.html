@@ -581,11 +581,11 @@
 
                     tr.innerHTML = `
                         <td class="p-3">
-                            <span class="font-bold text-white block">${item.full_name}</span>
-                            <span class="text-[10px] text-slate-500 sm:hidden">${item.email || ''}</span>
+                            <span class="font-bold text-white block">${escapeHtml(item.full_name)}</span>
+                            <span class="text-[10px] text-slate-500 sm:hidden">${escapeHtml(item.email || '')}</span>
                         </td>
-                        <td class="p-3 text-slate-400">${item.email || '—'}</td>
-                        <td class="p-3 font-mono text-[11px] text-blue-300">${item.ip_address || '—'}</td>
+                        <td class="p-3 text-slate-400">${escapeHtml(item.email || '—')}</td>
+                        <td class="p-3 font-mono text-[11px] text-blue-300">${escapeHtml(item.ip_address || '—')}</td>
                         <td class="p-3 text-slate-500 text-[11px]">${item.created_at.split(' ')[1]}</td>
                         <td class="p-3">${statusBadge}</td>
                         <td class="p-3 text-right space-x-1">
@@ -670,15 +670,15 @@
 
                 tr.innerHTML = `
                     <td class="p-3">
-                        <span class="font-bold text-white block">${l.student_name || 'Học sinh'}</span>
-                        <span class="text-[10px] text-slate-500">${l.email || l.machine_name || 'N/A'}</span>
+                        <span class="font-bold text-white block">${escapeHtml(l.student_name || 'Học sinh')}</span>
+                        <span class="text-[10px] text-slate-500">${escapeHtml(l.email || l.machine_name || 'N/A')}</span>
                     </td>
                     <td class="p-3 font-mono text-[11px] text-blue-300">
-                        ${l.hwid ? l.hwid.substring(0, 16) + '...' : '—'}
+                        ${l.hwid ? escapeHtml(l.hwid.substring(0, 16)) + '...' : '—'}
                     </td>
-                    <td class="p-3 text-slate-300 text-[11px] font-semibold">${l.duration_type || '—'}</td>
+                    <td class="p-3 text-slate-300 text-[11px] font-semibold">${escapeHtml(l.duration_type || '—')}</td>
                     <td class="p-3 text-slate-300 text-[11px] font-mono">
-                        ${l.expires_at ? l.expires_at : '—'}
+                        ${l.expires_at ? escapeHtml(l.expires_at) : '—'}
                     </td>
                     <td class="p-3">${statusBadge}</td>
                     <td class="p-3 text-right space-x-1 whitespace-nowrap">
@@ -862,13 +862,13 @@
                     }
 
                     tr.innerHTML = `
-                        <td class="p-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">${item.created_at}</td>
-                        <td class="p-3 font-bold text-white whitespace-nowrap">${item.student_name}</td>
+                        <td class="p-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">${escapeHtml(item.created_at)}</td>
+                        <td class="p-3 font-bold text-white whitespace-nowrap">${escapeHtml(item.student_name)}</td>
                         <td class="p-3 whitespace-nowrap">${evtBadge}</td>
-                        <td class="p-3 text-slate-300 text-[11px]">${item.details || '—'}</td>
-                        <td class="p-3 text-slate-400 text-[11px] font-mono whitespace-nowrap">${item.machine_name || '—'}</td>
-                        <td class="p-3 text-blue-300 text-[11px] font-mono whitespace-nowrap">${item.ip_address || '—'}</td>
-                        <td class="p-3 text-slate-500 text-[10px] font-mono whitespace-nowrap">${item.hwid ? item.hwid.substring(0, 14) + '...' : '—'}</td>
+                        <td class="p-3 text-slate-300 text-[11px]">${escapeHtml(item.details || '—')}</td>
+                        <td class="p-3 text-slate-400 text-[11px] font-mono whitespace-nowrap">${escapeHtml(item.machine_name || '—')}</td>
+                        <td class="p-3 text-blue-300 text-[11px] font-mono whitespace-nowrap">${escapeHtml(item.ip_address || '—')}</td>
+                        <td class="p-3 text-slate-500 text-[10px] font-mono whitespace-nowrap">${item.hwid ? escapeHtml(item.hwid.substring(0, 14)) + '...' : '—'}</td>
                     `;
                     tbody.appendChild(tr);
                 });
