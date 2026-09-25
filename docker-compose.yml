@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  seb-webportal:
+    build: .
+    container_name: seb_licensing_portal
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ../Setup_ThiTrucTuyen_v2.exe:/app/Setup_ThiTrucTuyen_v2.exe:ro
+    environment:
+      - PYTHONUNBUFFERED=1
