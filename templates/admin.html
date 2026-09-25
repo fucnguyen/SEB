@@ -514,6 +514,70 @@
         </div>
     </div>
 
+    <!-- Modal: Xem & Sửa Thông Tin Học Sinh -->
+    <div id="student-info-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-950 border border-cyan-500/40 rounded-2xl w-full max-w-lg p-5 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-user-pen text-cyan-400"></i> Thông Tin Chi Tiết & Chỉnh Sửa Học Sinh
+                </h3>
+                <button onclick="closeStudentInfoModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+                <!-- Thông tin hệ thống (Readonly) -->
+                <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">Mã máy HWID:</span>
+                        <button onclick="copyHwidFromModal()" class="text-[10px] text-cyan-400 hover:underline"><i class="fa-solid fa-copy"></i> Sao chép</button>
+                    </div>
+                    <code id="info-hwid" class="text-blue-300 text-[11px] font-mono break-all block bg-slate-950 p-1.5 rounded border border-slate-800"></code>
+                    <div class="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                        <div><span class="text-slate-400">Tên máy:</span> <span id="info-mach" class="text-slate-200 font-mono"></span></div>
+                        <div><span class="text-slate-400">Địa chỉ IP:</span> <span id="info-ip" class="text-blue-300 font-mono"></span></div>
+                        <div><span class="text-slate-400">Hạn sử dụng:</span> <span id="info-exp" class="text-amber-300 font-semibold"></span></div>
+                        <div><span class="text-slate-400">Trạng thái:</span> <span id="info-status" class="font-semibold"></span></div>
+                    </div>
+                </div>
+
+                <!-- Thông tin có thể chỉnh sửa -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Họ và Tên Học Sinh *</label>
+                    <input type="text" id="info-name" placeholder="Nguyễn Văn A" 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Email Học Sinh</label>
+                        <input type="email" id="info-email" placeholder="hocsinh@example.com" 
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Số Điện Thoại / Lớp</label>
+                        <input type="text" id="info-phone" placeholder="0912345678 hoặc Lớp 12A1" 
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">Ghi Chú Quản Trị (Lưu Riêng)</label>
+                    <textarea id="info-notes" rows="2" placeholder="Ví dụ: Đã nộp lệ phí, phòng thi số 2, máy tính bàn số 10..." 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"></textarea>
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeStudentInfoModal()" class="w-1/3 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-300 transition">
+                    Đóng
+                </button>
+                <button onclick="submitStudentInfoModal()" class="w-2/3 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl text-xs font-bold transition text-white shadow-lg shadow-cyan-600/30">
+                    💾 Lưu Lại Thông Tin Học Sinh
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Admin JS Scripts -->
     <script>
         let allLicenses = [];
@@ -668,10 +732,30 @@
                 if (l.status === "active") statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400">Hoạt động</span>`;
                 else if (l.status === "locked") statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400">Đã khóa</span>`;
 
+                let contactBadges = '';
+                if (l.email) contactBadges += `<div class="text-[11px] text-sky-400 truncate max-w-[210px]" title="${escapeHtml(l.email)}"><i class="fa-solid fa-envelope mr-1 text-[10px]"></i>${escapeHtml(l.email)}</div>`;
+                if (l.phone) contactBadges += `<div class="text-[11px] text-amber-300 truncate max-w-[210px]" title="${escapeHtml(l.phone)}"><i class="fa-solid fa-phone mr-1 text-[10px]"></i>${escapeHtml(l.phone)}</div>`;
+                if (l.notes) contactBadges += `<div class="text-[10px] text-slate-400 italic truncate max-w-[210px]" title="${escapeHtml(l.notes)}">📝 ${escapeHtml(l.notes)}</div>`;
+                if (!contactBadges) contactBadges = `<div class="text-[10px] text-slate-500 italic">Chưa có Email/SĐT (Bấm Sửa TT)</div>`;
+
+                let machineBadges = `<div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                    <span title="Tên máy"><i class="fa-solid fa-laptop text-slate-500"></i> ${escapeHtml(l.machine_name || 'PC')}</span>
+                    <span>•</span>
+                    <span class="text-blue-300 font-mono" title="Địa chỉ IP"><i class="fa-solid fa-globe text-slate-500"></i> ${escapeHtml(l.ip_address || '—')}</span>
+                </div>`;
+
                 tr.innerHTML = `
                     <td class="p-3">
-                        <span class="font-bold text-white block">${escapeHtml(l.student_name || 'Học sinh')}</span>
-                        <span class="text-[10px] text-slate-500">${escapeHtml(l.email || l.machine_name || 'N/A')}</span>
+                        <div class="flex items-start gap-2.5">
+                            <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow">
+                                🧑‍🎓
+                            </div>
+                            <div class="min-w-0">
+                                <span class="font-bold text-white text-xs block">${escapeHtml(l.student_name || 'Học sinh')}</span>
+                                ${contactBadges}
+                                ${machineBadges}
+                            </div>
+                        </div>
                     </td>
                     <td class="p-3 font-mono text-[11px] text-blue-300">
                         ${l.hwid ? escapeHtml(l.hwid.substring(0, 16)) + '...' : '—'}
@@ -682,6 +766,9 @@
                     </td>
                     <td class="p-3">${statusBadge}</td>
                     <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                        <button onclick="openStudentInfoModal('${escapeHtml(l.hwid)}')" class="px-2 py-1 bg-cyan-700/80 hover:bg-cyan-600 rounded-lg text-white font-semibold text-[11px]" title="Xem & Sửa Thông Tin Học Sinh (Email, SĐT, Ghi chú)">
+                            <i class="fa-solid fa-user-pen"></i> Sửa TT
+                        </button>
                         ${l.status === 'pending' ? `
                             <button onclick="quickApprove('${l.hwid}', '2h')" class="px-2 py-1 bg-amber-600 hover:bg-amber-500 rounded-lg text-white font-semibold text-[11px]" title="Cấp 2 Giờ (Cho 1 ca thi)">
                                 2 Giờ
@@ -748,6 +835,76 @@
 
         function closeApprovalModal() {
             document.getElementById("approval-modal").classList.add("hidden");
+        }
+
+        function openStudentInfoModal(hwid) {
+            const lic = allLicenses.find(l => l.hwid === hwid);
+            if (!lic) return;
+            document.getElementById("info-hwid").innerText = lic.hwid;
+            document.getElementById("info-mach").innerText = lic.machine_name || '—';
+            document.getElementById("info-ip").innerText = lic.ip_address || '—';
+            document.getElementById("info-exp").innerText = lic.expires_at || '—';
+            
+            let statusText = 'Chờ duyệt';
+            let statusClass = 'text-amber-400 font-semibold';
+            if (lic.status === 'active') { statusText = 'Đang hoạt động'; statusClass = 'text-emerald-400 font-semibold'; }
+            else if (lic.status === 'locked') { statusText = 'Đã khóa'; statusClass = 'text-rose-400 font-semibold'; }
+            
+            document.getElementById("info-status").innerText = statusText;
+            document.getElementById("info-status").className = statusClass;
+            
+            document.getElementById("info-name").value = lic.student_name || '';
+            document.getElementById("info-email").value = lic.email || '';
+            document.getElementById("info-phone").value = lic.phone || '';
+            document.getElementById("info-notes").value = lic.notes || '';
+
+            document.getElementById("student-info-modal").classList.remove("hidden");
+        }
+
+        function closeStudentInfoModal() {
+            document.getElementById("student-info-modal").classList.add("hidden");
+        }
+
+        function copyHwidFromModal() {
+            const h = document.getElementById("info-hwid").innerText;
+            if (h) copyToClipboard(h);
+        }
+
+        async function submitStudentInfoModal() {
+            const hwid = document.getElementById("info-hwid").innerText.trim();
+            const name = document.getElementById("info-name").value.trim();
+            const email = document.getElementById("info-email").value.trim();
+            const phone = document.getElementById("info-phone").value.trim();
+            const notes = document.getElementById("info-notes").value.trim();
+
+            if (!name) {
+                alert("Vui lòng nhập họ và tên học sinh!");
+                return;
+            }
+
+            try {
+                const res = await fetch("/api/admin/update-student-info", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        hwid: hwid,
+                        student_name: name,
+                        email: email,
+                        phone: phone,
+                        notes: notes
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeStudentInfoModal();
+                    loadLicenses();
+                    alert("✅ Đã lưu thông tin học sinh thành công!");
+                } else {
+                    alert("Lỗi: " + (data.message || "Không thể lưu thông tin!"));
+                }
+            } catch (err) {
+                alert("Lỗi kết nối máy chủ: " + err.message);
+            }
         }
 
         function onApproveDurationChange() {

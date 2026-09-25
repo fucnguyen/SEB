@@ -64,6 +64,16 @@ def init_db():
     )
     """)
 
+    try:
+        cursor.execute("ALTER TABLE licenses ADD COLUMN phone TEXT DEFAULT ''")
+    except Exception:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE licenses ADD COLUMN notes TEXT DEFAULT ''")
+    except Exception:
+        pass
+
     # 3. Bảng tin nhắn chat giữa học sinh và admin (kèm IP máy)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS chat_messages (
@@ -274,6 +284,19 @@ def delete_license(hwid: str) -> bool:
     conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM licenses WHERE hwid = ?", (hwid.strip(),))
+    affected = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
+
+def update_license_info(hwid: str, student_name: str, email: str = "", phone: str = "", notes: str = "") -> bool:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE licenses 
+        SET student_name = ?, email = ?, phone = ?, notes = ?
+        WHERE hwid = ?
+    """, (student_name.strip(), email.strip(), phone.strip(), notes.strip(), hwid.strip()))
     affected = c.rowcount > 0
     conn.commit()
     conn.close()

@@ -107,6 +107,13 @@ class ManualKeyModel(BaseModel):
     email: Optional[str] = ""
     note: Optional[str] = ""
 
+class UpdateStudentInfoModel(BaseModel):
+    hwid: str
+    student_name: str
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+    notes: Optional[str] = ""
+
 class SessionLogModel(BaseModel):
     hwid: str
     student_name: Optional[str] = "Học sinh"
@@ -564,6 +571,20 @@ async def api_admin_delete_license(payload: dict):
     hwid = payload.get("hwid", "")
     success = database.delete_license(hwid)
     return {"success": success}
+
+@app.post("/api/admin/update-student-info", dependencies=[Depends(require_admin)])
+async def api_admin_update_student_info(payload: UpdateStudentInfoModel):
+    hwid = payload.hwid.strip()
+    if not hwid:
+        return JSONResponse(status_code=400, content={"success": False, "message": "HWID không được để trống!"})
+    success = database.update_license_info(
+        hwid=hwid,
+        student_name=payload.student_name,
+        email=payload.email or "",
+        phone=payload.phone or "",
+        notes=payload.notes or ""
+    )
+    return {"success": success, "message": "Đã cập nhật thông tin học sinh thành công!"}
 
 @app.post("/api/admin/manual-generate-key", dependencies=[Depends(require_admin)])
 async def api_admin_manual_generate_key(payload: ManualKeyModel):
