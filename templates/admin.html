@@ -455,7 +455,7 @@
         <div class="glass-card max-w-md w-full rounded-2xl p-6 border border-slate-700 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
                 <h3 class="font-bold text-base text-white flex items-center gap-2">
-                    <i class="fa-solid fa-calendar-check text-indigo-400"></i> Duyệt Cấp Bản Quyền
+                    <i class="fa-solid fa-clock-rotate-left text-amber-400"></i> Duyệt Cấp / Sửa Hạn Bản Quyền
                 </h3>
                 <button onclick="closeApprovalModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
@@ -464,22 +464,33 @@
                 <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs space-y-1">
                     <div><span class="text-slate-400">Học sinh:</span> <strong id="approve-student-name" class="text-white"></strong></div>
                     <div><span class="text-slate-400">Mã máy HWID:</span> <code id="approve-hwid" class="text-blue-300 text-[11px]"></code></div>
+                    <div><span class="text-slate-400">Hạn hiện tại:</span> <span id="approve-current-exp" class="text-amber-300 font-mono text-[11px]"></span></div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Chọn Thời Hạn Cấp *</label>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Chọn Thời Hạn Cấp / Gia Hạn *</label>
                     <select id="approve-duration" onchange="onApproveDurationChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
-                        <option value="2h">⚡ 2 Giờ (Cho 1 ca thi)</option>
-                        <option value="4h">⚡ 4 Giờ (Ca thi dài)</option>
-                        <option value="8h">⚡ 8 Giờ (Trong ngày)</option>
-                        <option value="1d">1 Ngày (24 Giờ)</option>
-                        <option value="3d">3 Ngày</option>
-                        <option value="7d">7 Ngày (1 Tuần)</option>
-                        <option value="30d" selected>30 Ngày (1 Tháng)</option>
-                        <option value="120d">1 Học Kỳ (120 Ngày)</option>
-                        <option value="365d">1 Năm</option>
-                        <option value="life">Vĩnh Viễn</option>
-                        <option value="custom">📅 Tự chọn Ngày & Giờ hết hạn chính xác...</option>
+                        <optgroup label="─── ⚡ Gia Hạn Thêm Nhanh (Ca Thi) ───">
+                            <option value="+15m">➕ Gia hạn thêm 15 Phút</option>
+                            <option value="+30m" selected>➕ Gia hạn thêm 30 Phút</option>
+                            <option value="+1h">➕ Gia hạn thêm 1 Giờ</option>
+                            <option value="+2h">➕ Gia hạn thêm 2 Giờ</option>
+                        </optgroup>
+                        <optgroup label="─── 📅 Đặt Lại Thời Hạn Chuẩn ───">
+                            <option value="2h">⚡ 2 Giờ (Cho 1 ca thi mới)</option>
+                            <option value="4h">⚡ 4 Giờ</option>
+                            <option value="8h">⚡ 8 Giờ</option>
+                            <option value="1d">1 Ngày (24 Giờ)</option>
+                            <option value="3d">3 Ngày</option>
+                            <option value="7d">7 Ngày (1 Tuần)</option>
+                            <option value="30d">30 Ngày (1 Tháng)</option>
+                            <option value="120d">1 Học Kỳ (120 Ngày)</option>
+                            <option value="365d">1 Năm</option>
+                            <option value="life">Vĩnh Viễn</option>
+                        </optgroup>
+                        <optgroup label="─── 🎯 Ngày & Giờ Cụ Thể ───">
+                            <option value="custom">📅 Tự chọn Ngày & Giờ hết hạn chính xác...</option>
+                        </optgroup>
                     </select>
                 </div>
 
@@ -491,7 +502,7 @@
             </div>
 
             <button onclick="submitApprovalModal()" class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl text-xs font-bold transition text-white shadow-lg shadow-emerald-600/30">
-                Xác Nhận & Cấp Key Ngay
+                Lưu & Cập Nhật Hạn Ngay (Tự Động Nhúng Online)
             </button>
         </div>
     </div>
@@ -677,6 +688,9 @@
                         ` : ''}
 
                         ${l.status === 'active' ? `
+                            <button onclick="openApprovalModal('${l.hwid}', '${(l.student_name || 'Học sinh').replace(/'/g, "\\'")}', '${l.expires_at || ''}')" class="px-2 py-1 bg-amber-600/90 hover:bg-amber-500 rounded-lg text-white font-semibold text-[11px]" title="Sửa hạn / Gia hạn thêm giờ thi">
+                                <i class="fa-solid fa-clock"></i> Sửa Hạn
+                            </button>
                             <button onclick="lockLicense('${l.hwid}')" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-semibold text-[11px]" title="Khóa máy học sinh (Phần mềm tự hủy)">
                                 <i class="fa-solid fa-lock"></i> Khóa
                             </button>
@@ -715,11 +729,12 @@
 
         // Approval Modal (Duyệt Tùy Chọn Thời Gian)
         let pendingApproveHWID = "";
-        function openApprovalModal(hwid, name) {
+        function openApprovalModal(hwid, name, currentExp = "") {
             pendingApproveHWID = hwid;
             document.getElementById("approve-hwid").innerText = hwid;
             document.getElementById("approve-student-name").innerText = name;
-            document.getElementById("approve-duration").value = "30d";
+            document.getElementById("approve-current-exp").innerText = currentExp || "Chưa kích hoạt";
+            document.getElementById("approve-duration").value = currentExp ? "+30m" : "2h";
             document.getElementById("approve-custom-container").classList.add("hidden");
             document.getElementById("approval-modal").classList.remove("hidden");
         }

@@ -114,8 +114,10 @@ class SessionLogModel(BaseModel):
     event_type: str # START_EXAM, EXIT_NORMAL, EXIT_LOCKED, EXIT_DELETED, EXIT_EXPIRED
     details: Optional[str] = ""
 
-def calculate_expiration(duration: str, custom_datetime: Optional[str] = None) -> datetime:
+def calculate_expiration(duration: str, custom_datetime: Optional[str] = None, current_exp: Optional[datetime] = None) -> datetime:
     now = database.now_vn()
+    base = current_exp if (current_exp and current_exp > now) else now
+
     if duration == "custom" and custom_datetime:
         dt_str = custom_datetime.replace("T", " ").strip()
         if len(dt_str) == 16:
@@ -125,7 +127,13 @@ def calculate_expiration(duration: str, custom_datetime: Optional[str] = None) -
         except Exception:
             pass
 
-    if duration == "2h": return now + timedelta(hours=2)
+    if duration == "+15m": return base + timedelta(minutes=15)
+    elif duration == "+30m": return base + timedelta(minutes=30)
+    elif duration == "+45m": return base + timedelta(minutes=45)
+    elif duration == "+1h": return base + timedelta(hours=1)
+    elif duration == "+2h": return base + timedelta(hours=2)
+    elif duration == "+4h": return base + timedelta(hours=4)
+    elif duration == "2h": return now + timedelta(hours=2)
     elif duration == "4h": return now + timedelta(hours=4)
     elif duration == "8h": return now + timedelta(hours=8)
     elif duration == "1d": return now + timedelta(days=1)
@@ -480,12 +488,26 @@ async def api_admin_list_licenses():
 async def api_admin_approve_activation(payload: ApproveActivationModel):
     hwid = payload.hwid.strip()
     duration = payload.duration
-    exp_date = calculate_expiration(duration, payload.custom_datetime)
+    lic = database.get_license_by_hwid(hwid)
+    current_exp = None
+    if lic and lic.get("expires_at"):
+        try:
+            current_exp = datetime.strptime(lic["expires_at"], "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+
+    exp_date = calculate_expiration(duration, payload.custom_datetime, current_exp)
     exp_str = exp_date.strftime("%Y-%m-%d %H:%M:%S")
     license_key = crypto_engine.generate_license(hwid, exp_str)
 
     dur_label = duration
     if duration == "custom": dur_label = f"Hết hạn {exp_str}"
+    elif duration == "+15m": dur_label = f"+15 Phút (đến {exp_str})"
+    elif duration == "+30m": dur_label = f"+30 Phút (đến {exp_str})"
+    elif duration == "+45m": dur_label = f"+45 Phút (đến {exp_str})"
+    elif duration == "+1h": dur_label = f"+1 Giờ (đến {exp_str})"
+    elif duration == "+2h": dur_label = f"+2 Giờ (đến {exp_str})"
+    elif duration == "+4h": dur_label = f"+4 Giờ (đến {exp_str})"
     elif duration == "2h": dur_label = "2 Giờ"
     elif duration == "4h": dur_label = "4 Giờ"
     elif duration == "8h": dur_label = "8 Giờ"
@@ -498,6 +520,21 @@ async def api_admin_approve_activation(payload: ApproveActivationModel):
     elif duration == "life": dur_label = "Vĩnh Viễn"
 
     success = database.approve_license(hwid, license_key, exp_str, dur_label)
+
+    # Gửi thông báo Telegram cập nhật hạn
+    try:
+        st_name = lic.get("student_name", "Học sinh") if lic else "Học sinh"
+        tele_msg = (
+            f"⏱️ <b>ĐÃ CẬP NHẬT / GIA HẠN THỜI GIAN THI</b>\n\n"
+            f"👤 <b>Học sinh:</b> {st_name}\n"
+            f"🔑 <b>HWID:</b> <code>{hwid[:16]}...</code>\n"
+            f"⏳ <b>Hạn mới:</b> <b>{exp_str}</b> ({dur_label})\n"
+            f"ℹ️ <i>Mã mới đã được ký và sẽ tự động nhúng vào máy học sinh!</i>"
+        )
+        asyncio.create_task(telegram_bot.notify_admin_custom(tele_msg))
+    except Exception:
+        pass
+
     return {"success": success, "license_key": license_key, "expires_at": exp_str, "duration_label": dur_label}
 
 @app.post("/api/admin/lock-license", dependencies=[Depends(require_admin)])
