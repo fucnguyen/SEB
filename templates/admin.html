@@ -174,33 +174,65 @@
             </div>
         </div>
 
-        <!-- TAB 3: Chats -->
+        <!-- TAB 3: Chats (Phong cách Messenger / Zalo thời gian thực) -->
         <div id="tab-chats" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-5">
-            <div class="lg:col-span-4 glass-card rounded-2xl p-4 border border-slate-800 space-y-3">
-                <h4 class="font-bold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-2">Học Sinh Đang Chat</h4>
-                <div id="chat-sessions-list" class="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+            <!-- Left: Sessions list -->
+            <div class="lg:col-span-4 glass-card rounded-2xl p-4 border border-slate-800 space-y-3 flex flex-col h-[580px]">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <h4 class="font-bold text-xs uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-comments text-blue-400"></i> Hộp Thư Tin Nhắn
+                    </h4>
+                    <span id="badge-chat" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">0</span>
+                </div>
+                <input type="text" id="chat-search" placeholder="🔍 Tìm kiếm học sinh..." oninput="filterChatSessions()"
+                    class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                <div id="chat-sessions-list" class="space-y-1.5 flex-1 overflow-y-auto pr-1 chat-scroll">
                     <!-- Session cards loaded via JS -->
                 </div>
             </div>
 
-            <div class="lg:col-span-8 glass-card rounded-2xl p-4 border border-slate-800 flex flex-col h-[520px]">
-                <div class="border-b border-slate-800 pb-3 flex justify-between items-center">
-                    <div>
-                        <h4 id="active-chat-title" class="font-bold text-sm text-white">Chưa chọn học sinh</h4>
-                        <span id="active-chat-subtitle" class="text-xs text-slate-400">Bấm vào một phiên bên trái để trả lời</span>
+            <!-- Right: Active Chat Window -->
+            <div class="lg:col-span-8 glass-card rounded-2xl border border-slate-800 flex flex-col h-[580px] overflow-hidden">
+                <!-- Zalo/Messenger Topbar -->
+                <div class="p-3.5 border-b border-slate-800 bg-slate-900/70 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div id="active-chat-avatar" class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-md">
+                            🧑‍🎓
+                        </div>
+                        <div>
+                            <h4 id="active-chat-title" class="font-bold text-sm text-white">Chưa chọn cuộc trò chuyện</h4>
+                            <span id="active-chat-subtitle" class="text-[11px] text-slate-400 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-slate-500"></span> Bấm vào một học sinh bên trái để chat
+                            </span>
+                        </div>
+                    </div>
+                    <div id="active-chat-actions" class="hidden flex items-center gap-2">
+                        <button onclick="fillManualKeyFromChat()" class="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-key text-[10px]"></i> Cấp Key Học Sinh Này
+                        </button>
                     </div>
                 </div>
 
-                <div id="admin-chat-messages" class="flex-1 overflow-y-auto py-4 space-y-3 pr-2 chat-scroll">
-                    <div class="text-center text-xs text-slate-500 py-16">Chọn một cuộc trò chuyện để xem và trả lời tin nhắn.</div>
+                <!-- Messages Stream -->
+                <div id="admin-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3.5 chat-scroll bg-slate-950/40">
+                    <div class="text-center text-xs text-slate-500 py-28 flex flex-col items-center gap-2.5">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-slate-600 text-2xl border border-slate-800">
+                            <i class="fa-regular fa-comment-dots"></i>
+                        </div>
+                        <span>Chọn một học sinh từ danh sách để bắt đầu trò chuyện thời gian thực</span>
+                    </div>
                 </div>
 
-                <div class="pt-3 border-t border-slate-800 flex gap-2">
-                    <input type="text" id="admin-chat-input" placeholder="Nhập câu trả lời gửi học sinh..." 
-                        class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-blue-500"
+                <!-- Zalo/Messenger Input Bar -->
+                <div class="p-3 border-t border-slate-800 bg-slate-900/50 flex items-center gap-2">
+                    <button onclick="sendQuickAdminLike()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-400 flex items-center justify-center text-sm transition shrink-0" title="Gửi Like 👍">
+                        👍
+                    </button>
+                    <input type="text" id="admin-chat-input" placeholder="Nhập tin nhắn trả lời... (Enter để gửi)" 
+                        class="flex-1 bg-slate-900 border border-slate-700/80 rounded-full px-4 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-blue-500 placeholder-slate-500"
                         onkeypress="if(event.key==='Enter') sendAdminChatMessage()">
-                    <button onclick="sendAdminChatMessage()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs sm:text-sm font-bold transition text-white">
-                        <i class="fa-solid fa-paper-plane"></i> Gửi
+                    <button onclick="sendAdminChatMessage()" class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 transition active:scale-95 shrink-0">
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
                     </button>
                 </div>
             </div>
@@ -284,7 +316,7 @@
 
     <!-- Modal: Tạo Key Thủ Công -->
     <div id="manual-key-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="glass-card max-w-lg w-full rounded-2xl p-6 border border-slate-700 space-y-4 shadow-2xl">
+        <div class="glass-card max-w-xl w-full rounded-2xl p-6 border border-slate-700 space-y-4 shadow-2xl overflow-y-auto max-h-[92vh]">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
                 <h3 class="font-bold text-base text-white flex items-center gap-2">
                     <i class="fa-solid fa-key text-blue-400"></i> Tạo Key Bản Quyền Thủ Công
@@ -292,39 +324,126 @@
                 <button onclick="closeManualKeyModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
 
-            <div class="space-y-3">
+            <div class="space-y-3.5">
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Mã Máy Tính (HWID) *</label>
                     <input type="text" id="manual-hwid" placeholder="Dán mã HWID của học sinh..." 
                         class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500">
                 </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Họ và Tên Học Sinh *</label>
+                        <input type="text" id="manual-name" placeholder="Ví dụ: Nguyễn Văn Phúc" 
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Email / Số Điện Thoại *</label>
+                        <input type="text" id="manual-email" placeholder="phuc@gmail.com hoặc 0987..." 
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Ghi Chú / Lớp / Ca Thi</label>
+                    <input type="text" id="manual-note" placeholder="Ví dụ: Lớp 12A1 - Phòng thi số 3" 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                </div>
+
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Thời Hạn Cấp *</label>
-                    <select id="manual-duration" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
-                        <option value="7d">7 Ngày</option>
-                        <option value="30d" selected>30 Ngày</option>
+                    <select id="manual-duration" onchange="onManualDurationChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="2h">⚡ 2 Giờ (1 Ca thi nhanh)</option>
+                        <option value="4h">⚡ 4 Giờ (Ca thi dài)</option>
+                        <option value="8h">⚡ 8 Giờ (Trong ngày)</option>
+                        <option value="1d">1 Ngày (24 Giờ)</option>
+                        <option value="3d">3 Ngày</option>
+                        <option value="7d">7 Ngày (1 Tuần)</option>
+                        <option value="30d" selected>30 Ngày (1 Tháng - Mặc định)</option>
                         <option value="120d">1 Học Kỳ (120 Ngày)</option>
                         <option value="365d">1 Năm (365 Ngày)</option>
                         <option value="life">Vĩnh Viễn (10 Năm)</option>
+                        <option value="custom">📅 Tự chọn Ngày & Giờ hết hạn chính xác...</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Tên học sinh (Tùy chọn)</label>
-                    <input type="text" id="manual-name" placeholder="Nguyễn Văn A" 
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+
+                <!-- Custom DateTime Container (hiện khi chọn 'custom') -->
+                <div id="manual-custom-container" class="hidden p-3.5 rounded-xl bg-blue-950/40 border border-blue-500/40 space-y-2">
+                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider">
+                        <i class="fa-regular fa-calendar-days"></i> Chọn Ngày & Giờ Hết Hạn Cụ Thể:
+                    </label>
+                    <input type="datetime-local" id="manual-custom-datetime" 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                        onchange="updateManualCustomPreview()">
+                    <span id="manual-custom-preview" class="text-[11px] text-blue-400 block font-medium"></span>
                 </div>
             </div>
 
-            <div id="manual-key-result-box" class="hidden space-y-2">
-                <label class="block text-xs font-semibold text-emerald-400 uppercase tracking-wider">Mã kích hoạt đã tạo (RSA-2048 + AES-256):</label>
-                <textarea id="manual-generated-key" rows="3" readonly class="w-full bg-slate-900 border border-emerald-500/50 rounded-xl p-3 text-xs font-mono text-emerald-300"></textarea>
-                <button onclick="copyGeneratedKey()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 text-white">
+            <div id="manual-key-result-box" class="hidden space-y-3 pt-2 border-t border-slate-800">
+                <div class="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs space-y-1">
+                    <div class="text-emerald-400 font-bold flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-check"></i> Đã tạo key thành công!
+                    </div>
+                    <div class="text-slate-300 text-[11px]" id="manual-key-meta"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Mã Kích Hoạt (RSA-2048 + AES-256):</label>
+                    <textarea id="manual-generated-key" rows="3" readonly class="w-full bg-slate-900 border border-emerald-500/50 rounded-xl p-3 text-xs font-mono text-emerald-300"></textarea>
+                </div>
+                <button onclick="copyGeneratedKey()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 text-white shadow-lg shadow-emerald-600/20">
                     <i class="fa-solid fa-copy"></i> Sao Chép Mã Key
                 </button>
             </div>
 
-            <button id="btn-generate-manual" onclick="generateManualKey()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold transition text-white">
-                Tạo Key Ngay
+            <button id="btn-generate-manual" onclick="generateManualKey()" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl text-xs font-bold transition text-white shadow-lg shadow-blue-600/30">
+                Tạo Key Bản Quyền
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal: Duyệt Cấp Key Nhanh / Tùy Chọn Ngày Giờ -->
+    <div id="approval-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="glass-card max-w-md w-full rounded-2xl p-6 border border-slate-700 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-check text-indigo-400"></i> Duyệt Cấp Bản Quyền
+                </h3>
+                <button onclick="closeApprovalModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-3">
+                <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs space-y-1">
+                    <div><span class="text-slate-400">Học sinh:</span> <strong id="approve-student-name" class="text-white"></strong></div>
+                    <div><span class="text-slate-400">Mã máy HWID:</span> <code id="approve-hwid" class="text-blue-300 text-[11px]"></code></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Chọn Thời Hạn Cấp *</label>
+                    <select id="approve-duration" onchange="onApproveDurationChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="2h">⚡ 2 Giờ (Cho 1 ca thi)</option>
+                        <option value="4h">⚡ 4 Giờ (Ca thi dài)</option>
+                        <option value="8h">⚡ 8 Giờ (Trong ngày)</option>
+                        <option value="1d">1 Ngày (24 Giờ)</option>
+                        <option value="3d">3 Ngày</option>
+                        <option value="7d">7 Ngày (1 Tuần)</option>
+                        <option value="30d" selected>30 Ngày (1 Tháng)</option>
+                        <option value="120d">1 Học Kỳ (120 Ngày)</option>
+                        <option value="365d">1 Năm</option>
+                        <option value="life">Vĩnh Viễn</option>
+                        <option value="custom">📅 Tự chọn Ngày & Giờ hết hạn chính xác...</option>
+                    </select>
+                </div>
+
+                <div id="approve-custom-container" class="hidden p-3 rounded-xl bg-blue-950/40 border border-blue-500/40 space-y-1.5">
+                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider">Chọn ngày giờ:</label>
+                    <input type="datetime-local" id="approve-custom-datetime" 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <button onclick="submitApprovalModal()" class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl text-xs font-bold transition text-white shadow-lg shadow-emerald-600/30">
+                Xác Nhận & Cấp Key Ngay
             </button>
         </div>
     </div>
@@ -481,30 +600,35 @@
                         <span class="text-[10px] text-slate-500">${l.email || l.machine_name || 'N/A'}</span>
                     </td>
                     <td class="p-3 font-mono text-[11px] text-blue-300">
-                        ${l.hwid.substring(0, 16)}...
+                        ${l.hwid ? l.hwid.substring(0, 16) + '...' : '—'}
                     </td>
-                    <td class="p-3 text-slate-300 text-[11px]">${l.duration_type || '—'}</td>
-                    <td class="p-3 text-slate-400 text-[11px]">${l.expires_at ? l.expires_at.split(' ')[0] : '—'}</td>
+                    <td class="p-3 text-slate-300 text-[11px] font-semibold">${l.duration_type || '—'}</td>
+                    <td class="p-3 text-slate-300 text-[11px] font-mono">
+                        ${l.expires_at ? l.expires_at : '—'}
+                    </td>
                     <td class="p-3">${statusBadge}</td>
                     <td class="p-3 text-right space-x-1 whitespace-nowrap">
                         ${l.status === 'pending' ? `
-                            <button onclick="quickApprove('${l.hwid}', '30d')" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-semibold text-[11px]">
+                            <button onclick="quickApprove('${l.hwid}', '2h')" class="px-2 py-1 bg-amber-600 hover:bg-amber-500 rounded-lg text-white font-semibold text-[11px]" title="Cấp 2 Giờ (Cho 1 ca thi)">
+                                2 Giờ
+                            </button>
+                            <button onclick="quickApprove('${l.hwid}', '30d')" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-semibold text-[11px]" title="Cấp 30 Ngày">
                                 30N
                             </button>
-                            <button onclick="quickApprove('${l.hwid}', '120d')" class="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-semibold text-[11px]">
-                                1 Kỳ
+                            <button onclick="openApprovalModal('${l.hwid}', '${(l.student_name || 'Học sinh').replace(/'/g, "\\'")}')" class="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-semibold text-[11px]" title="Chọn ngày giờ cụ thể">
+                                <i class="fa-solid fa-calendar-days"></i> Chi tiết
                             </button>
                         ` : ''}
 
                         ${l.status === 'active' ? `
-                            <button onclick="lockLicense('${l.hwid}')" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-semibold text-[11px]" title="Khóa máy học sinh">
-                                <i class="fa-solid fa-lock"></i>
+                            <button onclick="lockLicense('${l.hwid}')" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-semibold text-[11px]" title="Khóa máy học sinh (Phần mềm tự hủy)">
+                                <i class="fa-solid fa-lock"></i> Khóa
                             </button>
                         ` : ''}
 
                         ${l.status === 'locked' ? `
-                            <button onclick="unlockLicense('${l.hwid}')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px]">
-                                <i class="fa-solid fa-lock-open"></i>
+                            <button onclick="unlockLicense('${l.hwid}')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px]" title="Mở khóa máy">
+                                <i class="fa-solid fa-lock-open"></i> Mở
                             </button>
                         ` : ''}
 
@@ -514,7 +638,7 @@
                             </button>
                         ` : ''}
 
-                        <button onclick="deleteLicense('${l.hwid}')" class="px-2 py-1 bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg text-[11px]">
+                        <button onclick="deleteLicense('${l.hwid}')" class="px-2 py-1 bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg text-[11px]" title="Xóa">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </td>
@@ -533,8 +657,62 @@
             loadDashboardStats();
         }
 
+        // Approval Modal (Duyệt Tùy Chọn Thời Gian)
+        let pendingApproveHWID = "";
+        function openApprovalModal(hwid, name) {
+            pendingApproveHWID = hwid;
+            document.getElementById("approve-hwid").innerText = hwid;
+            document.getElementById("approve-student-name").innerText = name;
+            document.getElementById("approve-duration").value = "30d";
+            document.getElementById("approve-custom-container").classList.add("hidden");
+            document.getElementById("approval-modal").classList.remove("hidden");
+        }
+
+        function closeApprovalModal() {
+            document.getElementById("approval-modal").classList.add("hidden");
+        }
+
+        function onApproveDurationChange() {
+            const val = document.getElementById("approve-duration").value;
+            const container = document.getElementById("approve-custom-container");
+            if (val === "custom") {
+                container.classList.remove("hidden");
+                const now = new Date();
+                now.setDate(now.getDate() + 1);
+                const pad = n => String(n).padStart(2, '0');
+                document.getElementById("approve-custom-datetime").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            } else {
+                container.classList.add("hidden");
+            }
+        }
+
+        async function submitApprovalModal() {
+            const duration = document.getElementById("approve-duration").value;
+            const customDatetime = document.getElementById("approve-custom-datetime").value;
+
+            if (duration === "custom" && !customDatetime) {
+                alert("Vui lòng chọn ngày và giờ hết hạn!");
+                return;
+            }
+
+            await fetch("/api/admin/approve-activation", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    hwid: pendingApproveHWID,
+                    duration: duration,
+                    custom_datetime: customDatetime
+                })
+            });
+
+            closeApprovalModal();
+            loadLicenses();
+            loadDashboardStats();
+            alert("Đã duyệt cấp bản quyền thành công!");
+        }
+
         async function lockLicense(hwid) {
-            if (!confirm(`Khóa máy (${hwid})? Phần mềm trên máy sẽ tự hủy.`)) return;
+            if (!confirm(`Khóa máy (${hwid})? Phần mềm trên máy sẽ tự hủy ngay lập tức.`)) return;
             await fetch("/api/admin/lock-license", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -575,43 +753,98 @@
             document.getElementById("manual-key-modal").classList.remove("hidden");
             document.getElementById("manual-key-result-box").classList.add("hidden");
             document.getElementById("btn-generate-manual").classList.remove("hidden");
+            onManualDurationChange();
         }
 
         function closeManualKeyModal() {
             document.getElementById("manual-key-modal").classList.add("hidden");
         }
 
+        function onManualDurationChange() {
+            const val = document.getElementById("manual-duration").value;
+            const container = document.getElementById("manual-custom-container");
+            if (val === "custom") {
+                container.classList.remove("hidden");
+                const now = new Date();
+                now.setDate(now.getDate() + 1);
+                const pad = n => String(n).padStart(2, '0');
+                const dtInput = document.getElementById("manual-custom-datetime");
+                if (!dtInput.value) {
+                    dtInput.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                }
+                updateManualCustomPreview();
+            } else {
+                container.classList.add("hidden");
+            }
+        }
+
+        function updateManualCustomPreview() {
+            const val = document.getElementById("manual-custom-datetime").value;
+            const preview = document.getElementById("manual-custom-preview");
+            if (!val) { preview.innerText = ""; return; }
+            const d = new Date(val);
+            preview.innerText = `Thời điểm hết hạn: ${d.toLocaleTimeString()} ngày ${d.toLocaleDateString()}`;
+        }
+
         async function generateManualKey() {
             const hwid = document.getElementById("manual-hwid").value.trim();
-            const duration = document.getElementById("manual-duration").value;
             const name = document.getElementById("manual-name").value.trim();
+            const email = document.getElementById("manual-email").value.trim();
+            const note = document.getElementById("manual-note").value.trim();
+            const duration = document.getElementById("manual-duration").value;
+            const customDatetime = document.getElementById("manual-custom-datetime").value;
 
             if (!hwid) {
-                alert("Vui lòng nhập mã máy (HWID)!");
+                alert("Vui lòng nhập Mã Máy Tính (HWID) của học sinh!");
+                return;
+            }
+            if (!name) {
+                alert("Vui lòng nhập Họ và Tên học sinh!");
+                return;
+            }
+            if (!email) {
+                alert("Vui lòng nhập Email hoặc SĐT của học sinh để quản lý!");
+                return;
+            }
+            if (duration === "custom" && !customDatetime) {
+                alert("Vui lòng chọn ngày và giờ hết hạn cụ thể!");
                 return;
             }
 
             const res = await fetch("/api/admin/manual-generate-key", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({hwid: hwid, duration: duration, name: name})
+                body: JSON.stringify({
+                    hwid: hwid, 
+                    duration: duration, 
+                    name: name,
+                    email: email,
+                    note: note,
+                    custom_datetime: customDatetime
+                })
             });
+
             const data = await res.json();
             if (data.success) {
                 document.getElementById("manual-generated-key").value = data.license_key;
+                document.getElementById("manual-key-meta").innerHTML = `
+                    <div>Học sinh: <strong>${data.student_name}</strong> (${data.email || '—'})</div>
+                    <div>Mã máy: <span class="font-mono text-blue-300">${data.hwid}</span></div>
+                    <div>Hạn sử dụng: <strong class="text-amber-400">${data.expires_at}</strong> (${data.duration_label})</div>
+                `;
                 document.getElementById("manual-key-result-box").classList.remove("hidden");
                 document.getElementById("btn-generate-manual").classList.add("hidden");
                 loadLicenses();
                 loadDashboardStats();
             } else {
-                alert("Lỗi tạo key: " + data.message);
+                alert("Lỗi tạo key: " + (data.message || "Không thể tạo key"));
             }
         }
 
         function copyGeneratedKey() {
             const key = document.getElementById("manual-generated-key").value;
             navigator.clipboard.writeText(key);
-            alert("Đã sao chép mã Key!");
+            alert("Đã sao chép mã Key vào bộ nhớ tạm!");
         }
 
         // Settings
@@ -662,72 +895,186 @@
             }
         }
 
-        // Chats
-        async function loadChatSessions() {
+        // ────────────────── Real-Time Messenger / Zalo Chat ──────────────────
+        let allChatSessions = [];
+        let lastMsgCount = 0;
+        let lastAdminMessagesHash = "";
+
+        function playNotificationSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch(e) {}
+        }
+
+        async function loadChatSessions(isSilent = false) {
             try {
                 const res = await fetch("/api/admin/chat-sessions");
                 if (res.status === 401) { window.location.href = "/login"; return; }
-                const sessions = await res.json();
-                const list = document.getElementById("chat-sessions-list");
-                list.innerHTML = "";
-                document.getElementById("badge-chat").innerText = sessions.length;
-
-                if (sessions.length === 0) {
-                    list.innerHTML = `<div class="text-xs text-slate-500 text-center py-4">Chưa có phiên chat nào.</div>`;
-                    return;
-                }
-
-                sessions.forEach(s => {
-                    const div = document.createElement("div");
-                    div.className = "p-3 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 cursor-pointer transition";
-                    div.onclick = () => selectChatSession(s.session_id, s.sender_name);
-                    div.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <span class="font-bold text-xs text-white">${s.sender_name}</span>
-                            <span class="text-[10px] text-slate-500">${s.last_activity.split(' ')[1]}</span>
-                        </div>
-                        <span class="text-[11px] text-blue-400 mt-1 block">${s.message_count} tin nhắn</span>
-                    `;
-                    list.appendChild(div);
-                });
+                allChatSessions = await res.json();
+                document.getElementById("badge-chat").innerText = allChatSessions.length;
+                renderChatSessionsList(allChatSessions);
             } catch (err) {}
+        }
+
+        function filterChatSessions() {
+            const q = document.getElementById("chat-search").value.toLowerCase();
+            const filtered = allChatSessions.filter(s => 
+                (s.sender_name && s.sender_name.toLowerCase().includes(q)) ||
+                (s.session_id && s.session_id.toLowerCase().includes(q))
+            );
+            renderChatSessionsList(filtered);
+        }
+
+        function renderChatSessionsList(sessions) {
+            const list = document.getElementById("chat-sessions-list");
+            list.innerHTML = "";
+
+            if (sessions.length === 0) {
+                list.innerHTML = `<div class="text-xs text-slate-500 text-center py-8">Chưa có phiên chat nào.</div>`;
+                return;
+            }
+
+            sessions.forEach(s => {
+                const isSelected = s.session_id === currentChatSessionId;
+                const div = document.createElement("div");
+                div.className = `p-3 rounded-2xl flex items-center gap-3 cursor-pointer transition border ${
+                    isSelected 
+                        ? 'bg-blue-600/20 border-blue-500/50 shadow-md' 
+                        : 'bg-slate-900/60 hover:bg-slate-900 border-slate-800'
+                }`;
+                div.onclick = () => selectChatSession(s.session_id, s.sender_name);
+
+                // Avatar màu ngẫu nhiên dựa vào tên
+                const colors = ['from-blue-600 to-indigo-600', 'from-emerald-600 to-teal-600', 'from-purple-600 to-pink-600', 'from-amber-600 to-orange-600'];
+                const colorIdx = Math.abs((s.sender_name || 'H').charCodeAt(0)) % colors.length;
+                const initial = (s.sender_name || 'H').charAt(0).toUpperCase();
+
+                const timeStr = s.last_activity ? s.last_activity.split(' ')[1] : '';
+
+                div.innerHTML = `
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-tr ${colors[colorIdx]} text-white flex items-center justify-center font-bold text-sm shrink-0 shadow">
+                        ${initial}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-xs text-white truncate">${s.sender_name}</span>
+                            <span class="text-[10px] text-slate-500 shrink-0">${timeStr}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-1">
+                            <span class="text-[11px] text-slate-400 truncate">${s.message_count} tin nhắn</span>
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
         }
 
         async function selectChatSession(sessionId, name) {
             currentChatSessionId = sessionId;
             document.getElementById("active-chat-title").innerText = name;
-            document.getElementById("active-chat-subtitle").innerText = `Session ID: ${sessionId}`;
-            loadAdminChatMessages();
+            document.getElementById("active-chat-subtitle").innerHTML = `
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Đang trực tuyến • ID: ${sessionId}
+            `;
+            document.getElementById("active-chat-actions").classList.remove("hidden");
+            
+            // Highlight selected session in list
+            renderChatSessionsList(allChatSessions);
+            
+            lastMsgCount = 0;
+            lastAdminMessagesHash = "";
+            await loadAdminChatMessages();
+            document.getElementById("admin-chat-input").focus();
         }
 
-        async function loadAdminChatMessages() {
+        let latestStudentHWIDFound = "";
+
+        async function loadAdminChatMessages(isSilent = false) {
             if (!currentChatSessionId) return;
             try {
                 const res = await fetch(`/api/chat/messages?session_id=${currentChatSessionId}`);
                 const msgs = await res.json();
+                
+                // Kiểm tra xem có tin nhắn mới không để tránh render giật màn hình
+                const currentHash = msgs.map(m => m.id + m.message).join('|');
+                if (currentHash === lastAdminMessagesHash) return;
+
+                if (isSilent && msgs.length > lastMsgCount) {
+                    const lastMsg = msgs[msgs.length - 1];
+                    if (lastMsg.sender === "student") {
+                        playNotificationSound();
+                    }
+                }
+                lastMsgCount = msgs.length;
+                lastAdminMessagesHash = currentHash;
+
                 const container = document.getElementById("admin-chat-messages");
                 container.innerHTML = "";
 
+                if (msgs.length === 0) {
+                    container.innerHTML = `<div class="text-center text-xs text-slate-500 py-16">Chưa có tin nhắn nào trong cuộc trò chuyện này.</div>`;
+                    return;
+                }
+
+                // Tìm mã HWID trong tin nhắn của học sinh (nếu học sinh dán mã máy)
                 msgs.forEach(m => {
+                    const match = m.message.match(/[A-Fa-f0-9]{32,64}/);
+                    if (match) latestStudentHWIDFound = match[0];
+
                     const isMe = m.sender === "admin";
-                    const bubble = document.createElement("div");
-                    bubble.className = isMe 
-                        ? "bg-blue-600/30 border border-blue-500/40 rounded-2xl rounded-tr-sm p-3 max-w-[85%] text-xs text-slate-200 ml-auto"
-                        : "bg-slate-900/90 border border-slate-800 rounded-2xl rounded-tl-sm p-3 max-w-[85%] text-xs text-slate-200 mr-auto";
-                    
-                    bubble.innerHTML = `
-                        <span class="font-bold block mb-1 text-[10px] ${isMe ? 'text-blue-300' : 'text-indigo-300'}">${m.sender_name} (${m.created_at.split(' ')[1]}):</span>
-                        <div class="leading-relaxed">${m.message}</div>
-                    `;
-                    container.appendChild(bubble);
+                    const timeStr = m.created_at ? m.created_at.split(' ')[1] : '';
+
+                    const row = document.createElement("div");
+
+                    if (isMe) {
+                        // Tin nhắn của Admin gửi đi (bên phải, màu xanh gradient Messenger)
+                        row.className = "flex flex-col items-end gap-1 ml-auto max-w-[82%]";
+                        row.innerHTML = `
+                            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl rounded-br-xs px-4 py-2.5 shadow-md shadow-blue-500/10 text-xs sm:text-sm leading-relaxed break-words">
+                                ${escapeHtml(m.message)}
+                            </div>
+                            <div class="flex items-center gap-1 text-[10px] text-slate-400 pr-1">
+                                <span>${timeStr}</span>
+                                <span class="text-blue-400 font-bold">✓✓</span>
+                            </div>
+                        `;
+                    } else {
+                        // Tin nhắn của Học sinh gửi đến (bên trái, màu xám sang trọng)
+                        row.className = "flex items-end gap-2.5 mr-auto max-w-[85%]";
+                        row.innerHTML = `
+                            <div class="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center text-xs font-bold shrink-0 mb-4 border border-slate-700 shadow">
+                                🧑‍🎓
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <span class="text-[10px] text-slate-400 pl-1 font-semibold">${escapeHtml(m.sender_name)}</span>
+                                <div class="bg-slate-800/95 border border-slate-700/60 text-slate-100 rounded-2xl rounded-bl-xs px-4 py-2.5 shadow-md text-xs sm:text-sm leading-relaxed break-words">
+                                    ${escapeHtml(m.message)}
+                                </div>
+                                <span class="text-[10px] text-slate-500 pl-1">${timeStr}</span>
+                            </div>
+                        `;
+                    }
+                    container.appendChild(row);
                 });
-                container.scrollTop = container.scrollHeight;
+
+                container.scrollTo({top: container.scrollHeight, behavior: 'smooth'});
             } catch (err) {}
         }
 
         async function sendAdminChatMessage() {
             if (!currentChatSessionId) {
-                alert("Vui lòng chọn học sinh để trả lời!");
+                alert("Vui lòng chọn học sinh bên trái để gửi tin nhắn!");
                 return;
             }
             const input = document.getElementById("admin-chat-input");
@@ -746,9 +1093,55 @@
                         message: text
                     })
                 });
-                loadAdminChatMessages();
+                await loadAdminChatMessages();
+                loadChatSessions();
             } catch (err) {}
         }
+
+        async function sendQuickAdminLike() {
+            if (!currentChatSessionId) {
+                alert("Vui lòng chọn học sinh trước!");
+                return;
+            }
+            try {
+                await fetch("/api/chat/send", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        session_id: currentChatSessionId,
+                        sender: "admin",
+                        sender_name: "Quản trị viên",
+                        message: "👍"
+                    })
+                });
+                await loadAdminChatMessages();
+            } catch (err) {}
+        }
+
+        function fillManualKeyFromChat() {
+            openManualKeyModal();
+            const studentName = document.getElementById("active-chat-title").innerText;
+            if (studentName && studentName !== "Chưa chọn cuộc trò chuyện") {
+                document.getElementById("manual-name").value = studentName;
+            }
+            if (latestStudentHWIDFound) {
+                document.getElementById("manual-hwid").value = latestStudentHWIDFound;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        // Khởi động vòng lặp kiểm tra tin nhắn thời gian thực (1.5 giây / lần)
+        setInterval(() => {
+            if (currentChatSessionId) {
+                loadAdminChatMessages(true);
+            }
+            loadChatSessions(true);
+        }, 1500);
     </script>
 </body>
 </html>

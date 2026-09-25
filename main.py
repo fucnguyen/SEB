@@ -22,7 +22,7 @@ import telegram_bot
 async def lifespan(app: FastAPI):
     # Khởi tạo cơ sở dữ liệu
     database.init_db()
-    print("[Hệ Thống] Database SQLite đã sẵn sàng.")
+    print("[System] Database SQLite ready.")
 
     # Khởi động Telegram Bot Polling ở chế độ nền
     bot_task = asyncio.create_task(telegram_bot.start_telegram_polling())
@@ -80,12 +80,39 @@ class ActivationRequestModel(BaseModel):
 
 class ApproveActivationModel(BaseModel):
     hwid: str
-    duration: str # 7d, 30d, 120d, 365d, life
+    duration: str # 2h, 4h, 8h, 1d, 3d, 7d, 30d, 120d, 365d, life, custom
+    custom_datetime: Optional[str] = None
 
 class ManualKeyModel(BaseModel):
     hwid: str
     duration: str
+    custom_datetime: Optional[str] = None
     name: Optional[str] = ""
+    email: Optional[str] = ""
+    note: Optional[str] = ""
+
+def calculate_expiration(duration: str, custom_datetime: Optional[str] = None) -> datetime:
+    now = datetime.now()
+    if duration == "custom" and custom_datetime:
+        dt_str = custom_datetime.replace("T", " ").strip()
+        if len(dt_str) == 16:
+            dt_str += ":00"
+        try:
+            return datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+
+    if duration == "2h": return now + timedelta(hours=2)
+    elif duration == "4h": return now + timedelta(hours=4)
+    elif duration == "8h": return now + timedelta(hours=8)
+    elif duration == "1d": return now + timedelta(days=1)
+    elif duration == "3d": return now + timedelta(days=3)
+    elif duration == "7d": return now + timedelta(days=7)
+    elif duration == "30d": return now + timedelta(days=30)
+    elif duration == "120d": return now + timedelta(days=120)
+    elif duration == "365d": return now + timedelta(days=365)
+    elif duration == "life": return now + timedelta(days=3650)
+    return now + timedelta(days=30)
 
 class ChatMessageModel(BaseModel):
     session_id: str
@@ -375,19 +402,25 @@ async def api_admin_list_licenses():
 async def api_admin_approve_activation(payload: ApproveActivationModel):
     hwid = payload.hwid.strip()
     duration = payload.duration
-    now = datetime.now()
-
-    if duration == "7d": exp_date = now + timedelta(days=7)
-    elif duration == "30d": exp_date = now + timedelta(days=30)
-    elif duration == "120d": exp_date = now + timedelta(days=120)
-    elif duration == "365d": exp_date = now + timedelta(days=365)
-    elif duration == "life": exp_date = now + timedelta(days=3650)
-    else: exp_date = now + timedelta(days=30)
-
+    exp_date = calculate_expiration(duration, payload.custom_datetime)
     exp_str = exp_date.strftime("%Y-%m-%d %H:%M:%S")
     license_key = crypto_engine.generate_license(hwid, exp_str)
-    success = database.approve_license(hwid, license_key, exp_str, duration)
-    return {"success": success, "license_key": license_key, "expires_at": exp_str}
+
+    dur_label = duration
+    if duration == "custom": dur_label = f"Hết hạn {exp_str}"
+    elif duration == "2h": dur_label = "2 Giờ"
+    elif duration == "4h": dur_label = "4 Giờ"
+    elif duration == "8h": dur_label = "8 Giờ"
+    elif duration == "1d": dur_label = "1 Ngày"
+    elif duration == "3d": dur_label = "3 Ngày"
+    elif duration == "7d": dur_label = "7 Ngày"
+    elif duration == "30d": dur_label = "30 Ngày"
+    elif duration == "120d": dur_label = "1 Học Kỳ"
+    elif duration == "365d": dur_label = "1 Năm"
+    elif duration == "life": dur_label = "Vĩnh Viễn"
+
+    success = database.approve_license(hwid, license_key, exp_str, dur_label)
+    return {"success": success, "license_key": license_key, "expires_at": exp_str, "duration_label": dur_label}
 
 @app.post("/api/admin/lock-license", dependencies=[Depends(require_admin)])
 async def api_admin_lock_license(payload: dict):
@@ -410,25 +443,43 @@ async def api_admin_delete_license(payload: dict):
 @app.post("/api/admin/manual-generate-key", dependencies=[Depends(require_admin)])
 async def api_admin_manual_generate_key(payload: ManualKeyModel):
     hwid = payload.hwid.strip()
-    duration = payload.duration
+    if not hwid:
+        return JSONResponse(status_code=400, content={"success": False, "message": "Mã máy tính (HWID) không được để trống!"})
+
     name = payload.name.strip() or "Học sinh thủ công"
-    now = datetime.now()
+    email = payload.email.strip() if payload.email else ""
+    note = payload.note.strip() if payload.note else "Cấp thủ công"
 
-    if duration == "7d": exp_date = now + timedelta(days=7)
-    elif duration == "30d": exp_date = now + timedelta(days=30)
-    elif duration == "120d": exp_date = now + timedelta(days=120)
-    elif duration == "365d": exp_date = now + timedelta(days=365)
-    elif duration == "life": exp_date = now + timedelta(days=3650)
-    else: exp_date = now + timedelta(days=30)
-
+    exp_date = calculate_expiration(payload.duration, payload.custom_datetime)
     exp_str = exp_date.strftime("%Y-%m-%d %H:%M:%S")
     license_key = crypto_engine.generate_license(hwid, exp_str)
     req_id = "MANUAL_" + uuid.uuid4().hex[:8].upper()
 
-    database.create_or_update_activation_request(req_id, hwid, name, "", "Manual PC", "127.0.0.1")
-    database.approve_license(hwid, license_key, exp_str, duration)
+    dur_label = payload.duration
+    if payload.duration == "custom": dur_label = f"Hết hạn {exp_str}"
+    elif payload.duration == "2h": dur_label = "2 Giờ"
+    elif payload.duration == "4h": dur_label = "4 Giờ"
+    elif payload.duration == "8h": dur_label = "8 Giờ"
+    elif payload.duration == "1d": dur_label = "1 Ngày"
+    elif payload.duration == "3d": dur_label = "3 Ngày"
+    elif payload.duration == "7d": dur_label = "7 Ngày"
+    elif payload.duration == "30d": dur_label = "30 Ngày"
+    elif payload.duration == "120d": dur_label = "1 Học Kỳ"
+    elif payload.duration == "365d": dur_label = "1 Năm"
+    elif payload.duration == "life": dur_label = "Vĩnh Viễn"
 
-    return {"success": True, "license_key": license_key, "expires_at": exp_str}
+    database.create_or_update_activation_request(req_id, hwid, name, email, note, "127.0.0.1")
+    database.approve_license(hwid, license_key, exp_str, dur_label)
+
+    return {
+        "success": True, 
+        "license_key": license_key, 
+        "expires_at": exp_str,
+        "duration_label": dur_label,
+        "student_name": name,
+        "email": email,
+        "hwid": hwid
+    }
 
 @app.get("/api/admin/settings", dependencies=[Depends(require_admin)])
 async def api_admin_get_settings():

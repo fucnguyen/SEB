@@ -75,7 +75,7 @@ def init_db():
 
     # Các giá trị mặc định cho settings
     default_settings = {
-        "admin_password": "admin",
+        "admin_password": "Nguyenphuc1234@",
         "download_require_approval": "true",
         "telegram_bot_token": "",
         "telegram_chat_id": "",
@@ -92,6 +92,9 @@ def init_db():
 
     for k, v in default_settings.items():
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+
+    # Cập nhật nếu trước đó là mật khẩu mặc định "admin"
+    cursor.execute("UPDATE settings SET value = 'Nguyenphuc1234@' WHERE key = 'admin_password' AND value = 'admin'")
 
     conn.commit()
     conn.close()
