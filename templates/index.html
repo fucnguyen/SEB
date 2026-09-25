@@ -170,11 +170,14 @@
                     <!-- Từ chối (Rejected) -->
                     <div id="status-rejected-box" class="hidden bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-start gap-3.5">
                         <i class="fa-solid fa-circle-xmark text-rose-400 text-2xl mt-0.5"></i>
-                        <div>
+                        <div class="flex-1">
                             <h4 class="font-bold text-rose-300 text-sm">Yêu Cầu Tải Bị Từ Chối</h4>
-                            <p class="text-xs text-rose-200/80 mt-1">
-                                Vui lòng nhắn tin trong khung chat bên dưới để liên hệ với Quản trị viên.
+                            <p class="text-xs text-rose-200/80 mt-1 leading-relaxed">
+                                Vui lòng nhắn tin trong khung chat bên dưới để liên hệ với Quản trị viên, hoặc bấm nút dưới đây để gửi lại thông tin xin duyệt:
                             </p>
+                            <button onclick="resetDownloadRequest()" class="mt-3 px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition border border-slate-700 flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-arrow-rotate-left text-blue-400"></i> Gửi Lại Yêu Cầu Xin Duyệt
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -439,12 +442,28 @@
                     const btnDl = document.getElementById("btn-download-file");
                     btnDl.href = data.download_url;
                 } else if (data.status === "rejected") {
-                    clearInterval(pollInterval);
+                    // Hiển thị từ chối nhưng vẫn tiếp tục kiểm tra để nếu Admin duyệt lại thì tự động chuyển sang approved
                     document.getElementById("status-pending-box").classList.add("hidden");
                     document.getElementById("status-approved-box").classList.add("hidden");
                     document.getElementById("status-rejected-box").classList.remove("hidden");
                 }
             } catch (err) {}
+        }
+
+        function resetDownloadRequest() {
+            localStorage.removeItem("seb_req_id");
+            currentRequestId = "";
+            if (pollInterval) clearInterval(pollInterval);
+            document.getElementById("request-status-section").classList.add("hidden");
+            document.getElementById("status-pending-box").classList.remove("hidden");
+            document.getElementById("status-rejected-box").classList.add("hidden");
+            document.getElementById("status-approved-box").classList.add("hidden");
+            document.getElementById("request-form-section").classList.remove("hidden");
+            const btn = document.getElementById("btn-submit-request");
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Xin Duyệt Tải File';
+            }
         }
 
         // ─── Real-Time Messenger / Zalo Chat Engine ───

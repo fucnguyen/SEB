@@ -522,14 +522,20 @@
                         <td class="p-3">${statusBadge}</td>
                         <td class="p-3 text-right space-x-1">
                             ${item.status === 'pending' ? `
-                                <button onclick="approveDownload('${item.request_id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px]">
+                                <button onclick="approveDownload('${item.request_id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px]" title="Duyệt cho tải">
                                     <i class="fa-solid fa-check"></i> Duyệt
                                 </button>
-                                <button onclick="rejectDownload('${item.request_id}')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-semibold text-[11px]">
+                                <button onclick="rejectDownload('${item.request_id}')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-semibold text-[11px]" title="Từ chối">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
+                            ` : item.status === 'rejected' ? `
+                                <button onclick="approveDownload('${item.request_id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px]" title="Mở khóa duyệt lại cho học sinh">
+                                    <i class="fa-solid fa-rotate-left"></i> Duyệt Lại
+                                </button>
                             ` : `
-                                <span class="text-slate-500 text-[11px]">Xong</span>
+                                <button onclick="rejectDownload('${item.request_id}')" class="px-2 py-1 bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-rose-300 rounded-lg text-[10px]" title="Khóa / Thu hồi quyền tải">
+                                    <i class="fa-solid fa-lock"></i> Khóa lại
+                                </button>
                             `}
                         </td>
                     `;

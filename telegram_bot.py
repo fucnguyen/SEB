@@ -123,22 +123,30 @@ async def process_telegram_callback(callback_query: dict):
         expires_at = (database.now_vn() + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
         success = database.approve_download_request(req_id, token, expires_at)
         new_text = original_text + f"\n\n👉 <b>KẾT QUẢ:</b> ✅ ĐÃ PHÊ DUYỆT CHO TẢI (Hạn link: 30 phút)"
+        inline_keyboard = [
+            [{"text": "🔒 Khóa / Thu hồi quyền tải", "callback_data": f"dl_rej:{req_id}"}]
+        ]
         await send_telegram_request("editMessageText", {
             "chat_id": chat_id,
             "message_id": message_id,
             "text": new_text,
-            "parse_mode": "HTML"
+            "parse_mode": "HTML",
+            "reply_markup": {"inline_keyboard": inline_keyboard}
         })
 
     elif action == "dl_rej":
         req_id = parts[1]
         database.reject_download_request(req_id)
         new_text = original_text + f"\n\n👉 <b>KẾT QUẢ:</b> ❌ ĐÃ TỪ CHỐI TẢI FILE"
+        inline_keyboard = [
+            [{"text": "🔄 Đổi ý: Duyệt cho tải ngay", "callback_data": f"dl_app:{req_id}"}]
+        ]
         await send_telegram_request("editMessageText", {
             "chat_id": chat_id,
             "message_id": message_id,
             "text": new_text,
-            "parse_mode": "HTML"
+            "parse_mode": "HTML",
+            "reply_markup": {"inline_keyboard": inline_keyboard}
         })
 
     # 2. Xử lý kích hoạt mã máy HWID
@@ -170,11 +178,18 @@ async def process_telegram_callback(callback_query: dict):
         elif duration == "lock":
             database.lock_license(hwid)
             new_text = original_text + f"\n\n👉 <b>KẾT QUẢ:</b> 🔒 ĐÃ KHÓA MÃ MÁY NÀY!"
+            inline_keyboard = [
+                [
+                    {"text": "🔓 Mở Khóa Lại (30 Ngày)", "callback_data": f"act:30d:{req_id}"},
+                    {"text": "🔓 Mở Khóa Lại (Vĩnh viễn)", "callback_data": f"act:life:{req_id}"}
+                ]
+            ]
             await send_telegram_request("editMessageText", {
                 "chat_id": chat_id,
                 "message_id": message_id,
                 "text": new_text,
-                "parse_mode": "HTML"
+                "parse_mode": "HTML",
+                "reply_markup": {"inline_keyboard": inline_keyboard}
             })
             return
         else:
@@ -190,11 +205,15 @@ async def process_telegram_callback(callback_query: dict):
             f"📅 Thời hạn: <b>{label}</b> (Hết hạn: {exp_str})\n"
             f"💻 Phần mềm trên máy học sinh sẽ tự động mở khóa ngay lập tức!"
         )
+        inline_keyboard = [
+            [{"text": "🔒 Khóa Khẩn Cấp Máy Này", "callback_data": f"act:lock:{req_id}"}]
+        ]
         await send_telegram_request("editMessageText", {
             "chat_id": chat_id,
             "message_id": message_id,
             "text": new_text,
-            "parse_mode": "HTML"
+            "parse_mode": "HTML",
+            "reply_markup": {"inline_keyboard": inline_keyboard}
         })
 
 # ────────────────── Background Polling Loop ──────────────────
