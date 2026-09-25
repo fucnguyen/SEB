@@ -101,6 +101,9 @@
             <button onclick="switchTab('tab-licenses')" id="btn-tab-licenses" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-key"></i> Quản Lý Mã Máy HWID (<span id="badge-lic">0</span>)
             </button>
+            <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Vào / Thoát (<span id="badge-logs">0</span>)
+            </button>
             <button onclick="switchTab('tab-chats')" id="btn-tab-chats" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-comments"></i> Tin Nhắn Chat (<span id="badge-chat">0</span>)
             </button>
@@ -312,6 +315,51 @@
 
         </div>
 
+        <!-- TAB 5: Access / Session Logs -->
+        <div id="tab-logs" class="hidden space-y-4">
+            <div class="glass-card rounded-2xl overflow-hidden shadow-xl border border-slate-800">
+                <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-slate-900/60">
+                    <div>
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i> Lịch Sử Đăng Nhập & Vào / Thoát Bài Thi
+                        </h2>
+                        <p class="text-xs text-slate-400">Ghi nhận chi tiết từng lần vào thi, nộp bài, bị khóa hoặc tự hủy của học sinh</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="loadAccessLogs()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
+                            <i class="fa-solid fa-rotate"></i> Làm mới
+                        </button>
+                        <button onclick="clearAccessLogs()" class="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/50 text-rose-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-trash-can"></i> Xóa lịch sử
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-950/60 text-slate-400 font-semibold border-b border-slate-800">
+                                <th class="p-3">Thời Gian (GMT+7)</th>
+                                <th class="p-3">Học Sinh</th>
+                                <th class="p-3">Hành Động / Sự Kiện</th>
+                                <th class="p-3">Chi Tiết / Lý Do</th>
+                                <th class="p-3">Máy Tính</th>
+                                <th class="p-3">IP Mạng</th>
+                                <th class="p-3">Mã HWID</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table-body" class="divide-y divide-slate-800/60">
+                            <tr>
+                                <td colspan="7" class="p-6 text-center text-slate-500">
+                                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải dữ liệu nhật ký...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- Modal: Tạo Key Thủ Công -->
@@ -457,12 +505,13 @@
             loadDashboardStats();
             loadDownloadRequests();
             loadLicenses();
+            loadAccessLogs();
             loadSettings();
             setInterval(loadDashboardStats, 5000);
         });
 
         function switchTab(tabId) {
-            ["tab-downloads", "tab-licenses", "tab-chats", "tab-settings"].forEach(id => {
+            ["tab-downloads", "tab-licenses", "tab-logs", "tab-chats", "tab-settings"].forEach(id => {
                 document.getElementById(id).classList.add("hidden");
                 document.getElementById("btn-" + id).className = "pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition";
             });
@@ -470,6 +519,7 @@
             document.getElementById("btn-" + tabId).className = "pb-3 border-b-2 border-blue-500 text-blue-400 flex items-center gap-1.5 transition";
 
             if (tabId === "tab-chats") loadChatSessions();
+            if (tabId === "tab-logs") loadAccessLogs();
         }
 
         async function loadDashboardStats() {
@@ -752,6 +802,63 @@
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text);
             alert("Đã sao chép mã Key!");
+        }
+
+        // Access Logs API
+        async function loadAccessLogs() {
+            try {
+                const res = await fetch("/api/admin/access-logs");
+                if (res.status === 401) { window.location.href = "/login"; return; }
+                const data = await res.json();
+                const list = data.logs || [];
+                const badge = document.getElementById("badge-logs");
+                if (badge) badge.innerText = list.length;
+
+                const tbody = document.getElementById("logs-table-body");
+                if (!tbody) return;
+                if (list.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">Chưa có nhật ký vào / thoát nào.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = "";
+                list.forEach(item => {
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-slate-900/40 transition";
+
+                    let evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-slate-500/20 text-slate-400 font-semibold">${item.event_type}</span>`;
+                    if (item.event_type === "START_EXAM") {
+                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-semibold"><i class="fa-solid fa-play mr-1"></i>Vào Bài Thi</span>`;
+                    } else if (item.event_type === "EXIT_NORMAL") {
+                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400 font-semibold"><i class="fa-solid fa-check mr-1"></i>Thoát / Nộp Bài</span>`;
+                    } else if (item.event_type === "EXIT_LOCKED") {
+                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400 font-semibold"><i class="fa-solid fa-lock mr-1"></i>Bị Khóa Từ Xa</span>`;
+                    } else if (item.event_type === "EXIT_DELETED") {
+                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400 font-semibold"><i class="fa-solid fa-trash mr-1"></i>Bị Xóa Bản Quyền</span>`;
+                    } else if (item.event_type === "EXIT_EXPIRED") {
+                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400 font-semibold"><i class="fa-solid fa-hourglass-end mr-1"></i>Hết Giờ Thi</span>`;
+                    }
+
+                    tr.innerHTML = `
+                        <td class="p-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">${item.created_at}</td>
+                        <td class="p-3 font-bold text-white whitespace-nowrap">${item.student_name}</td>
+                        <td class="p-3 whitespace-nowrap">${evtBadge}</td>
+                        <td class="p-3 text-slate-300 text-[11px]">${item.details || '—'}</td>
+                        <td class="p-3 text-slate-400 text-[11px] font-mono whitespace-nowrap">${item.machine_name || '—'}</td>
+                        <td class="p-3 text-blue-300 text-[11px] font-mono whitespace-nowrap">${item.ip_address || '—'}</td>
+                        <td class="p-3 text-slate-500 text-[10px] font-mono whitespace-nowrap">${item.hwid ? item.hwid.substring(0, 14) + '...' : '—'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function clearAccessLogs() {
+            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử vào/thoát này không?")) return;
+            await fetch("/api/admin/clear-access-logs", { method: "POST" });
+            loadAccessLogs();
         }
 
         // Manual Key Modal

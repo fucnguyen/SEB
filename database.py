@@ -85,6 +85,20 @@ def init_db():
     )
     """)
 
+    # 5. Bảng ghi nhận lịch sử Vào / Thoát bài thi của học sinh
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS access_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hwid TEXT NOT NULL,
+        student_name TEXT NOT NULL,
+        machine_name TEXT,
+        ip_address TEXT,
+        event_type TEXT NOT NULL, -- START_EXAM, EXIT_NORMAL, EXIT_LOCKED, EXIT_DELETED, EXIT_EXPIRED
+        details TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+
     # Các giá trị mặc định cho settings
     default_settings = {
         "admin_password": "Nguyenphuc1234@",
@@ -352,3 +366,54 @@ def get_all_settings() -> Dict[str, str]:
     rows = {r["key"]: r["value"] for r in c.fetchall()}
     conn.close()
     return rows
+
+# ────────────────── Access Logs API (Vào / Thoát Ca Thi) ──────────────────
+
+def log_access_event(
+    hwid: str,
+    student_name: str,
+    machine_name: str,
+    ip_address: str,
+    event_type: str,
+    details: str = ""
+) -> Dict[str, Any]:
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO access_logs (hwid, student_name, machine_name, ip_address, event_type, details, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (hwid.strip(), student_name.strip(), machine_name.strip(), ip_address.strip(), event_type.strip(), details.strip(), now))
+    log_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return {
+        "id": log_id,
+        "hwid": hwid,
+        "student_name": student_name,
+        "machine_name": machine_name,
+        "ip_address": ip_address,
+        "event_type": event_type,
+        "details": details,
+        "created_at": now
+    }
+
+def list_access_logs(limit: int = 200, hwid: Optional[str] = None) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    c = conn.cursor()
+    if hwid:
+        c.execute("SELECT * FROM access_logs WHERE hwid = ? ORDER BY id DESC LIMIT ?", (hwid.strip(), limit))
+    else:
+        c.execute("SELECT * FROM access_logs ORDER BY id DESC LIMIT ?", (limit,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def clear_access_logs() -> bool:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM access_logs")
+    conn.commit()
+    conn.close()
+    return True
+

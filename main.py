@@ -2,6 +2,7 @@ import os
 import uuid
 import asyncio
 import hashlib
+import httpx
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
@@ -17,17 +18,32 @@ import crypto_engine
 import storage
 import telegram_bot
 
-# ────────────────── App Lifespan ──────────────────
+# ────────────────── App Lifespan & Keep-Alive ──────────────────
+async def render_keepalive_task():
+    """Tự động gửi ping đến máy chủ mỗi 10 phút để Render không bao giờ ngủ đông"""
+    await asyncio.sleep(60) # Chờ 1 phút sau khi khởi động
+    while True:
+        try:
+            render_url = os.environ.get("RENDER_EXTERNAL_URL") or "https://seb-ki1x.onrender.com"
+            ping_url = f"{render_url.rstrip('/')}/api/ping"
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                await client.get(ping_url)
+        except Exception:
+            pass
+        await asyncio.sleep(600) # Mỗi 10 phút ping 1 lần
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi tạo cơ sở dữ liệu
     database.init_db()
     print("[System] Database SQLite ready.")
 
-    # Khởi động Telegram Bot Polling ở chế độ nền
+    # Khởi động Telegram Bot Polling và Keep-Alive ở chế độ nền
     bot_task = asyncio.create_task(telegram_bot.start_telegram_polling())
+    keepalive_task = asyncio.create_task(render_keepalive_task())
     yield
     bot_task.cancel()
+    keepalive_task.cancel()
 
 app = FastAPI(title="SEB Licensing Portal", lifespan=lifespan)
 
@@ -90,6 +106,13 @@ class ManualKeyModel(BaseModel):
     name: Optional[str] = ""
     email: Optional[str] = ""
     note: Optional[str] = ""
+
+class SessionLogModel(BaseModel):
+    hwid: str
+    student_name: Optional[str] = "Học sinh"
+    machine_name: Optional[str] = ""
+    event_type: str # START_EXAM, EXIT_NORMAL, EXIT_LOCKED, EXIT_DELETED, EXIT_EXPIRED
+    details: Optional[str] = ""
 
 def calculate_expiration(duration: str, custom_datetime: Optional[str] = None) -> datetime:
     now = database.now_vn()
@@ -356,7 +379,62 @@ async def api_check_activation(hwid: str):
 
     return {"status": "pending", "message": "Đang chờ Quản trị viên duyệt qua Telegram/Web..."}
 
+@app.get("/api/ping")
+@app.get("/api/health")
+async def api_ping():
+    return {
+        "status": "online",
+        "server_time": database.now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+        "service": "SEB Licensing & Portal"
+    }
+
+@app.post("/api/log-session")
+async def api_log_session(payload: SessionLogModel, request: Request):
+    client_ip = get_client_ip(request)
+    hwid = payload.hwid.strip()
+    name = payload.student_name.strip() if payload.student_name else "Học sinh"
+    mach = payload.machine_name.strip() if payload.machine_name else "Unknown"
+    evt = payload.event_type.strip()
+    details = payload.details.strip() if payload.details else ""
+
+    log_entry = database.log_access_event(hwid, name, mach, client_ip, evt, details)
+
+    # Gửi thông báo tức thì lên Telegram cho Admin nắm được
+    try:
+        evt_labels = {
+            "START_EXAM": "🟢 <b>HỌC SINH BẮT ĐẦU VÀO THI</b>",
+            "EXIT_NORMAL": "🏁 <b>HỌC SINH ĐÃ THOÁT / NỘP BÀI THI</b>",
+            "EXIT_LOCKED": "🔒 <b>MÁY BỊ KHÓA TỪ XA VÀ BUỘC THOÁT</b>",
+            "EXIT_DELETED": "🗑️ <b>BẢN QUYỀN BỊ XÓA VÀ BUỘC THOÁT</b>",
+            "EXIT_EXPIRED": "⌛ <b>HẾT HẠN SỬ DỤNG VÀ BUỘC THOÁT</b>"
+        }
+        title = evt_labels.get(evt, f"ℹ️ <b>SỰ KIỆN: {evt}</b>")
+        time_vn = database.now_vn().strftime("%H:%M:%S %d/%m/%Y")
+        tele_msg = (
+            f"{title}\n\n"
+            f"👤 <b>Học sinh:</b> {name}\n"
+            f"💻 <b>Máy:</b> {mach} (IP: <code>{client_ip}</code>)\n"
+            f"🔑 <b>HWID:</b> <code>{hwid[:16]}...</code>\n"
+            f"📝 <b>Chi tiết:</b> {details}\n"
+            f"⏰ <b>Thời gian:</b> {time_vn}"
+        )
+        asyncio.create_task(telegram_bot.notify_admin_custom(tele_msg))
+    except Exception:
+        pass
+
+    return {"success": True, "log": log_entry}
+
 # ────────────────── Admin Management API ──────────────────
+
+@app.get("/api/admin/access-logs", dependencies=[Depends(require_admin)])
+async def api_admin_access_logs(limit: int = 150, hwid: Optional[str] = None):
+    logs = database.list_access_logs(limit=limit, hwid=hwid)
+    return {"logs": logs}
+
+@app.post("/api/admin/clear-access-logs", dependencies=[Depends(require_admin)])
+async def api_admin_clear_access_logs():
+    success = database.clear_access_logs()
+    return {"success": success}
 
 @app.get("/api/admin/stats", dependencies=[Depends(require_admin)])
 async def api_admin_stats():

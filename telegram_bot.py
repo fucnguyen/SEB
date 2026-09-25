@@ -28,6 +28,16 @@ async def send_telegram_request(method: str, payload: dict) -> Optional[dict]:
         print(f"[Telegram Error] {e}")
     return None
 
+async def notify_admin_custom(text: str) -> None:
+    _, chat_id, enabled = get_bot_credentials()
+    if not chat_id or not enabled:
+        return
+    await send_telegram_request("sendMessage", {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML"
+    })
+
 async def notify_download_request(req: Dict[str, Any]):
     _, chat_id, enabled = get_bot_credentials()
     if not chat_id or not enabled:
