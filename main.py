@@ -1,12 +1,13 @@
 import os
 import uuid
 import asyncio
+import hashlib
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -38,7 +39,32 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# ────────────────── Admin Authentication ──────────────────
+AUTH_COOKIE_NAME = "seb_admin_token"
+AUTH_SALT = "seb_licensing_auth_salt_super_secret_2026"
+
+def get_admin_expected_token() -> str:
+    admin_pass = database.get_setting("admin_password", "admin")
+    return hashlib.sha256(f"{admin_pass}:{AUTH_SALT}".encode()).hexdigest()
+
+def is_admin_authenticated(request: Request) -> bool:
+    token = request.cookies.get(AUTH_COOKIE_NAME) or request.headers.get("x-admin-token")
+    if not token:
+        return False
+    return token == get_admin_expected_token()
+
+def require_admin(request: Request):
+    if not is_admin_authenticated(request):
+        raise HTTPException(status_code=401, detail="Chưa đăng nhập quyền Quản trị viên!")
+    return True
+
 # ────────────────── Pydantic Request Models ──────────────────
+
+class LoginModel(BaseModel):
+    password: str
+
+class ChangePasswordModel(BaseModel):
+    password: str
 
 class DownloadRequestModel(BaseModel):
     full_name: str
@@ -70,6 +96,7 @@ class ChatMessageModel(BaseModel):
 class SettingsModel(BaseModel):
     telegram_bot_token: Optional[str] = ""
     telegram_chat_id: Optional[str] = ""
+    external_download_url: Optional[str] = ""
     r2_endpoint_url: Optional[str] = ""
     r2_bucket_name: Optional[str] = ""
     r2_access_key: Optional[str] = ""
@@ -81,9 +108,64 @@ class SettingsModel(BaseModel):
 async def page_index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
+@app.get("/login", response_class=HTMLResponse)
+async def page_login(request: Request):
+    if is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    return templates.TemplateResponse(request=request, name="login.html")
+
 @app.get("/admin", response_class=HTMLResponse)
 async def page_admin(request: Request):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/login", status_code=303)
     return templates.TemplateResponse(request=request, name="admin.html")
+
+@app.get("/admin/logout")
+async def admin_logout():
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie(AUTH_COOKIE_NAME)
+    return response
+
+# ────────────────── Admin Authentication API ──────────────────
+
+@app.post("/api/admin/login")
+async def api_admin_login(payload: LoginModel):
+    stored_pass = database.get_setting("admin_password", "admin")
+    if payload.password.strip() == stored_pass:
+        token = get_admin_expected_token()
+        res = JSONResponse(content={"success": True, "message": "Đăng nhập thành công!"})
+        res.set_cookie(
+            key=AUTH_COOKIE_NAME,
+            value=token,
+            httponly=True,
+            max_age=86400 * 7,
+            samesite="lax"
+        )
+        return res
+    return JSONResponse(
+        status_code=400,
+        content={"success": False, "message": "Mật khẩu không chính xác!"}
+    )
+
+@app.post("/api/admin/change-password", dependencies=[Depends(require_admin)])
+async def api_admin_change_password(payload: ChangePasswordModel):
+    new_pass = payload.password.strip()
+    if not new_pass or len(new_pass) < 4:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Mật khẩu phải có ít nhất 4 ký tự!"}
+        )
+    database.set_setting("admin_password", new_pass)
+    token = hashlib.sha256(f"{new_pass}:{AUTH_SALT}".encode()).hexdigest()
+    res = JSONResponse(content={"success": True, "message": "Đổi mật khẩu thành công!"})
+    res.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        max_age=86400 * 7,
+        samesite="lax"
+    )
+    return res
 
 # ────────────────── Student Download API ──────────────────
 
@@ -249,7 +331,7 @@ async def api_check_activation(hwid: str):
 
 # ────────────────── Admin Management API ──────────────────
 
-@app.get("/api/admin/stats")
+@app.get("/api/admin/stats", dependencies=[Depends(require_admin)])
 async def api_admin_stats():
     dls = database.list_download_requests(100)
     lics = database.list_licenses(200)
@@ -267,11 +349,11 @@ async def api_admin_stats():
         "total_licenses": len(lics)
     }
 
-@app.get("/api/admin/download-requests")
+@app.get("/api/admin/download-requests", dependencies=[Depends(require_admin)])
 async def api_admin_list_downloads():
     return database.list_download_requests(50)
 
-@app.post("/api/admin/approve-download")
+@app.post("/api/admin/approve-download", dependencies=[Depends(require_admin)])
 async def api_admin_approve_download(payload: dict):
     req_id = payload.get("request_id")
     token = str(uuid.uuid4())
@@ -279,17 +361,17 @@ async def api_admin_approve_download(payload: dict):
     success = database.approve_download_request(req_id, token, expires_at)
     return {"success": success}
 
-@app.post("/api/admin/reject-download")
+@app.post("/api/admin/reject-download", dependencies=[Depends(require_admin)])
 async def api_admin_reject_download(payload: dict):
     req_id = payload.get("request_id")
     success = database.reject_download_request(req_id)
     return {"success": success}
 
-@app.get("/api/admin/licenses")
+@app.get("/api/admin/licenses", dependencies=[Depends(require_admin)])
 async def api_admin_list_licenses():
     return database.list_licenses(100)
 
-@app.post("/api/admin/approve-activation")
+@app.post("/api/admin/approve-activation", dependencies=[Depends(require_admin)])
 async def api_admin_approve_activation(payload: ApproveActivationModel):
     hwid = payload.hwid.strip()
     duration = payload.duration
@@ -307,25 +389,25 @@ async def api_admin_approve_activation(payload: ApproveActivationModel):
     success = database.approve_license(hwid, license_key, exp_str, duration)
     return {"success": success, "license_key": license_key, "expires_at": exp_str}
 
-@app.post("/api/admin/lock-license")
+@app.post("/api/admin/lock-license", dependencies=[Depends(require_admin)])
 async def api_admin_lock_license(payload: dict):
     hwid = payload.get("hwid", "")
     success = database.lock_license(hwid)
     return {"success": success}
 
-@app.post("/api/admin/unlock-license")
+@app.post("/api/admin/unlock-license", dependencies=[Depends(require_admin)])
 async def api_admin_unlock_license(payload: dict):
     hwid = payload.get("hwid", "")
     success = database.unlock_license(hwid)
     return {"success": success}
 
-@app.post("/api/admin/delete-license")
+@app.post("/api/admin/delete-license", dependencies=[Depends(require_admin)])
 async def api_admin_delete_license(payload: dict):
     hwid = payload.get("hwid", "")
     success = database.delete_license(hwid)
     return {"success": success}
 
-@app.post("/api/admin/manual-generate-key")
+@app.post("/api/admin/manual-generate-key", dependencies=[Depends(require_admin)])
 async def api_admin_manual_generate_key(payload: ManualKeyModel):
     hwid = payload.hwid.strip()
     duration = payload.duration
@@ -348,18 +430,18 @@ async def api_admin_manual_generate_key(payload: ManualKeyModel):
 
     return {"success": True, "license_key": license_key, "expires_at": exp_str}
 
-@app.get("/api/admin/settings")
+@app.get("/api/admin/settings", dependencies=[Depends(require_admin)])
 async def api_admin_get_settings():
     return database.get_all_settings()
 
-@app.post("/api/admin/settings")
+@app.post("/api/admin/settings", dependencies=[Depends(require_admin)])
 async def api_admin_save_settings(payload: SettingsModel):
     for k, v in payload.dict().items():
         if v is not None:
             database.set_setting(k, v)
     return {"success": True}
 
-@app.post("/api/admin/test-telegram")
+@app.post("/api/admin/test-telegram", dependencies=[Depends(require_admin)])
 async def api_admin_test_telegram():
     token, chat_id, _ = telegram_bot.get_bot_credentials()
     if not token or not chat_id:
@@ -388,7 +470,7 @@ async def api_send_chat_message(msg: ChatMessageModel):
     )
     return {"success": True, "data": res}
 
-@app.get("/api/admin/chat-sessions")
+@app.get("/api/admin/chat-sessions", dependencies=[Depends(require_admin)])
 async def api_admin_chat_sessions():
     return database.list_active_chat_sessions()
 

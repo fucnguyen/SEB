@@ -80,6 +80,7 @@ def init_db():
         "telegram_bot_token": "",
         "telegram_chat_id": "",
         "telegram_notifications_enabled": "true",
+        "external_download_url": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_v2.exe",
         "r2_endpoint_url": "",
         "r2_access_key": "",
         "r2_secret_key": "",

@@ -2,154 +2,174 @@
 <html lang="vi" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Thi Trực Tuyến SEB - Cổng Kích Hoạt & Tải Phần Mềm</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hệ Thống Thi Trực Tuyến SEB - Tải & Kích Hoạt Phần Mềm</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#eff6ff',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            900: '#1e3a8a',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .glow {
-            box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
+        .glow-btn {
+            box-shadow: 0 0 25px -3px rgba(37, 99, 235, 0.45);
         }
+        .glow-success {
+            box-shadow: 0 0 30px -3px rgba(16, 185, 129, 0.5);
+        }
+        /* Custom scrollbar for chat */
+        .chat-scroll::-webkit-scrollbar { width: 4px; }
+        .chat-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); border-radius: 9999px; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-blue-600 selection:text-white relative">
 
-    <!-- Top Navigation -->
-    <header class="border-b border-slate-800 bg-slate-900/60 sticky top-0 z-50 backdrop-blur-md">
+    <!-- Ambient glowing backgrounds -->
+    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-slate-800/80 bg-slate-950/80 sticky top-0 z-50 backdrop-blur-xl">
         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/30">
-                    <i class="fa-solid fa-shield-halved text-xl"></i>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 border border-white/10">
+                    <i class="fa-solid fa-shield-halved text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg leading-tight text-white flex items-center gap-2">
+                    <h1 class="font-extrabold text-base sm:text-lg leading-tight text-white flex items-center gap-2">
                         Thi Trực Tuyến SEB
-                        <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 font-mono">v2.5 Pro</span>
+                        <span class="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30 font-mono font-bold">PRO</span>
                     </h1>
-                    <p class="text-xs text-slate-400">Cổng Phân Phối & Kích Hoạt Bản Quyền Chính Thức</p>
+                    <p class="text-[11px] text-slate-400 hidden sm:block">Cổng Tải & Kích Hoạt Bản Quyền Chính Thức</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-3">
-                <a href="/admin" class="text-xs text-slate-400 hover:text-blue-400 flex items-center gap-1.5 transition">
-                    <i class="fa-solid fa-lock"></i> Cổng Quản Trị
-                </a>
+            
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Hệ Thống Sẵn Sàng
+                </span>
             </div>
+        </div>
+
+        <!-- Mobile Quick Tabs Switcher (Visible only on mobile) -->
+        <div class="lg:hidden flex border-t border-slate-800/60 bg-slate-900/60 text-xs font-bold divide-x divide-slate-800">
+            <button onclick="mobileSwitchTab('m-tab-download')" id="m-btn-download" class="flex-1 py-2.5 text-blue-400 bg-slate-800/40 flex items-center justify-center gap-1.5 transition">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Xin Tải File
+            </button>
+            <button onclick="mobileSwitchTab('m-tab-chat')" id="m-btn-chat" class="flex-1 py-2.5 text-slate-400 flex items-center justify-center gap-1.5 transition">
+                <i class="fa-solid fa-comments"></i> Nhắn Admin
+            </button>
+            <button onclick="mobileSwitchTab('m-tab-guide')" id="m-btn-guide" class="flex-1 py-2.5 text-slate-400 flex items-center justify-center gap-1.5 transition">
+                <i class="fa-solid fa-book-open"></i> Hướng Dẫn
+            </button>
         </div>
     </header>
 
     <!-- Main Content Container -->
-    <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <main class="max-w-6xl mx-auto px-4 py-5 sm:py-8 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
         
-        <!-- Left Column: Download & Registration & Live Chat (7 cols) -->
-        <div class="lg:col-span-7 space-y-6">
+        <!-- Left Column: Registration & Download (7 cols) -->
+        <div id="col-download" class="lg:col-span-7 space-y-6">
             
             <!-- Registration / Download Card -->
-            <div class="glass rounded-2xl p-6 shadow-2xl relative overflow-hidden">
-                <div class="absolute -right-10 -top-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
+            <div class="glass-card rounded-2xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
                 <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-                    <div class="flex items-center gap-2">
-                        <span class="flex h-3 w-3 relative">
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center text-sm font-bold border border-blue-500/20">
+                            1
                         </span>
-                        <h2 class="font-bold text-lg text-white">Bước 1: Xin Phép Tải File Cài Đặt (~205 MB)</h2>
+                        <div>
+                            <h2 class="font-bold text-base sm:text-lg text-white">Xin Quyền Tải Bản Cài Đặt</h2>
+                            <p class="text-[11px] text-slate-400">File cài đặt: Setup_ThiTrucTuyen_v2.exe (~205 MB)</p>
+                        </div>
                     </div>
-                    <span class="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">Bảo vệ 2 lớp</span>
+                    <span class="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 hidden sm:inline-block">
+                        Khóa 1 Máy (IP)
+                    </span>
                 </div>
 
                 <!-- Form khi chưa gửi yêu cầu -->
                 <div id="request-form-section" class="space-y-4">
-                    <p class="text-sm text-slate-300">
-                        Để bảo mật và tránh thất thoát phần mềm, vui lòng điền thông tin bên dưới để Quản trị viên duyệt quyền tải về máy:
+                    <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        Để đảm bảo an toàn phòng thi, vui lòng điền thông tin để Quản trị viên duyệt quyền tải về máy tính của bạn:
                     </p>
 
-                    <div class="space-y-3">
+                    <div class="space-y-3.5">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Họ và tên học sinh *</label>
+                            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Họ và tên của bạn *</label>
                             <input type="text" id="input-name" placeholder="Ví dụ: Nguyễn Văn An" 
-                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition text-white">
+                                class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition placeholder-slate-500">
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             <div>
-                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Email / Số điện thoại</label>
+                                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Email / Số điện thoại</label>
                                 <input type="text" id="input-email" placeholder="an.nguyen@gmail.com" 
-                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition text-white">
+                                    class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition placeholder-slate-500">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Lớp thi / Mã sinh viên</label>
-                                <input type="text" id="input-note" placeholder="Ví dụ: Lớp 12A1 - THPT Chuyên" 
-                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition text-white">
+                                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Lớp thi / Ghi chú</label>
+                                <input type="text" id="input-note" placeholder="Lớp 12A1..." 
+                                    class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition placeholder-slate-500">
                             </div>
                         </div>
                     </div>
 
                     <button id="btn-submit-request" onclick="submitDownloadRequest()" 
-                        class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-semibold rounded-xl transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Xin Tải File
+                        class="w-full py-3.5 sm:py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] font-bold text-sm sm:text-base rounded-xl transition glow-btn flex items-center justify-center gap-2 text-white">
+                        <i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Xin Duyệt Tải File
                     </button>
+                    
+                    <p class="text-[11px] text-center text-slate-500">
+                        <i class="fa-solid fa-shield-halved text-blue-500"></i> Link tải được gắn chặt với địa chỉ IP máy bạn và tự hủy sau 30 phút.
+                    </p>
                 </div>
 
                 <!-- Section hiển thị trạng thái chờ duyệt hoặc đã duyệt -->
                 <div id="request-status-section" class="hidden space-y-4">
                     
                     <!-- Chờ duyệt (Pending) -->
-                    <div id="status-pending-box" class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
-                        <i class="fa-solid fa-clock text-amber-400 text-xl mt-0.5 animate-spin"></i>
+                    <div id="status-pending-box" class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 sm:p-5 flex items-start gap-3.5 animate-pulse">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 text-lg">
+                            <i class="fa-solid fa-hourglass-half fa-spin"></i>
+                        </div>
                         <div>
-                            <h4 class="font-bold text-amber-300 text-sm">Đang Chờ Quản Trị Viên Phê Duyệt</h4>
-                            <p class="text-xs text-amber-200/80 mt-1">
-                                Yêu cầu của bạn đã được gửi đến Telegram của Quản trị viên. Vui lòng giữ trang này, nút tải sẽ tự động mở khóa ngay khi được duyệt!
+                            <h4 class="font-bold text-amber-300 text-sm sm:text-base">Đang Chờ Quản Trị Viên Duyệt...</h4>
+                            <p class="text-xs text-amber-200/80 mt-1 leading-relaxed">
+                                Yêu cầu của bạn đã được gửi đến Telegram của Quản trị viên. Hãy giữ trang này, nút tải sẽ <strong>tự động mở khóa ngay lập tức</strong> khi được duyệt!
                             </p>
                         </div>
                     </div>
 
                     <!-- Đã duyệt (Approved) -->
                     <div id="status-approved-box" class="hidden space-y-4">
-                        <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-start gap-3">
-                            <i class="fa-solid fa-circle-check text-emerald-400 text-2xl mt-0.5"></i>
+                        <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 sm:p-5 flex items-start gap-3.5">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 text-xl">
+                                <i class="fa-solid fa-circle-check"></i>
+                            </div>
                             <div>
-                                <h4 class="font-bold text-emerald-300 text-sm">Yêu Cầu Tải Đã Được Phê Duyệt!</h4>
+                                <h4 class="font-bold text-emerald-300 text-sm sm:text-base">Đã Phê Duyệt! Tải Về Ngay</h4>
                                 <p class="text-xs text-emerald-200/80 mt-1">
-                                    Đường link tải được ký số an toàn và có hiệu lực trong <strong id="token-timer" class="text-white">30:00</strong> phút.
+                                    Đường link tải an toàn dành riêng cho máy của bạn có hiệu lực trong 30 phút.
                                 </p>
                             </div>
                         </div>
 
                         <a id="btn-download-file" href="#" target="_blank"
-                            class="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 font-bold text-lg rounded-xl transition shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-3 text-white">
-                            <i class="fa-solid fa-cloud-arrow-down text-2xl"></i>
-                            <span>Tải Xuống Bản Cài Đặt (Setup_ThiTrucTuyen_v2.exe)</span>
+                            class="w-full py-4 sm:py-4.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 font-extrabold text-base sm:text-lg rounded-xl transition glow-success flex items-center justify-center gap-3 text-white text-center shadow-xl shadow-emerald-500/20 active:scale-[0.99]">
+                            <i class="fa-solid fa-cloud-arrow-down text-2xl animate-bounce"></i>
+                            <span>BẤM VÀO ĐÂY ĐỂ TẢI XUỐNG (~205 MB)</span>
                         </a>
-                        <p class="text-center text-xs text-slate-400">Dung lượng: ~205 MB • Đã bảo vệ chống rã file AES-256</p>
+                        <p class="text-center text-[11px] text-slate-400">File cài đặt tự động kích hoạt chế độ thi Safe Exam Browser</p>
                     </div>
 
                     <!-- Từ chối (Rejected) -->
-                    <div id="status-rejected-box" class="hidden bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-start gap-3">
-                        <i class="fa-solid fa-circle-xmark text-rose-400 text-xl mt-0.5"></i>
+                    <div id="status-rejected-box" class="hidden bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-start gap-3.5">
+                        <i class="fa-solid fa-circle-xmark text-rose-400 text-2xl mt-0.5"></i>
                         <div>
                             <h4 class="font-bold text-rose-300 text-sm">Yêu Cầu Tải Bị Từ Chối</h4>
                             <p class="text-xs text-rose-200/80 mt-1">
@@ -162,106 +182,111 @@
             </div>
 
             <!-- Live Chat Box với Admin -->
-            <div class="glass rounded-2xl p-6 shadow-2xl space-y-4">
+            <div id="card-chat" class="glass-card rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-comments text-blue-400"></i>
-                        <h3 class="font-bold text-sm text-white">Nhắn Tin Trực Tiếp Với Quản Trị Viên</h3>
+                        <div class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-comments"></i>
+                        </div>
+                        <h3 class="font-bold text-sm text-white">Nhắn Tin Với Quản Trị Viên</h3>
                     </div>
-                    <span class="text-xs text-emerald-400 flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Admin Online
+                    <span class="text-[11px] text-emerald-400 flex items-center gap-1.5 font-medium">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Online
                     </span>
                 </div>
 
-                <div id="chat-messages" class="h-48 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-700">
-                    <div class="bg-slate-800/60 rounded-xl p-3 max-w-[85%] text-xs text-slate-300 border border-slate-700/50">
+                <div id="chat-messages" class="h-56 sm:h-64 overflow-y-auto space-y-3 pr-2 chat-scroll">
+                    <div class="bg-slate-900/80 rounded-2xl rounded-tl-sm p-3.5 max-w-[88%] text-xs text-slate-300 border border-slate-800">
                         <span class="font-bold text-blue-400 block mb-1">Hệ Thống:</span>
                         Chào bạn! Hãy gửi thông tin xin tải hoặc dán Mã máy (HWID) nếu bạn cần Admin duyệt kích hoạt thủ công nhé.
                     </div>
                 </div>
 
-                <div class="flex gap-2">
-                    <input type="text" id="chat-input" placeholder="Nhập tin nhắn gửi Quản trị viên..." 
-                        class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 text-white"
+                <div class="flex gap-2 pt-2">
+                    <input type="text" id="chat-input" placeholder="Nhập tin nhắn..." 
+                        class="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-blue-500 placeholder-slate-500"
                         onkeypress="if(event.key==='Enter') sendChatMessage()">
                     <button onclick="sendChatMessage()" 
-                        class="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-semibold transition flex items-center gap-2">
-                        <i class="fa-solid fa-paper-plane"></i> Gửi
+                        class="px-4 sm:px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 text-white shadow-md shadow-blue-600/30">
+                        <i class="fa-solid fa-paper-plane text-xs"></i> Gửi
                     </button>
                 </div>
             </div>
 
         </div>
 
-        <!-- Right Column: Instructions & Activation Guide (5 cols) -->
-        <div class="lg:col-span-5 space-y-6">
+        <!-- Right Column: Process Steps & Highlights (5 cols) -->
+        <div id="col-guide" class="lg:col-span-5 space-y-6">
 
             <!-- Process Steps Guide -->
-            <div class="glass rounded-2xl p-6 shadow-2xl space-y-4">
-                <h3 class="font-bold text-base text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-                    <i class="fa-solid fa-list-check text-blue-400"></i> Quy Trình Cài Đặt & Vào Thi
-                </h3>
+            <div class="glass-card rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+                    <div class="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-route"></i>
+                    </div>
+                    <h3 class="font-bold text-sm sm:text-base text-white">Quy Trình 3 Bước Vào Thi</h3>
+                </div>
 
                 <div class="space-y-4">
-                    <div class="flex gap-3 items-start">
-                        <div class="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-500 text-blue-400 font-bold flex items-center justify-center text-xs shrink-0 mt-0.5">1</div>
+                    <div class="flex gap-3.5 items-start">
+                        <div class="w-7 h-7 rounded-full bg-blue-600 text-white font-extrabold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-md shadow-blue-600/30">1</div>
                         <div>
-                            <h4 class="text-sm font-bold text-white">Tải & Chạy Bộ Cài</h4>
-                            <p class="text-xs text-slate-400 mt-1">
-                                Sau khi Admin duyệt, bấm nút tải file <code>Setup_ThiTrucTuyen_v2.exe</code> (~205MB) và cài đặt theo hướng dẫn trên màn hình.
+                            <h4 class="text-xs sm:text-sm font-bold text-white">Tải & Cài Đặt</h4>
+                            <p class="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                                Sau khi được duyệt, bấm nút tải file <code>Setup_ThiTrucTuyen_v2.exe</code> (~205MB) và cài đặt vào máy tính.
                             </p>
                         </div>
                     </div>
 
-                    <div class="flex gap-3 items-start">
-                        <div class="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-500 text-blue-400 font-bold flex items-center justify-center text-xs shrink-0 mt-0.5">2</div>
+                    <div class="flex gap-3.5 items-start">
+                        <div class="w-7 h-7 rounded-full bg-indigo-600 text-white font-extrabold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-md shadow-indigo-600/30">2</div>
                         <div>
-                            <h4 class="text-sm font-bold text-white">Khởi Động & Gửi Yêu Cầu</h4>
-                            <p class="text-xs text-slate-400 mt-1">
-                                Mở icon <strong>"Thi Trực Tuyến"</strong> ngoài màn hình Desktop. Ứng dụng tự động quét <strong>Mã Máy (HWID)</strong> của bạn. Bấm <em>"Gửi yêu cầu kích hoạt lên Server"</em>.
+                            <h4 class="text-xs sm:text-sm font-bold text-white">Gửi Yêu Cầu Kích Hoạt</h4>
+                            <p class="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                                Mở biểu tượng <strong>"Thi Trực Tuyến"</strong> trên màn hình Desktop. Điền tên và bấm nút <em>"Gửi yêu cầu kích hoạt"</em>.
                             </p>
                         </div>
                     </div>
 
-                    <div class="flex gap-3 items-start">
-                        <div class="w-7 h-7 rounded-full bg-blue-600/30 border border-blue-500 text-blue-400 font-bold flex items-center justify-center text-xs shrink-0 mt-0.5">3</div>
+                    <div class="flex gap-3.5 items-start">
+                        <div class="w-7 h-7 rounded-full bg-emerald-600 text-white font-extrabold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-md shadow-emerald-600/30">3</div>
                         <div>
-                            <h4 class="text-sm font-bold text-white">Tự Động Mở Khóa Thi</h4>
-                            <p class="text-xs text-slate-400 mt-1">
-                                Admin nhận thông báo trên Telegram và duyệt chỉ với 1 chạm. Phần mềm trên máy bạn sẽ <strong>tự động mở khóa ngay lập tức</strong> mà không cần gõ mã tay!
+                            <h4 class="text-xs sm:text-sm font-bold text-white">Tự Động Mở Khóa Vào Thi</h4>
+                            <p class="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                                Admin duyệt trên Telegram, phần mềm sẽ <strong>tự động mở khóa ngay lập tức</strong> mà không cần gõ mã tay!
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Features Highlights -->
-            <div class="glass rounded-2xl p-6 shadow-2xl space-y-3">
-                <h4 class="font-bold text-xs uppercase tracking-wider text-slate-400">Tính năng nổi bật</h4>
+            <!-- Features Highlights Cards -->
+            <div class="glass-card rounded-2xl p-5 sm:p-6 shadow-2xl space-y-3">
+                <h4 class="font-bold text-xs uppercase tracking-wider text-slate-400">Bảo mật phòng thi chuẩn 100%</h4>
                 
                 <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                        <i class="fa-solid fa-microchip text-indigo-400 mb-1 block"></i>
+                    <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800/80">
+                        <i class="fa-solid fa-microchip text-indigo-400 mb-1.5 block text-base"></i>
                         <span class="font-bold text-xs text-white block">Khóa Mã Máy (HWID)</span>
-                        <span class="text-[11px] text-slate-400">1 key chỉ chạy trên 1 máy duy nhất</span>
+                        <span class="text-[11px] text-slate-400">1 key chỉ chạy trên 1 máy</span>
                     </div>
 
-                    <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                        <i class="fa-solid fa-robot text-teal-400 mb-1 block"></i>
+                    <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800/80">
+                        <i class="fa-solid fa-robot text-teal-400 mb-1.5 block text-base"></i>
                         <span class="font-bold text-xs text-white block">Trợ lý AI (Phím F2)</span>
-                        <span class="text-[11px] text-slate-400">Giao diện thẻ nổi Copilot thông minh</span>
+                        <span class="text-[11px] text-slate-400">Thẻ nổi Copilot thông minh</span>
                     </div>
 
-                    <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                        <i class="fa-solid fa-bolt text-amber-400 mb-1 block"></i>
-                        <span class="font-bold text-xs text-white block">Duyệt 1 Giây Qua Telegram</span>
-                        <span class="text-[11px] text-slate-400">Phê duyệt mọi lúc mọi nơi trên điện thoại</span>
+                    <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800/80">
+                        <i class="fa-solid fa-bolt text-amber-400 mb-1.5 block text-base"></i>
+                        <span class="font-bold text-xs text-white block">Duyệt 1 Giây Qua Bot</span>
+                        <span class="text-[11px] text-slate-400">Phê duyệt mọi lúc trên điện thoại</span>
                     </div>
 
-                    <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                        <i class="fa-solid fa-skull-crossbones text-rose-400 mb-1 block"></i>
+                    <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800/80">
+                        <i class="fa-solid fa-skull-crossbones text-rose-400 mb-1.5 block text-base"></i>
                         <span class="font-bold text-xs text-white block">Tự Hủy Khi Hết Hạn</span>
-                        <span class="text-[11px] text-slate-400">Xóa sạch dấu vết khi quá hạn bản quyền</span>
+                        <span class="text-[11px] text-slate-400">Xóa sạch dấu vết khi quá hạn</span>
                     </div>
                 </div>
             </div>
@@ -271,8 +296,8 @@
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-slate-900 py-6 text-center text-xs text-slate-500">
-        Hệ Thống Thi Trực Tuyến An Toàn SEB &copy; 2026. Mọi quyền được bảo hộ.
+    <footer class="border-t border-slate-900/80 py-5 text-center text-xs text-slate-500 relative z-10">
+        <p>Hệ Thống Thi Trực Tuyến An Toàn SEB &copy; 2026. Mọi quyền được bảo hộ.</p>
     </footer>
 
     <!-- Client-Side Scripts -->
@@ -283,6 +308,40 @@
         let currentRequestId = localStorage.getItem("seb_req_id") || "";
         let pollInterval = null;
 
+        // Mobile Tab Switcher Logic
+        function mobileSwitchTab(tab) {
+            const colDl = document.getElementById("col-download");
+            const cardChat = document.getElementById("card-chat");
+            const colGuide = document.getElementById("col-guide");
+            const btnDl = document.getElementById("m-btn-download");
+            const btnChat = document.getElementById("m-btn-chat");
+            const btnGuide = document.getElementById("m-btn-guide");
+
+            // Reset buttons
+            [btnDl, btnChat, btnGuide].forEach(b => {
+                b.className = "flex-1 py-2.5 text-slate-400 flex items-center justify-center gap-1.5 transition";
+            });
+
+            if (tab === "m-tab-download") {
+                colDl.classList.remove("hidden");
+                cardChat.classList.remove("hidden");
+                colGuide.classList.add("hidden");
+                btnDl.className = "flex-1 py-2.5 text-blue-400 bg-slate-800/40 flex items-center justify-center gap-1.5 transition";
+                window.scrollTo({top: 0, behavior: 'smooth'});
+            } else if (tab === "m-tab-chat") {
+                colDl.classList.remove("hidden");
+                cardChat.classList.remove("hidden");
+                colGuide.classList.add("hidden");
+                btnChat.className = "flex-1 py-2.5 text-blue-400 bg-slate-800/40 flex items-center justify-center gap-1.5 transition";
+                cardChat.scrollIntoView({behavior: 'smooth'});
+            } else if (tab === "m-tab-guide") {
+                colDl.classList.add("hidden");
+                colGuide.classList.remove("hidden");
+                btnGuide.className = "flex-1 py-2.5 text-blue-400 bg-slate-800/40 flex items-center justify-center gap-1.5 transition";
+                window.scrollTo({top: 0, behavior: 'smooth'});
+            }
+        }
+
         // Tự động kiểm tra trạng thái yêu cầu nếu đã lưu
         if (currentRequestId) {
             document.getElementById("request-form-section").classList.add("hidden");
@@ -290,7 +349,7 @@
             startPollingStatus();
         }
 
-        // Tải lịch sử chat ban đầu
+        // Tải lịch sử chat
         loadChatMessages();
         setInterval(loadChatMessages, 4000);
 
@@ -331,12 +390,12 @@
                 } else {
                     alert("Lỗi: " + (data.message || "Không thể gửi yêu cầu"));
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Xin Tải File';
+                    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Xin Duyệt Tải File';
                 }
             } catch (err) {
                 alert("Lỗi kết nối máy chủ!");
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Xin Tải File';
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Xin Duyệt Tải File';
             }
         }
 
@@ -375,11 +434,10 @@
                 const msgs = await res.json();
                 const container = document.getElementById("chat-messages");
                 
-                // Lưu scroll position
                 const isScrolledToBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 50;
 
                 container.innerHTML = `
-                    <div class="bg-slate-800/60 rounded-xl p-3 max-w-[85%] text-xs text-slate-300 border border-slate-700/50">
+                    <div class="bg-slate-900/80 rounded-2xl rounded-tl-sm p-3.5 max-w-[88%] text-xs text-slate-300 border border-slate-800">
                         <span class="font-bold text-blue-400 block mb-1">Hệ Thống:</span>
                         Chào bạn! Hãy gửi thông tin xin tải hoặc dán Mã máy (HWID) nếu bạn cần Admin duyệt kích hoạt thủ công nhé.
                     </div>
@@ -389,12 +447,12 @@
                     const isMe = m.sender === "student";
                     const bubble = document.createElement("div");
                     bubble.className = isMe 
-                        ? "bg-blue-600/30 border border-blue-500/40 rounded-xl p-3 max-w-[85%] text-xs text-slate-200 ml-auto"
-                        : "bg-emerald-600/20 border border-emerald-500/40 rounded-xl p-3 max-w-[85%] text-xs text-slate-200 mr-auto";
+                        ? "bg-blue-600/30 border border-blue-500/40 rounded-2xl rounded-tr-sm p-3 max-w-[85%] text-xs text-slate-200 ml-auto"
+                        : "bg-emerald-600/20 border border-emerald-500/40 rounded-2xl rounded-tl-sm p-3 max-w-[85%] text-xs text-slate-200 mr-auto";
                     
                     bubble.innerHTML = `
-                        <span class="font-bold block mb-1 text-[11px] ${isMe ? 'text-blue-300' : 'text-emerald-300'}">${m.sender_name} (${m.created_at.split(' ')[1]}):</span>
-                        <div>${m.message}</div>
+                        <span class="font-bold block mb-1 text-[10px] ${isMe ? 'text-blue-300' : 'text-emerald-300'}">${m.sender_name} (${m.created_at.split(' ')[1]}):</span>
+                        <div class="leading-relaxed">${m.message}</div>
                     `;
                     container.appendChild(bubble);
                 });
