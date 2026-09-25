@@ -139,6 +139,9 @@ def init_db():
     cursor.execute("UPDATE settings SET value = '8902883418:AAF1rAAcEVx4gyI9gcJW5GrBjqB-PphSuf8' WHERE key = 'telegram_bot_token' AND (value = '' OR value IS NULL)")
     cursor.execute("UPDATE settings SET value = '6396371761' WHERE key = 'telegram_chat_id' AND (value = '' OR value IS NULL)")
 
+    # 6. Tự động nạp danh sách mã máy lịch sử và bản quyền từ seed_data.json
+    seed_initial_data(cursor)
+
     conn.commit()
     conn.close()
 
@@ -260,6 +263,8 @@ def approve_license(hwid: str, license_key: str, expires_at: str, duration_type:
     affected = c.rowcount > 0
     conn.commit()
     conn.close()
+    if affected:
+        sync_seed_file()
     return affected
 
 def lock_license(hwid: str) -> bool:
@@ -269,6 +274,8 @@ def lock_license(hwid: str) -> bool:
     affected = c.rowcount > 0
     conn.commit()
     conn.close()
+    if affected:
+        sync_seed_file()
     return affected
 
 def unlock_license(hwid: str) -> bool:
@@ -278,6 +285,8 @@ def unlock_license(hwid: str) -> bool:
     affected = c.rowcount > 0
     conn.commit()
     conn.close()
+    if affected:
+        sync_seed_file()
     return affected
 
 def delete_license(hwid: str) -> bool:
@@ -287,6 +296,8 @@ def delete_license(hwid: str) -> bool:
     affected = c.rowcount > 0
     conn.commit()
     conn.close()
+    if affected:
+        sync_seed_file()
     return affected
 
 def update_license_info(hwid: str, student_name: str, email: str = "", phone: str = "", notes: str = "") -> bool:
@@ -300,6 +311,8 @@ def update_license_info(hwid: str, student_name: str, email: str = "", phone: st
     affected = c.rowcount > 0
     conn.commit()
     conn.close()
+    if affected:
+        sync_seed_file()
     return affected
 
 def update_heartbeat(hwid: str) -> None:
@@ -444,4 +457,228 @@ def clear_access_logs() -> bool:
     conn.commit()
     conn.close()
     return True
+
+# ────────────────── Auto-Seed & Data Backup / Restore ──────────────────
+
+SEED_FILE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed_data.json")
+
+def seed_initial_data(cursor):
+    """
+    Tự động nạp danh sách mã máy lịch sử và bản quyền từ seed_data.json vào DB.
+    Đảm bảo sau mỗi lần redeploy hoặc restart trên Render, toàn bộ key cũ không bao giờ bị mất!
+    """
+    seed_paths = [
+        SEED_FILE_PATH,
+        os.path.join(DB_DIR, "seed_data.json")
+    ]
+    seed_file = None
+    for p in seed_paths:
+        if os.path.exists(p):
+            seed_file = p
+            break
+
+    if not seed_file:
+        return
+
+    try:
+        import json
+        with open(seed_file, "r", encoding="utf-8") as f:
+            seed = json.load(f)
+
+        # 1. Nạp licenses
+        for lic in seed.get("licenses", []):
+            hwid = lic.get("hwid", "").strip()
+            if not hwid:
+                continue
+            cursor.execute("SELECT id, status, license_key FROM licenses WHERE hwid = ?", (hwid,))
+            row = cursor.fetchone()
+            if not row:
+                cursor.execute("""
+                    INSERT INTO licenses (
+                        request_id, hwid, student_name, email, phone, machine_name, ip_address,
+                        status, duration_type, license_key, activated_at, expires_at,
+                        last_heartbeat, created_at, notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    lic.get("request_id") or f"REQ_{hwid[:8]}",
+                    hwid,
+                    lic.get("student_name", "Học sinh"),
+                    lic.get("email", ""),
+                    lic.get("phone", ""),
+                    lic.get("machine_name", ""),
+                    lic.get("ip_address", ""),
+                    lic.get("status", "active"),
+                    lic.get("duration_type", "365d"),
+                    lic.get("license_key", ""),
+                    lic.get("activated_at", lic.get("created_at")),
+                    lic.get("expires_at", ""),
+                    lic.get("last_heartbeat", lic.get("activated_at")),
+                    lic.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                    lic.get("notes", "")
+                ))
+            else:
+                # Nếu đã có nhưng chưa có key hoặc đang pending mà seed có key active thì phục hồi
+                if (not row["license_key"] or row["status"] == "pending") and lic.get("license_key"):
+                    cursor.execute("""
+                        UPDATE licenses SET 
+                            license_key = ?, status = ?, expires_at = ?, duration_type = ?,
+                            student_name = COALESCE(NULLIF(?, ''), student_name),
+                            email = COALESCE(NULLIF(?, ''), email),
+                            phone = COALESCE(NULLIF(?, ''), phone),
+                            machine_name = COALESCE(NULLIF(?, ''), machine_name),
+                            notes = COALESCE(NULLIF(?, ''), notes)
+                        WHERE hwid = ?
+                    """, (
+                        lic.get("license_key"), lic.get("status", "active"), lic.get("expires_at"),
+                        lic.get("duration_type", "365d"), lic.get("student_name", ""),
+                        lic.get("email", ""), lic.get("phone", ""), lic.get("machine_name", ""),
+                        lic.get("notes", ""), hwid
+                    ))
+
+        # 2. Nạp download requests
+        for dl in seed.get("download_requests", []):
+            req_id = dl.get("request_id")
+            if not req_id:
+                continue
+            cursor.execute("SELECT id FROM download_requests WHERE request_id = ?", (req_id,))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO download_requests (
+                        request_id, full_name, email, note, ip_address, status,
+                        download_token, token_expires_at, created_at, approved_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    req_id,
+                    dl.get("full_name", ""),
+                    dl.get("email", ""),
+                    dl.get("note", ""),
+                    dl.get("ip_address", ""),
+                    dl.get("status", "approved"),
+                    dl.get("download_token", ""),
+                    dl.get("token_expires_at", ""),
+                    dl.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                    dl.get("approved_at", dl.get("created_at"))
+                ))
+        try:
+            print(f"[Seed] Successfully seeded {len(seed.get('licenses', []))} licenses and {len(seed.get('download_requests', []))} downloads.")
+        except Exception:
+            pass
+    except Exception as e:
+        try:
+            print(f"[Warning] Failed to load seed_data.json: {e}")
+        except Exception:
+            pass
+
+def sync_seed_file():
+    """Tự động đồng bộ các license và yêu cầu tải mới nhất ra seed_data.json để lưu trữ lâu dài"""
+    try:
+        data = export_all_data()
+        payload = {
+            "licenses": data.get("licenses", []),
+            "download_requests": data.get("download_requests", [])
+        }
+        import json
+        with open(SEED_FILE_PATH, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+def export_all_data() -> Dict[str, Any]:
+    """Xuất toàn bộ cơ sở dữ liệu thành đối tượng Dict JSON để tải về máy tính"""
+    conn = get_connection()
+    c = conn.cursor()
+    
+    c.execute("SELECT * FROM licenses ORDER BY id ASC")
+    licenses = [dict(r) for r in c.fetchall()]
+    
+    c.execute("SELECT * FROM download_requests ORDER BY id ASC")
+    download_requests = [dict(r) for r in c.fetchall()]
+    
+    c.execute("SELECT * FROM chat_messages ORDER BY id ASC")
+    chat_messages = [dict(r) for r in c.fetchall()]
+    
+    c.execute("SELECT * FROM access_logs ORDER BY id DESC LIMIT 500")
+    access_logs = [dict(r) for r in c.fetchall()]
+    
+    c.execute("SELECT key, value FROM settings")
+    settings = {r["key"]: r["value"] for r in c.fetchall()}
+    
+    conn.close()
+    return {
+        "exported_at": now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+        "licenses": licenses,
+        "download_requests": download_requests,
+        "chat_messages": chat_messages,
+        "access_logs": access_logs,
+        "settings": settings
+    }
+
+def import_all_data(data: Dict[str, Any], overwrite: bool = False) -> Dict[str, int]:
+    """Nạp dữ liệu từ file backup JSON vào cơ sở dữ liệu"""
+    conn = get_connection()
+    c = conn.cursor()
+    stats = {"licenses": 0, "download_requests": 0, "chat_messages": 0, "access_logs": 0}
+    
+    for lic in data.get("licenses", []):
+        hwid = lic.get("hwid", "").strip()
+        if not hwid:
+            continue
+        c.execute("SELECT id FROM licenses WHERE hwid = ?", (hwid,))
+        exists = c.fetchone()
+        if exists and overwrite:
+            c.execute("""
+                UPDATE licenses SET
+                    student_name = ?, email = ?, phone = ?, machine_name = ?, ip_address = ?,
+                    status = ?, duration_type = ?, license_key = ?, activated_at = ?,
+                    expires_at = ?, last_heartbeat = ?, notes = ?
+                WHERE hwid = ?
+            """, (
+                lic.get("student_name", ""), lic.get("email", ""), lic.get("phone", ""),
+                lic.get("machine_name", ""), lic.get("ip_address", ""), lic.get("status", "active"),
+                lic.get("duration_type", "365d"), lic.get("license_key", ""), lic.get("activated_at"),
+                lic.get("expires_at"), lic.get("last_heartbeat"), lic.get("notes", ""), hwid
+            ))
+            stats["licenses"] += 1
+        elif not exists:
+            c.execute("""
+                INSERT INTO licenses (
+                    request_id, hwid, student_name, email, phone, machine_name, ip_address,
+                    status, duration_type, license_key, activated_at, expires_at,
+                    last_heartbeat, created_at, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                lic.get("request_id") or f"REQ_{hwid[:8]}", hwid, lic.get("student_name", ""),
+                lic.get("email", ""), lic.get("phone", ""), lic.get("machine_name", ""),
+                lic.get("ip_address", ""), lic.get("status", "active"), lic.get("duration_type", "365d"),
+                lic.get("license_key", ""), lic.get("activated_at"), lic.get("expires_at"),
+                lic.get("last_heartbeat"), lic.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                lic.get("notes", "")
+            ))
+            stats["licenses"] += 1
+            
+    for dl in data.get("download_requests", []):
+        req_id = dl.get("request_id")
+        if not req_id:
+            continue
+        c.execute("SELECT id FROM download_requests WHERE request_id = ?", (req_id,))
+        exists = c.fetchone()
+        if not exists:
+            c.execute("""
+                INSERT INTO download_requests (
+                    request_id, full_name, email, note, ip_address, status,
+                    download_token, token_expires_at, created_at, approved_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                req_id, dl.get("full_name", ""), dl.get("email", ""), dl.get("note", ""),
+                dl.get("ip_address", ""), dl.get("status", "approved"), dl.get("download_token", ""),
+                dl.get("token_expires_at", ""), dl.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                dl.get("approved_at")
+            ))
+            stats["download_requests"] += 1
+            
+    conn.commit()
+    conn.close()
+    sync_seed_file()
+    return stats
+
 

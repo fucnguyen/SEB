@@ -37,6 +37,13 @@
             </div>
 
             <div class="flex items-center space-x-2 sm:space-x-3">
+                <button onclick="downloadBackupJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Tải file JSON sao lưu toàn bộ dữ liệu máy & key về máy tính">
+                    <i class="fa-solid fa-download text-[11px] text-emerald-400"></i> <span class="hidden sm:inline">Sao Lưu</span>
+                </button>
+                <button onclick="triggerRestoreJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Khôi phục danh sách máy & key từ file JSON">
+                    <i class="fa-solid fa-upload text-[11px] text-amber-400"></i> <span class="hidden sm:inline">Khôi Phục</span>
+                </button>
+                <input type="file" id="backup-file-input" accept=".json" class="hidden" onchange="handleRestoreFile(event)">
                 <button onclick="openManualKeyModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-white shadow-md shadow-blue-600/20">
                     <i class="fa-solid fa-key text-[11px]"></i> <span class="hidden sm:inline">Tạo Key</span> Thủ Công
                 </button>
@@ -309,6 +316,27 @@
                     </div>
                     <button onclick="changeAdminPassword()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-xl text-xs font-bold text-white transition">
                         Cập Nhật Mật Khẩu
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quản Lý & Khôi Phục Dữ Liệu -->
+            <div class="glass-card rounded-2xl p-5 sm:p-6 border border-slate-800 space-y-4">
+                <h3 class="font-bold text-sm sm:text-base text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                    <i class="fa-solid fa-database text-cyan-400"></i> Quản Lý & Khôi Phục Dữ Liệu (Backup & Restore)
+                </h3>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    Render miễn phí có thể làm mới máy chủ khi cập nhật code hoặc sau thời gian không hoạt động. Toàn bộ mã máy lịch sử đã được lưu cố định vào file hạt giống hệ thống. Bạn cũng có thể tải bản sao lưu JSON về máy tính cá nhân hoặc nạp lại bất cứ lúc nào:
+                </p>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="downloadBackupJson()" class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-xs font-bold text-white transition flex items-center gap-2 shadow-lg shadow-cyan-600/20">
+                        <i class="fa-solid fa-download"></i> Tải File Sao Lưu (Backup JSON)
+                    </button>
+                    <button onclick="triggerRestoreJson()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-200 border border-slate-700 transition flex items-center gap-2">
+                        <i class="fa-solid fa-upload text-amber-400"></i> Nạp File Sao Lưu (Restore JSON)
+                    </button>
+                    <button onclick="restoreSeedData()" class="px-4 py-2.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 rounded-xl text-xs font-semibold border border-indigo-500/30 transition flex items-center gap-2">
+                        <i class="fa-solid fa-arrows-rotate"></i> Nạp Lại Tất Cả Key Lịch Sử Gốc
                     </button>
                 </div>
             </div>
@@ -1430,6 +1458,83 @@
             const div = document.createElement("div");
             div.innerText = text;
             return div.innerHTML;
+        }
+
+        async function downloadBackupJson() {
+            try {
+                const res = await fetch("/api/admin/backup-export");
+                if (!res.ok) throw new Error("Không thể tải file sao lưu");
+                const data = await res.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                const dateStr = new Date().toISOString().slice(0, 10);
+                a.href = url;
+                a.download = `seb_backup_${dateStr}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert("Lỗi sao lưu: " + err.message);
+            }
+        }
+
+        function triggerRestoreJson() {
+            const input = document.getElementById("backup-file-input");
+            if (input) input.click();
+        }
+
+        async function handleRestoreFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    if (!confirm("Bạn có chắc chắn muốn nạp bản sao lưu này? Hệ thống sẽ cập nhật danh sách máy và key.")) {
+                        event.target.value = "";
+                        return;
+                    }
+                    const res = await fetch("/api/admin/backup-import", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify(json)
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        alert(`Khôi phục thành công!\n- Máy & Key: ${result.stats.licenses}\n- Yêu cầu tải: ${result.stats.download_requests}`);
+                        loadLicenses();
+                        loadDownloadRequests();
+                        loadStats();
+                    } else {
+                        alert("Khôi phục thất bại: " + (result.detail || "Lỗi không xác định"));
+                    }
+                } catch (err) {
+                    alert("Lỗi đọc file JSON: " + err.message);
+                } finally {
+                    event.target.value = "";
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function restoreSeedData() {
+            if (!confirm("Khôi phục lại toàn bộ danh sách máy và key lịch sử gốc?")) return;
+            try {
+                const res = await fetch("/api/admin/restore-seed", { method: "POST" });
+                const result = await res.json();
+                if (result.success) {
+                    alert(`Đã nạp lại thành công danh sách gốc!\n- Máy & Key: ${result.stats.licenses}`);
+                    loadLicenses();
+                    loadDownloadRequests();
+                    loadStats();
+                } else {
+                    alert("Thất bại: " + (result.detail || "Lỗi không xác định"));
+                }
+            } catch (err) {
+                alert("Lỗi: " + err.message);
+            }
         }
 
         // Khởi động vòng lặp kiểm tra tin nhắn thời gian thực (1.5 giây / lần)

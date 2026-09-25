@@ -651,6 +651,39 @@ async def api_admin_test_telegram():
     })
     return {"success": res is not None}
 
+# ────────────────── Backup & Restore API ──────────────────
+
+@app.get("/api/admin/backup-export", dependencies=[Depends(require_admin)])
+async def api_admin_backup_export():
+    """Xuất toàn bộ database thành JSON để admin tải về lưu trữ"""
+    data = database.export_all_data()
+    now_str = database.now_vn().strftime("%Y%m%d_%H%M%S")
+    filename = f"seb_database_backup_{now_str}.json"
+    return JSONResponse(
+        content=data,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@app.post("/api/admin/backup-import", dependencies=[Depends(require_admin)])
+async def api_admin_backup_import(payload: Dict[str, Any]):
+    """Nhập dữ liệu từ file backup JSON vào database"""
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Dữ liệu JSON không đúng định dạng!")
+    stats = database.import_all_data(payload, overwrite=True)
+    return {"success": True, "stats": stats}
+
+@app.post("/api/admin/restore-seed", dependencies=[Depends(require_admin)])
+async def api_admin_restore_seed():
+    """Khôi phục lại toàn bộ danh sách key và máy lịch sử gốc từ seed_data.json"""
+    seed_file = database.SEED_FILE_PATH
+    if not os.path.exists(seed_file):
+        raise HTTPException(status_code=404, detail="Không tìm thấy file seed_data.json gốc!")
+    import json
+    with open(seed_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    stats = database.import_all_data(data, overwrite=True)
+    return {"success": True, "stats": stats}
+
 # ────────────────── Live Chat & Client IP API ──────────────────
 
 @app.get("/api/my-ip")
