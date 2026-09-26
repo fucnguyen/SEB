@@ -320,12 +320,12 @@ async def api_stream_local_file(token: str, request: Request):
     if not row:
         raise HTTPException(status_code=403, detail="Mã tải không hợp lệ hoặc đã hết hạn!")
 
-    # 1. Kiểm tra thời hạn 30 phút của link
+    # 1. Kiểm tra thời hạn 24 giờ của link
     exp_str = row.get("token_expires_at")
     if exp_str:
         exp_time = datetime.strptime(exp_str, "%Y-%m-%d %H:%M:%S")
         if database.now_vn() > exp_time:
-            raise HTTPException(status_code=403, detail="Đường link tải này đã hết hạn (30 phút). Vui lòng gửi yêu cầu xin duyệt lại!")
+            raise HTTPException(status_code=403, detail="Đường link tải này đã hết hạn (24 giờ). Vui lòng gửi yêu cầu xin duyệt lại!")
 
     # 2. KIỂM TRA ĐỊA CHỈ IP (IP-Binding)
     current_ip = get_client_ip(request)
@@ -506,7 +506,7 @@ async def api_admin_list_downloads():
 async def api_admin_approve_download(payload: dict):
     req_id = payload.get("request_id")
     token = str(uuid.uuid4())
-    expires_at = (database.now_vn() + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+    expires_at = (database.now_vn() + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
     success = database.approve_download_request(req_id, token, expires_at)
     return {"success": success}
 
