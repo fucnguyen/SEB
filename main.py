@@ -763,6 +763,26 @@ async def api_admin_get_exam_sessions():
     """Lấy danh sách các thí sinh đang trong ca thi"""
     return database.list_live_exam_sessions()
 
+@app.get("/api/admin/seb-sessions", dependencies=[Depends(require_admin)])
+async def api_admin_get_seb_sessions():
+    """Lấy danh sách các phiên thi chạy qua hệ thống SEB Browser"""
+    all_sessions = database.list_live_exam_sessions()
+    seb_sessions = [
+        s for s in all_sessions 
+        if "SEB" in (s.get("exam_title") or "").upper() or "SAFEEXAM" in (s.get("exam_title") or "").upper()
+    ]
+    return {"success": True, "system": "SEB", "count": len(seb_sessions), "sessions": seb_sessions}
+
+@app.get("/api/admin/fpt-sessions", dependencies=[Depends(require_admin)])
+async def api_admin_get_fpt_sessions():
+    """Lấy danh sách các ca thi EOS (Trắc nghiệm) và PEA (Thực hành C/Java/C#) của FPT"""
+    all_sessions = database.list_live_exam_sessions()
+    fpt_sessions = [
+        s for s in all_sessions 
+        if any(k in (s.get("exam_title") or "").upper() for k in ["EOS", "PEA", "PRJ", "PRF", "PRO", "SPK", "TRẮC NGHIỆM", "THỰC HÀNH"])
+    ]
+    return {"success": True, "system": "EOS_PEA", "count": len(fpt_sessions), "sessions": fpt_sessions}
+
 @app.get("/api/admin/exam-questions/{hwid}", dependencies=[Depends(require_admin)])
 async def api_admin_get_exam_questions(hwid: str):
     """Lấy toàn bộ câu hỏi, ảnh và đáp án của 1 thí sinh cụ thể"""
