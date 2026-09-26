@@ -857,16 +857,126 @@
         });
 
         function switchTab(tabId) {
-            ["tab-downloads", "tab-licenses", "tab-logs", "tab-chats", "tab-settings", "tab-exam-support"].forEach(id => {
-                document.getElementById(id).classList.add("hidden");
-                document.getElementById("btn-" + id).className = "pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition";
+            const tabs = ["tab-downloads", "tab-licenses", "tab-logs", "tab-chats", "tab-settings", "tab-exam-support", "tab-fpt-main", "tab-seb-main", "tab-exam-builder"];
+            tabs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add("hidden");
             });
-            document.getElementById(tabId).classList.remove("hidden");
-            document.getElementById("btn-" + tabId).className = "pb-3 border-b-2 border-blue-500 text-blue-400 flex items-center gap-1.5 transition";
+
+            const isEos = currentSystemMode === 'EOS';
+            const activeBorderClass = isEos ? "border-emerald-500" : "border-blue-500";
+            const activeTextClass = isEos ? "text-emerald-400" : "text-blue-400";
+
+            const activeSubbarId = isEos ? "subtab-bar-eos" : "subtab-bar-seb";
+            const subbarBtns = document.querySelectorAll(`#${activeSubbarId} button`);
+            subbarBtns.forEach(btn => {
+                btn.classList.remove("border-blue-500", "border-emerald-500", "text-blue-400", "text-emerald-400");
+                btn.classList.add("border-transparent", "text-slate-400");
+            });
+
+            const targetEl = document.getElementById(tabId);
+            if (targetEl) targetEl.classList.remove("hidden");
+
+            subbarBtns.forEach(btn => {
+                if (btn.getAttribute("onclick") && btn.getAttribute("onclick").includes(tabId)) {
+                    btn.classList.remove("border-transparent", "text-slate-400");
+                    btn.classList.add(activeBorderClass, activeTextClass);
+                }
+            });
 
             if (tabId === "tab-chats") loadChatSessions();
             if (tabId === "tab-logs") loadAccessLogs();
             if (tabId === "tab-exam-support") loadExamSessions();
+            if (tabId === "tab-fpt-main") loadFPTSectionData();
+            if (tabId === "tab-seb-main") loadSEBSectionData();
+        }
+
+        async function loadFPTSectionData() {
+            try {
+                const res = await fetch("/api/admin/fpt-sessions");
+                if (res.status === 401) return;
+                const data = await res.json();
+                const grid = document.getElementById("fpt-sessions-grid");
+                const badge = document.getElementById("badge-fpt-count");
+                if (badge) badge.innerText = data.count || 0;
+                if (!grid) return;
+                const sessions = data.sessions || [];
+                if (sessions.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full p-8 text-center text-slate-500 glass-card rounded-2xl space-y-3">
+                            <i class="fa-solid fa-folder-open text-3xl text-emerald-500/50 block mb-1"></i>
+                            <div>Chưa có ca thi EOS/PEA nào trong hệ thống.</div>
+                            <button onclick="triggerFolderExamLoad()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-emerald-600/20">
+                                <i class="fa-solid fa-folder-open mr-1"></i> Bấm Vào Đây Để Nạp Đề Có Sẵn Từ Folder
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                grid.innerHTML = "";
+                sessions.forEach(s => {
+                    const card = document.createElement("div");
+                    card.className = "glass-card rounded-2xl p-4 border border-slate-800 space-y-3 hover:border-emerald-500/50 transition cursor-pointer";
+                    card.onclick = () => {
+                        switchTab('tab-exam-support');
+                        selectExamSession(s.hwid, s.student_name, s.exam_title);
+                    };
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="font-bold text-sm text-white flex items-center gap-1.5 truncate">
+                                <i class="fa-solid fa-graduation-cap text-emerald-400"></i> ${escapeHtml(s.student_name)}
+                            </div>
+                            <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold shrink-0">ONLINE</span>
+                        </div>
+                        <div class="text-xs text-slate-300 font-medium truncate">${escapeHtml(s.exam_title || 'Bài thi EOS')}</div>
+                        <div class="flex justify-between items-center text-[11px] text-slate-400 pt-2 border-t border-slate-800/60">
+                            <span>Số câu: <strong class="text-emerald-400">${s.total_questions || 0}</strong></span>
+                            <span class="text-slate-500">${s.last_sync ? s.last_sync.split(' ')[1] : ''}</span>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) {}
+        }
+
+        async function loadSEBSectionData() {
+            try {
+                const res = await fetch("/api/admin/seb-sessions");
+                if (res.status === 401) return;
+                const data = await res.json();
+                const grid = document.getElementById("seb-sessions-grid");
+                const badge = document.getElementById("badge-seb-count");
+                if (badge) badge.innerText = data.count || 0;
+                if (!grid) return;
+                const sessions = data.sessions || [];
+                if (sessions.length === 0) {
+                    grid.innerHTML = `<div class="col-span-full p-8 text-center text-slate-500 glass-card rounded-2xl">Chưa có ca thi SEB nào kết nối...</div>`;
+                    return;
+                }
+                grid.innerHTML = "";
+                sessions.forEach(s => {
+                    const card = document.createElement("div");
+                    card.className = "glass-card rounded-2xl p-4 border border-slate-800 space-y-3 hover:border-blue-500/50 transition cursor-pointer";
+                    card.onclick = () => {
+                        switchTab('tab-exam-support');
+                        selectExamSession(s.hwid, s.student_name, s.exam_title);
+                    };
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="font-bold text-sm text-white flex items-center gap-1.5 truncate">
+                                <i class="fa-solid fa-shield-halved text-blue-400"></i> ${escapeHtml(s.student_name)}
+                            </div>
+                            <span class="px-2 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 font-bold shrink-0">ONLINE</span>
+                        </div>
+                        <div class="text-xs text-slate-300 font-medium truncate">${escapeHtml(s.exam_title || 'SEB Session')}</div>
+                        <div class="flex justify-between items-center text-[11px] text-slate-400 pt-2 border-t border-slate-800/60">
+                            <span>Số câu: <strong class="text-blue-400">${s.total_questions || 0}</strong></span>
+                            <span class="text-slate-500">${s.last_sync ? s.last_sync.split(' ')[1] : ''}</span>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) {}
         }
 
         async function loadDashboardStats() {
