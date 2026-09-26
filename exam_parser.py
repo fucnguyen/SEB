@@ -60,17 +60,58 @@ def extract_pea_image(raw: bytes) -> Optional[bytes]:
     return None
 
 def extract_pea_starter_zip(raw: bytes) -> Optional[bytes]:
-    """Trích xuất tệp Starter ZIP Project (.zip) đính kèm trong đề thi PEA"""
-    zip_offsets = [m.start() for m in re.finditer(rb'PK\x03\x04', raw)]
-    for offset in zip_offsets:
-        try:
-            zf = zipfile.ZipFile(io.BytesIO(raw[offset:]))
-            names = zf.namelist()
-            if any('src/' in n for n in names) or len(names) >= 3:
-                return raw[offset:]
-        except Exception:
-            pass
-    return None
+    """Trích xuất và đóng gói sạch sẽ Starter ZIP Project cho tất cả các câu hỏi (Q1, Q2, Q3, Q4) của đề PEA"""
+    tasks_zips = []
+    pos = 0
+    raw_len = len(raw)
+
+    # 1. Tìm các mảng byte GivenMaterials (Record 0x0F ArraySinglePrimitive kiểu byte 0x02)
+    while pos < raw_len - 9:
+        if raw[pos] == 0x0F and raw[pos+9] == 0x02:
+            arr_len = int.from_bytes(raw[pos+5:pos+9], 'little')
+            data_start = pos + 10
+            if 500 < arr_len < 2000000 and data_start + arr_len <= raw_len:
+                bdata = raw[data_start:data_start+arr_len]
+                if bdata[:4] == b'PK\x03\x04':
+                    try:
+                        zf = zipfile.ZipFile(io.BytesIO(bdata))
+                        if len(zf.namelist()) > 0:
+                            tasks_zips.append(bdata)
+                    except Exception:
+                        pass
+        pos += 1
+
+    # 2. Nếu không tìm thấy qua cờ 0x0F, quét theo chữ ký PK\\x03\\x04
+    if not tasks_zips:
+        offsets = [m.start() for m in re.finditer(rb'PK\x03\x04', raw)]
+        for off in offsets:
+            try:
+                sub_raw = raw[off:]
+                zf = zipfile.ZipFile(io.BytesIO(sub_raw))
+                if any('src/' in n for n in zf.namelist()) or len(zf.namelist()) >= 3:
+                    tasks_zips.append(sub_raw)
+                    break
+            except Exception:
+                pass
+
+    if not tasks_zips:
+        return None
+
+    # 3. Đóng gói lại thành tệp ZIP chuẩn tuyệt đối không lỗi phần đuôi thừa
+    out_buf = io.BytesIO()
+    with zipfile.ZipFile(out_buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf_out:
+        if len(tasks_zips) == 1:
+            zf_in = zipfile.ZipFile(io.BytesIO(tasks_zips[0]))
+            for item in zf_in.infolist():
+                zf_out.writestr(item, zf_in.read(item.filename))
+        else:
+            for q_idx, q_zip in enumerate(tasks_zips):
+                prefix = f"Q{q_idx+1}/"
+                zf_in = zipfile.ZipFile(io.BytesIO(q_zip))
+                for item in zf_in.infolist():
+                    zf_out.writestr(prefix + item.filename, zf_in.read(item.filename))
+
+    return out_buf.getvalue()
 
 def parse_pea_exam(raw: bytes, filename: str) -> Dict[str, Any]:
     """Phân tích đề thi thực hành PEA (Java / C / C++ / C#)"""
