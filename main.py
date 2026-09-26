@@ -198,6 +198,10 @@ class SettingsModel(BaseModel):
 async def page_index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
+@app.get("/mock-exam", response_class=HTMLResponse)
+async def page_mock_exam(request: Request):
+    return templates.TemplateResponse(request=request, name="mock_exam.html")
+
 @app.get("/login", response_class=HTMLResponse)
 async def page_login(request: Request):
     if is_admin_authenticated(request):

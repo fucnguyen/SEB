@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đề Thi Thử - SEB Testing</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f8; color: #333; padding: 20px; line-height: 1.6; }
+        .quiz-container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #1a73e8; border-bottom: 2px solid #e8eaed; padding-bottom: 15px; }
+        
+        /* Moodle-like structure */
+        .que { border: 1px solid #dee2e6; margin-bottom: 25px; padding: 20px; border-radius: 6px; background-color: #fff; }
+        .que .info { font-weight: bold; background-color: #f8f9fa; padding: 10px; margin: -20px -20px 15px -20px; border-bottom: 1px solid #dee2e6; border-radius: 6px 6px 0 0; }
+        .qtext { margin-bottom: 15px; font-size: 16px; font-weight: 500; }
+        .answer { margin-left: 10px; }
+        
+        /* Options */
+        .answer > div { margin-bottom: 10px; display: flex; items-center; gap: 8px; }
+        input[type="radio"], input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        label { cursor: pointer; }
+        
+        /* Text/Essay inputs */
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 15px; font-family: inherit; }
+        textarea.form-control { resize: vertical; min-height: 100px; }
+        
+        .submit-btn { display: block; width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 30px; }
+        .submit-btn:hover { background: #1557b0; }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <h1>BÀI THI KIỂM TRA HỆ THỐNG</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">Trang này giả lập giao diện thi Moodle để test tính năng đồng bộ đề & nhận đáp án.</p>
+
+        <form onsubmit="event.preventDefault(); alert('Nộp bài thành công!');">
+            
+            <!-- Câu 1: Trắc nghiệm 1 đáp án (Radio) -->
+            <div id="q1" class="que multichoice">
+                <div class="info">Câu 1</div>
+                <div class="content">
+                    <div class="qtext">
+                        <p>Thủ đô của Việt Nam là gì?</p>
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Hanoi_Flag_Tower.jpg/320px-Hanoi_Flag_Tower.jpg" alt="Hanoi" style="max-height: 150px; border-radius: 4px; margin-top: 10px;">
+                    </div>
+                    <div class="answer">
+                        <div><input type="radio" name="q1" value="A" id="q1_a"><label for="q1_a">A. Thành phố Hồ Chí Minh</label></div>
+                        <div><input type="radio" name="q1" value="B" id="q1_b"><label for="q1_b">B. Đà Nẵng</label></div>
+                        <div><input type="radio" name="q1" value="C" id="q1_c"><label for="q1_c">C. Hà Nội</label></div>
+                        <div><input type="radio" name="q1" value="D" id="q1_d"><label for="q1_d">D. Huế</label></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Câu 2: Trắc nghiệm nhiều đáp án (Checkbox) -->
+            <div id="q2" class="que multichoice">
+                <div class="info">Câu 2</div>
+                <div class="content">
+                    <div class="qtext">
+                        <p>Những ngôn ngữ lập trình nào sau đây dùng để làm Web Front-end? (Chọn nhiều đáp án)</p>
+                    </div>
+                    <div class="answer">
+                        <div><input type="checkbox" name="q2[]" value="HTML" id="q2_a"><label for="q2_a">HTML</label></div>
+                        <div><input type="checkbox" name="q2[]" value="Python" id="q2_b"><label for="q2_b">Python</label></div>
+                        <div><input type="checkbox" name="q2[]" value="JavaScript" id="q2_c"><label for="q2_c">JavaScript</label></div>
+                        <div><input type="checkbox" name="q2[]" value="CSS" id="q2_d"><label for="q2_d">CSS</label></div>
+                        <div><input type="checkbox" name="q2[]" value="C++" id="q2_e"><label for="q2_e">C++</label></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Câu 3: Điền từ ngắn (Text) -->
+            <div id="q3" class="que shortanswer">
+                <div class="info">Câu 3</div>
+                <div class="content">
+                    <div class="qtext">
+                        <p>Điền vào chỗ trống: Khởi nghĩa Hai Bà Trưng diễn ra vào năm bao nhiêu?</p>
+                    </div>
+                    <div class="answer">
+                        <input type="text" name="q3" class="form-control" placeholder="Nhập câu trả lời ngắn...">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Câu 4: Tự luận (Essay) -->
+            <div id="q4" class="que essay">
+                <div class="info">Câu 4</div>
+                <div class="content">
+                    <div class="qtext">
+                        <p>Hãy tóm tắt nguyên lý hoạt động của Safe Exam Browser (Tự luận):</p>
+                    </div>
+                    <div class="answer">
+                        <textarea name="q4" class="form-control" placeholder="Nhập nội dung tự luận của bạn vào đây..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn">NỘP BÀI THI</button>
+        </form>
+    </div>
+</body>
+</html>
