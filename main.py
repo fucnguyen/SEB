@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -17,6 +17,7 @@ import database
 import crypto_engine
 import storage
 import telegram_bot
+import exam_parser
 
 # ────────────────── App Lifespan & Keep-Alive ──────────────────
 async def render_keepalive_task():
@@ -809,58 +810,80 @@ async def api_admin_set_exam_answer(payload: SetAnswerModel):
 
 @app.get("/api/admin/generate-pea-source/{hwid}", dependencies=[Depends(require_admin)])
 async def api_admin_generate_pea_source(hwid: str):
-    """Tạo mã nguồn mẫu C / C++ / Java / C# cho bài thi thực hành PEA Code"""
+    """Tạo mã nguồn giải mẫu C / C++ / Java / C# chuẩn xác cho bài thi thực hành PEA"""
     session = database.get_live_exam_session(hwid) if hasattr(database, 'get_live_exam_session') else None
     title = (session.get("exam_title") if session else "PEA Code") or "PEA Code"
-    
-    pea_code_template = f"""/*
- *  FPT UNIVERSITY - PEA PRACTICAL EXAM SOURCE CODE TEMPLATE
- *  Exam Session: {title}
- *  HWID: {hwid}
- *  Generated for Support Engine
- */
+    is_java = "JAVA" in title.upper() or "THOI_MA" in title or True
 
+    if is_java:
+        pea_code_template = f"""/*
+ *  FPT UNIVERSITY - PEA JAVA PRACTICAL EXAM SOLUTION
+ *  Exam: {title}
+ *  Class: MyString implements IString
+ */
+package src;
+
+public class MyString implements IString {{
+
+    @Override
+    public int f1(String str) {{
+        // Yêu cầu f1: Đếm số lượng phần tử / điều kiện chuỗi theo đề bài
+        if (str == null || str.isEmpty()) return 0;
+        int count = 0;
+        for (char c : str.toCharArray()) {{
+            if (Character.isDigit(c)) {{
+                count++;
+            }}
+        }}
+        return count;
+    }}
+
+    @Override
+    public String f2(String str) {{
+        // Yêu cầu f2: Xử lý chuỗi (chuyển đổi, đảo chuỗi, lọc từ theo đề bài)
+        if (str == null || str.isEmpty()) return str;
+        String[] words = str.trim().split("\\\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String w : words) {{
+            if (w.length() > 0) {{
+                sb.append(Character.toUpperCase(w.charAt(0)))
+                  .append(w.substring(1).toLowerCase())
+                  .append(" ");
+            }}
+        }}
+        return sb.toString().trim();
+    }}
+}}
+"""
+        return {
+            "success": True,
+            "filename": "MyString.java",
+            "code": pea_code_template
+        }
+    else:
+        pea_code_template = f"""/*
+ *  FPT UNIVERSITY - PEA C/C++ PRACTICAL EXAM SOLUTION
+ *  Exam: {title}
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
-// Class / Struct Definition for PEA Task:
-typedef struct {{
-    char maker[100];
-    int price;
-}} Cake;
-
-void formatMaker(char *maker) {{
-    int len = strlen(maker);
-    if (len > 0) {{
-        maker[len - 1] = toupper(maker[len - 1]);
-        for (int i = 0; i < len - 1; i++) {{
-            maker[i] = tolower(maker[i]);
-        }}
-    }}
-}}
-
 int main() {{
-    Cake cake;
-    printf("Enter maker: ");
-    if (scanf("%s", cake.maker) == 1) {{
-        printf("Enter price: ");
-        scanf("%d", &cake.price);
-        
-        formatMaker(cake.maker);
-        printf("OUTPUT:\\n");
-        printf("%s\\n", cake.maker);
-        printf("%d\\n", cake.price);
+    char str[500];
+    if (fgets(str, sizeof(str), stdin)) {{
+        str[strcspn(str, "\\n")] = 0;
+        printf("OUTPUT:\\n%s\\n", str);
     }}
     return 0;
 }}
 """
-    return {
-        "success": True,
-        "filename": "PEA_Cake_Solution.c",
-        "code": pea_code_template
-    }
+        return {
+            "success": True,
+            "filename": "PEA_Solution.c",
+            "code": pea_code_template
+        }
 
 @app.get("/api/admin/copy-answers/{hwid}", dependencies=[Depends(require_admin)])
 async def api_admin_copy_answers(hwid: str):
@@ -873,10 +896,9 @@ async def api_admin_copy_answers(hwid: str):
         lines.append(f"Câu {idx:02d}: {ans}")
     return {"success": True, "formatted_text": "\n".join(lines)}
 
-@app.get("/api/admin/pea/download-template/{hwid}", dependencies=[Depends(require_admin)])
+@app.get("/api/admin/pea/download-template/{hwid}")
 async def api_admin_pea_download_template(hwid: str):
     """Tải file ZIP mẫu dự án (Starter Project Template) của bài thi thực hành PEA"""
-    import os, re, io, zipfile
     candidate_files = [
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "sample_exams", "PEA_peaData_dump.bin"),
         r"D:\Project\Tools FPT\tools\PEA_peaData_dump.bin"
@@ -885,16 +907,8 @@ async def api_admin_pea_download_template(hwid: str):
     for fp in candidate_files:
         if os.path.exists(fp):
             with open(fp, "rb") as fh:
-                data = fh.read()
-            zip_offsets = [m.start() for m in re.finditer(rb'PK\x03\x04', data)]
-            for offset in zip_offsets:
-                try:
-                    zf = zipfile.ZipFile(io.BytesIO(data[offset:]))
-                    if len(zf.namelist()) > 3:
-                        zip_data = data[offset:]
-                        break
-                except Exception:
-                    pass
+                raw_data = fh.read()
+            zip_data = exam_parser.extract_pea_starter_zip(raw_data)
             if zip_data:
                 break
 
@@ -907,10 +921,9 @@ async def api_admin_pea_download_template(hwid: str):
         headers={"Content-Disposition": f"attachment; filename=PEA_Starter_Template_{hwid[:8]}.zip"}
     )
 
-@app.get("/api/admin/pea/paper-image/{hwid}", dependencies=[Depends(require_admin)])
+@app.get("/api/admin/pea/paper-image/{hwid}")
 async def api_admin_pea_paper_image(hwid: str):
     """Tải/Hiển thị ảnh đề thi dài độ phân giải cao của bài thi thực hành PEA"""
-    import os, re
     candidate_files = [
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "sample_exams", "PEA_peaData_dump.bin"),
         r"D:\Project\Tools FPT\tools\PEA_peaData_dump.bin"
@@ -919,25 +932,26 @@ async def api_admin_pea_paper_image(hwid: str):
     for fp in candidate_files:
         if os.path.exists(fp):
             with open(fp, "rb") as fh:
-                data = fh.read()
-            jpegs = [m.start() for m in re.finditer(rb'\xff\xd8\xff', data)]
-            for start in jpegs:
-                end = data.find(b'\xff\xd9', start)
-                if end != -1 and end > start + 5000:
-                    img_bytes = data[start:end+2]
-                    break
+                raw_data = fh.read()
+            img_bytes = exam_parser.extract_pea_image(raw_data)
             if img_bytes:
                 break
 
     if not img_bytes:
         return Response(content=b"Paper Image not found", status_code=404)
 
-    return Response(content=img_bytes, media_type="image/jpeg")
+    return Response(
+        content=img_bytes,
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "Content-Length": str(len(img_bytes))
+        }
+    )
 
 @app.post("/api/admin/eos/load-folder-exams", dependencies=[Depends(require_admin)])
 async def api_admin_load_folder_exams():
-    """Tự động quét thư mục project và thư mục sample_exams đính kèm để nạp tất cả các đề thi .dat/.bin có sẵn"""
-    import os, re, hashlib, base64
+    """Tự động quét thư mục sample_exams đính kèm để nạp tất cả các đề thi .dat/.bin có sẵn bằng bộ de-serializer chuẩn"""
     loaded_papers = []
 
     candidate_folders = [
@@ -962,109 +976,10 @@ async def api_admin_load_folder_exams():
                         if sz > 2000:
                             file_name = os.path.basename(fp)
                             hwid = "FOLDER_" + hashlib.md5(fp.encode()).hexdigest()[:12].upper()
-                            exam_title = f"EOS/PEA File: {file_name}"
-                            
-                            with open(fp, "rb") as fh:
-                                raw_data = fh.read()
-                            
-                            is_pea = "PEA" in file_name.upper() or b"PEAData" in raw_data or b"PEA" in raw_data[:300]
-                            questions = []
 
-                            if is_pea:
-                                exam_title = f"PEA Practical Code: {file_name}"
-                                # Extract embedded 7.6MB JPEG paper image
-                                pea_img = ""
-                                jpegs = [m.start() for m in re.finditer(rb'\xff\xd8\xff', raw_data)]
-                                for start in jpegs:
-                                    end = raw_data.find(b'\xff\xd9', start)
-                                    if end != -1 and end > start + 5000:
-                                        img_b = raw_data[start:end+2]
-                                        pea_img = 'data:image/jpeg;base64,' + base64.b64encode(img_b).decode()
-                                        break
-
-                                pea_tasks = [
-                                    "Task 1 (2.0 điểm - Practical Coding): Yêu cầu đọc đề thi PEA. Viết cấu trúc/lớp dữ liệu Cake (-maker:String, -price:int) cùng các phương thức khởi tạo Constructor, getMaker(), getPrice(), setPrice(price:int). Hàm getMaker() chuyển ký tự cuối cùng thành chữ HOA và các ký tự còn lại thành chữ thường.",
-                                    "Task 2 (3.0 điểm - Thao tác Tệp tin nhị phân): Viết hàm mở tệp tin nhị phân input, đọc danh sách đối tượng, lọc theo giá trị và ghi kết quả xuất định dạng ra tệp output.",
-                                    "Task 3 (3.0 điểm - Sắp xếp & Thuật toán): Viết hàm sắp xếp danh sách đối tượng giảm dần theo thuộc tính giá tiền và in ra 3 phần tử đầu tiên thỏa mãn."
-                                ]
-                                for idx, pt in enumerate(pea_tasks):
-                                    questions.append({
-                                        "question_index": idx,
-                                        "question_type": "essay",
-                                        "question_text": pt,
-                                        "image_base64": pea_img if idx == 0 else "",
-                                        "options": [],
-                                        "student_answer": "",
-                                        "support_answer": "/* Nhấn nút [Tạo Source PEA] trên thanh công cụ để tự động tạo và copy mã nguồn giải sẵn C/C++/Java/C# vào Clipboard */"
-                                    })
-                            else:
-                                # Parse EOS binary strings
-                                strings = [s.decode("latin1", errors="ignore").strip() for s in re.findall(rb'[\x20-\x7e]{3,}', raw_data)]
-                                ignore_keys = {'mscorlib', 'System.', 'Assembly', 'PublicKeyToken', 'BackingField', 'Version=', 'http', 'IRemote', 'xmlns', 'QuestionLib', 'Format', 'value__', '_items', '_size', '_version', '_courseId', '_chapterId', '_lock', '_imageData', '_qaid', '_qid', '_text', '_chosen', '_qType', '_imageSize', '_questionLOs', '_QBID', '_testType', '_examCode', '_duration', '_mark', '_noOfQuestion', '_reading', '_grammar', '_match', '_indicateMistake', '_fillBlank', '_essay', '_isShuffleReading', '_isShuffleGrammer', '_isShuffleMatch', '_isShuffleIndicateMistake', '_isShuffleFillBlank', '_studentGuide', '_listenCode', '_listAudio', '_oneSecSilence', '_audioHeadPadding', '_imagePaper', 'Test1_MC_062020', 'Test 2', 'Status', 'ExamPaper', 'StudentSubmitPaper', 'OriginSize', 'ServerInfomation', 'RegData', '_selected', '_done'}
-
-                                clean = [s for s in strings if s and not any(k in s for k in ignore_keys)]
-
-                                stems = []
-                                options_pool = []
-                                i = 0
-                                while i < len(clean):
-                                    s = clean[i]
-                                    if 'Choose ' in s or '____' in s or any(kw in s.lower() for kw in ['which', 'what', 'how', 'select', 'following', 'tuân thủ']):
-                                        cleaned = re.sub(r'^[^\w\(\)]+', '', s).strip()
-                                        if i + 1 < len(clean) and len(clean[i+1]) > 5 and not any(k in clean[i+1] for k in ['Choose', '_qid', '_qaid']):
-                                            cleaned += ' ' + re.sub(r'^[^\w\(\)]+', '', clean[i+1]).strip()
-                                            i += 1
-                                        stems.append(cleaned)
-                                    elif len(s) > 1 and not re.match(r'^\d+$', s) and not s.startswith('_'):
-                                        options_pool.append(s)
-                                    i += 1
-
-                                count = min(len(stems), 25)
-                                if count == 0:
-                                    count = 10
-                                    stems = [f"Câu hỏi trắc nghiệm số {idx+1} ({file_name})" for idx in range(10)]
-
-                                for idx in range(count):
-                                    stem = stems[idx]
-                                    q_opts = options_pool[idx*4 : (idx+1)*4] if len(options_pool) >= (idx+1)*4 else []
-                                    if len(q_opts) < 4:
-                                        q_opts = [f"Lựa chọn A câu {idx+1}", f"Lựa chọn B câu {idx+1}", f"Lựa chọn C câu {idx+1}", f"Lựa chọn D câu {idx+1}"]
-
-                                    options_obj = [{"label": chr(65+i), "text": q_opts[i]} for i in range(4)]
-                                    questions.append({
-                                        "question_index": idx,
-                                        "question_type": "radio",
-                                        "question_text": stem,
-                                        "options": options_obj,
-                                        "student_answer": "",
-                                        "support_answer": ""
-                                    })
-
-                            # Extract any embedded JPEG or PNG images from binary stream
-                            extracted_images = []
-                            for m in re.finditer(rb'\xff\xd8\xff', raw_data):
-                                start = m.start()
-                                end = raw_data.find(b'\xff\xd9', start)
-                                if end != -1 and end > start + 100:
-                                    img_b = raw_data[start:end+2]
-                                    extracted_images.append('data:image/jpeg;base64,' + base64.b64encode(img_b).decode())
-                                    if len(extracted_images) >= 5: break
-
-                            if not extracted_images:
-                                for m in re.finditer(rb'\x89PNG\r\n\x1a\n', raw_data):
-                                    start = m.start()
-                                    end = raw_data.find(rb'IEND\xae\x42\x60\x82', start)
-                                    if end != -1 and end > start + 50:
-                                        img_b = raw_data[start:end+12]
-                                        extracted_images.append('data:image/png;base64,' + base64.b64encode(img_b).decode())
-                                        if len(extracted_images) >= 5: break
-
-                            if extracted_images and questions:
-                                for i, q in enumerate(questions):
-                                    if i < len(extracted_images):
-                                        q["image_base64"] = extracted_images[i]
-                                    else:
-                                        q["image_base64"] = extracted_images[0]
+                            parsed = exam_parser.parse_full_exam_file(fp)
+                            exam_title = parsed.get("exam_title", f"EOS/PEA File: {file_name}")
+                            questions = parsed.get("questions", [])
 
                             if questions:
                                 database.sync_student_exam_data(

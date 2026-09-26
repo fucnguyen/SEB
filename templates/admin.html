@@ -2112,7 +2112,7 @@
                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                                     <span class="text-[10px] text-emerald-400 font-semibold">LIVE</span>
                                     <span class="text-[10px] text-slate-500">• Sync: ${lastSync}</span>
-                                    <span class="text-[10px] text-slate-500">• ${s.question_count || 0} câu</span>
+                                    <span class="text-[10px] text-slate-400 font-bold">• ${s.question_count || s.total_questions || 0} câu</span>
                                 </div>
                             </div>
                         </div>
@@ -2238,8 +2238,7 @@
                 container.innerHTML = "";
 
                 const isPeaExamOverall = (currentExamName || "").toUpperCase().includes("PEA") || 
-                                         (currentExamHWID || "").toUpperCase().includes("PEA") || 
-                                         questions.some(q => q.question_type === "essay" || q.question_type === "pea" || q.question_type === "practical");
+                                         (currentExamHWID || "").toUpperCase().includes("PEA");
 
                 if (isPeaExamOverall) {
                     const paperImgUrl = `/api/admin/pea/paper-image/${encodeURIComponent(currentExamHWID)}`;
@@ -2254,6 +2253,9 @@
                                 <span class="text-xs text-slate-300 font-medium">Hình ảnh Class Diagram, Method Specification & Output Sample</span>
                             </div>
                             <div class="flex items-center gap-2">
+                                <a href="${paperImgUrl}" target="_blank" download="PEA_Paper_${encodeURIComponent(currentExamHWID)}.jpg" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
+                                    <i class="fa-solid fa-file-arrow-down"></i> Tải ảnh đề PEA (HD)
+                                </a>
                                 <button onclick="triggerPeaTemplateDownload()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
                                     <i class="fa-solid fa-download"></i> Tải Starter ZIP PEA
                                 </button>
@@ -2262,12 +2264,12 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="overflow-x-auto max-h-[550px] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-2 text-center">
+                        <div class="overflow-x-auto max-h-[600px] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-2 text-center">
                             <img src="${paperImgUrl}" 
                                  onclick="openImageLightbox('${paperImgUrl}', 'Đề thi thực hành PEA (Chất lượng cao HD)')" 
                                  class="w-full max-w-full h-auto object-contain rounded-lg cursor-zoom-in hover:opacity-95 transition shadow-lg mx-auto"
-                                 onerror="this.parentElement.style.display='none'"
-                                 alt="Đề thi thực hành PEA">
+                                 loading="lazy"
+                                 alt="Đề thi thực hành PEA (Chất lượng cao HD)">
                         </div>
                     `;
                     container.appendChild(peaHeaderCard);
@@ -2383,21 +2385,24 @@
                     } else if (qtype === "text" || qtype === "essay") {
                         // Free-text input / Code Solution area
                         const rows = qtype === "essay" ? 4 : 1;
+                        const placeholderText = isPeaExamOverall
+                            ? "Nhập mã nguồn / đáp án bài thi thực hành PEA..."
+                            : "Nhập bài văn / luận tiếng Anh hoặc nội dung câu trả lời...";
                         const inputEl = qtype === "essay"
-                            ? `<textarea id="text-ans-${q.question_index}" rows="${rows}" placeholder="Nhập mã nguồn / đáp án bài thi thực hành PEA..." class="flex-1 bg-slate-900 border border-cyan-700/60 rounded-xl px-3 py-2 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 resize-none shadow-inner">${escapeHtml(chosenAns)}</textarea>`
+                            ? `<textarea id="text-ans-${q.question_index}" rows="${rows}" placeholder="${placeholderText}" class="flex-1 bg-slate-900 border border-cyan-700/60 rounded-xl px-3 py-2 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 resize-none shadow-inner">${escapeHtml(chosenAns)}</textarea>`
                             : `<input type="text" id="text-ans-${q.question_index}" value="${escapeHtml(chosenAns)}" placeholder="Nhập câu trả lời..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">`;
                         answerAreaHtml = `
                             <div class="space-y-2">
-                                ${qtype === 'essay' ? `
+                                ${isPeaExamOverall ? `
                                     <div class="flex items-center gap-2 pb-1">
                                         <button onclick="triggerPeaSourceGen()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-cyan-600/30">
-                                            <i class="fa-solid fa-code"></i> Tạo Mã Nguồn Giải PEA (C/C++/Java/C#)
+                                            <i class="fa-solid fa-code"></i> Tạo Mã Nguồn Giải PEA (Java/C/C++)
                                         </button>
                                         <span class="text-[11px] text-cyan-400/80">Tự động sinh code mẫu chuẩn bài thi thực hành PEA</span>
                                     </div>` : ''
                                 }
                                 <div class="flex items-start gap-2">
-                                    <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0 pt-2">Mã nguồn / Đáp án:</span>
+                                    <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0 pt-2">${isPeaExamOverall ? "Mã nguồn:" : "Đáp án:"}</span>
                                     ${inputEl}
                                     <button onclick="submitTextAnswer('${currentExamHWID}', ${q.question_index})" class="shrink-0 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-xs font-bold text-white border-2 border-cyan-500 transition shadow-md">Lưu Đáp Án</button>
                                     ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="shrink-0 px-2 py-2 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕</button>` : ""}

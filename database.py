@@ -790,9 +790,12 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
             b64 = oc.get("image_base64", "")
             oc["image_base64"] = b64[:100000] if b64 else ""
             opts_clean.append(oc)
-
         opts_json = json.dumps(opts_clean, ensure_ascii=False)
-        stem_img  = (q.get("image_base64") or "")[:300000]
+
+        # Don't truncate base64 image if it's within 1MB
+        stem_img = q.get("image_base64") or ""
+        if len(stem_img) > 1000000:
+            stem_img = ""  # Larger than 1MB is served via dedicated endpoint
         imgs_json = json.dumps([stem_img] if stem_img else [], ensure_ascii=False)
 
         try:
@@ -867,7 +870,11 @@ def list_live_exam_sessions(limit: int = 50) -> List[Dict[str, Any]]:
     conn = get_connection()
     c    = conn.cursor()
     c.execute("SELECT * FROM live_exam_sessions ORDER BY last_sync DESC LIMIT ?", (limit,))
-    rows = [dict(r) for r in c.fetchall()]
+    rows = []
+    for r in c.fetchall():
+        d = dict(r)
+        d["question_count"] = d.get("total_questions", 0)
+        rows.append(d)
     conn.close()
     return rows
 
