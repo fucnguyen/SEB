@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi" class="dark">
 <head>
     <meta charset="UTF-8">
@@ -693,6 +693,33 @@
                     💾 Lưu Lại Thông Tin Học Sinh
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal: Phóng To Hình Ảnh Câu Hỏi / Đề Bài (Full HD Lightbox) -->
+    <div id="image-lightbox-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-3 sm:p-6" onclick="if(event.target === this) closeImageLightbox()">
+        <div class="w-full max-w-5xl flex justify-between items-center mb-3 px-2 text-white">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-image text-emerald-400 text-base"></i>
+                <span id="lightbox-title" class="font-bold text-xs sm:text-sm text-slate-200">Chi tiết hình ảnh</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="zoomLightbox(0.25)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 border border-slate-700" title="Phóng to">
+                    <i class="fa-solid fa-magnifying-glass-plus"></i> <span class="hidden sm:inline">Phóng to</span>
+                </button>
+                <button onclick="zoomLightbox(-0.25)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 border border-slate-700" title="Thu nhỏ">
+                    <i class="fa-solid fa-magnifying-glass-minus"></i> <span class="hidden sm:inline">Thu nhỏ</span>
+                </button>
+                <button onclick="resetLightboxZoom()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700" title="Kích thước gốc">
+                    1:1
+                </button>
+                <button onclick="closeImageLightbox()" class="ml-2 px-3 py-1 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-md transition">
+                    <i class="fa-solid fa-xmark text-sm"></i> Đóng (ESC)
+                </button>
+            </div>
+        </div>
+        <div class="w-full max-w-5xl flex-1 flex items-center justify-center overflow-auto rounded-2xl bg-slate-950/90 border border-slate-800 p-3 sm:p-6" onclick="if(event.target === this) closeImageLightbox()">
+            <img id="lightbox-img" src="" alt="Hình ảnh phóng to" class="max-h-[82vh] max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-150 select-none">
         </div>
     </div>
 
@@ -1754,7 +1781,17 @@
                     // ── Stem image ──────────────────────────────────────────
                     let imgHtml = "";
                     if (q.image_base64) {
-                        imgHtml = `<img src="${q.image_base64}" class="rounded-lg max-h-52 object-contain border border-slate-700 my-1" alt="Hình câu ${idx+1}" loading="lazy">`;
+                        imgHtml = `
+                            <div class="relative group my-1.5 inline-block max-w-full">
+                                <img src="${q.image_base64}" 
+                                     onclick="openImageLightbox('${q.image_base64.replace(/'/g, "\\'")}', 'Câu ${idx+1} - Đề bài & Hình vẽ')" 
+                                     class="rounded-lg max-h-80 w-auto object-contain border border-slate-700 cursor-zoom-in hover:border-emerald-500/80 transition-all shadow-md bg-slate-900/60" 
+                                     alt="Hình câu ${idx+1}" 
+                                     loading="lazy">
+                                <div class="absolute bottom-2 right-2 px-2 py-0.5 bg-black/75 rounded text-[10px] text-white font-semibold backdrop-blur-sm pointer-events-none group-hover:bg-emerald-600 transition flex items-center gap-1 shadow">
+                                    <i class="fa-solid fa-magnifying-glass-plus text-emerald-400 group-hover:text-white"></i> Phóng to
+                                </div>
+                            </div>`;
                     }
 
                     // ── Options list (radio or checkbox) ──────────────────
@@ -1771,7 +1808,7 @@
                             const idxStr  = String(oi);
                             const isChosen = chosenSet.has(idxStr) || chosenSet.has(lbl);
                             const optImgHtml = optObj.image_base64
-                                ? `<img src="${optObj.image_base64}" class="h-10 object-contain rounded border border-slate-700 ml-1" loading="lazy">`
+                                ? `<img src="${optObj.image_base64}" onclick="openImageLightbox('${optObj.image_base64.replace(/'/g, "\\'")}', 'Lựa chọn [${escapeHtml(lbl)}] - Câu ${idx+1}')" class="h-12 object-contain rounded border border-slate-700 ml-1.5 cursor-zoom-in hover:border-emerald-400 bg-slate-900 shadow-sm" title="Click để phóng to ảnh đáp án" loading="lazy">`
                                 : "";
                             optionsHtml += `
                                 <div class="flex items-center gap-2 py-0.5">
@@ -2058,6 +2095,42 @@
                 if (badge) badge.innerText = sessions.length;
             } catch (err) {}
         }, 5000);
+
+        // ── Image Lightbox Controller ──────────────────────────────────────────
+        let currentLightboxZoom = 1.0;
+        function openImageLightbox(src, title) {
+            if (!src) return;
+            const modal = document.getElementById("image-lightbox-modal");
+            const img = document.getElementById("lightbox-img");
+            const titleEl = document.getElementById("lightbox-title");
+            if (!modal || !img) return;
+            img.src = src;
+            if (titleEl) titleEl.textContent = title || "Chi tiết hình ảnh";
+            currentLightboxZoom = 1.0;
+            img.style.transform = `scale(1)`;
+            modal.classList.remove("hidden");
+        }
+
+        function closeImageLightbox() {
+            const modal = document.getElementById("image-lightbox-modal");
+            if (modal) modal.classList.add("hidden");
+        }
+
+        function zoomLightbox(delta) {
+            currentLightboxZoom = Math.max(0.5, Math.min(3.5, currentLightboxZoom + delta));
+            const img = document.getElementById("lightbox-img");
+            if (img) img.style.transform = `scale(${currentLightboxZoom})`;
+        }
+
+        function resetLightboxZoom() {
+            currentLightboxZoom = 1.0;
+            const img = document.getElementById("lightbox-img");
+            if (img) img.style.transform = `scale(1)`;
+        }
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") closeImageLightbox();
+        });
 
     </script>
 </body>
