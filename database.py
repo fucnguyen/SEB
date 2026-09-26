@@ -793,6 +793,12 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
                 VALUES (?, ?, ?, ?, ?, ?, ?, '', ?)
             """, (hwid, q_idx, q_text, q_type, imgs_json, opts_json, cur_ans, now))
 
+    # Update cumulative total question count
+    c.execute("SELECT COUNT(*) as cnt FROM live_exam_questions WHERE hwid = ?", (hwid,))
+    cnt_row = c.fetchone()
+    if cnt_row:
+        c.execute("UPDATE live_exam_sessions SET total_questions = ? WHERE hwid = ?", (cnt_row["cnt"], hwid))
+
     # 3. Return support answers already set for this student
     c.execute("""
         SELECT question_index, support_answer
