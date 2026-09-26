@@ -74,6 +74,11 @@ def init_db():
     except Exception:
         pass
 
+    try:
+        cursor.execute("ALTER TABLE licenses ADD COLUMN system_type TEXT DEFAULT 'SEB'")
+    except Exception:
+        pass
+
     # 3. Bảng tin nhắn chat giữa học sinh và admin (kèm IP máy)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS chat_messages (
@@ -250,7 +255,7 @@ def get_request_by_download_token(token: str) -> Optional[Dict[str, Any]]:
 # ────────────────── License & HWID API ──────────────────
 
 def create_or_update_activation_request(
-    request_id: str, hwid: str, student_name: str, email: str, machine_name: str, ip_address: str
+    request_id: str, hwid: str, student_name: str, email: str, machine_name: str, ip_address: str, system_type: str = "SEB"
 ) -> Dict[str, Any]:
     now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
@@ -260,17 +265,16 @@ def create_or_update_activation_request(
     existing = c.fetchone()
 
     if existing:
-        # Nếu đã có nhưng đang pending hoặc active, cập nhật thông tin
         c.execute("""
             UPDATE licenses 
-            SET student_name = ?, email = ?, machine_name = ?, ip_address = ?, last_heartbeat = ?
+            SET student_name = ?, email = ?, machine_name = ?, ip_address = ?, last_heartbeat = ?, system_type = ?
             WHERE hwid = ?
-        """, (student_name, email, machine_name, ip_address, now, hwid))
+        """, (student_name, email, machine_name, ip_address, now, system_type, hwid))
     else:
         c.execute("""
-            INSERT INTO licenses (request_id, hwid, student_name, email, machine_name, ip_address, status, created_at, last_heartbeat)
-            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-        """, (request_id, hwid, student_name, email, machine_name, ip_address, now, now))
+            INSERT INTO licenses (request_id, hwid, student_name, email, machine_name, ip_address, status, created_at, last_heartbeat, system_type)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+        """, (request_id, hwid, student_name, email, machine_name, ip_address, now, now, system_type))
 
     conn.commit()
     conn.close()

@@ -497,11 +497,15 @@
     <!-- Modal: Tạo Key Thủ Công -->
     <div id="manual-key-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="glass-card max-w-xl w-full rounded-2xl p-6 border border-slate-700 space-y-4 shadow-2xl overflow-y-auto max-h-[92vh]">
+            <input type="hidden" id="manual-system-type" value="SEB">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3">
                 <h3 class="font-bold text-base text-white flex items-center gap-2">
-                    <i class="fa-solid fa-key text-blue-400"></i> Tạo Key Bản Quyền Thủ Công
+                    <i class="fa-solid fa-key text-blue-400"></i> <span id="manual-modal-title">Tạo Key Bản Quyền Thủ Công</span>
                 </h3>
-                <button onclick="closeManualKeyModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                <div class="flex items-center gap-2">
+                    <div id="manual-system-tag-badge" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">Hệ Thống: SEB</div>
+                    <button onclick="closeManualKeyModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
             </div>
 
             <div class="space-y-3.5">
@@ -1201,7 +1205,18 @@
         }
 
         // Manual Key Modal
-        function openManualKeyModal() {
+        function openManualKeyModal(sysType = 'SEB') {
+            const sysInput = document.getElementById("manual-system-type");
+            if (sysInput) sysInput.value = sysType;
+            const badge = document.getElementById("manual-system-tag-badge");
+            const title = document.getElementById("manual-modal-title");
+            if (sysType === 'EOS') {
+                if (badge) { badge.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'; badge.innerText = 'Hệ Thống: EOS & PEA (FPT)'; }
+                if (title) title.innerText = 'Tạo Key EOS / PEA Thủ Công';
+            } else {
+                if (badge) { badge.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30'; badge.innerText = 'Hệ Thống: SEB Browser'; }
+                if (title) title.innerText = 'Tạo Key SEB Thủ Công';
+            }
             document.getElementById("manual-key-modal").classList.remove("hidden");
             document.getElementById("manual-key-result-box").classList.add("hidden");
             document.getElementById("btn-generate-manual").classList.remove("hidden");
@@ -1263,6 +1278,7 @@
                 return;
             }
 
+            const sysType = document.getElementById("manual-system-type")?.value || "SEB";
             const res = await fetch("/api/admin/manual-generate-key", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -1272,7 +1288,8 @@
                     name: name,
                     email: email,
                     note: note,
-                    custom_datetime: customDatetime
+                    custom_datetime: customDatetime,
+                    system_type: sysType
                 })
             });
 

@@ -115,6 +115,7 @@ class ManualKeyModel(BaseModel):
     name: Optional[str] = ""
     email: Optional[str] = ""
     note: Optional[str] = ""
+    system_type: Optional[str] = "SEB"
 
 class UpdateStudentInfoModel(BaseModel):
     hwid: str
@@ -517,8 +518,12 @@ async def api_admin_reject_download(payload: dict):
     return {"success": success}
 
 @app.get("/api/admin/licenses", dependencies=[Depends(require_admin)])
-async def api_admin_list_licenses():
-    return database.list_licenses(100)
+async def api_admin_list_licenses(system_type: Optional[str] = None):
+    licenses = database.list_licenses(200)
+    if system_type:
+        target = system_type.upper()
+        licenses = [l for l in licenses if (l.get("system_type") or "SEB").upper() == target]
+    return licenses
 
 @app.post("/api/admin/approve-activation", dependencies=[Depends(require_admin)])
 async def api_admin_approve_activation(payload: ApproveActivationModel):
@@ -638,7 +643,8 @@ async def api_admin_manual_generate_key(payload: ManualKeyModel):
     elif payload.duration == "365d": dur_label = "1 Năm"
     elif payload.duration == "life": dur_label = "Vĩnh Viễn"
 
-    database.create_or_update_activation_request(req_id, hwid, name, email, note, "127.0.0.1")
+    sys_type = (payload.system_type or "SEB").upper()
+    database.create_or_update_activation_request(req_id, hwid, name, email, note, "127.0.0.1", system_type=sys_type)
     database.approve_license(hwid, license_key, exp_str, dur_label)
 
     return {
