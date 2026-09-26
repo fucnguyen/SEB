@@ -403,6 +403,47 @@
                 </div>
             </div>
 
+        <!-- TAB: Ca Thi EOS & PEA FPT System -->
+        <div id="tab-fpt-main" class="hidden space-y-4">
+            <div class="glass-card rounded-2xl p-4 border border-emerald-500/30 bg-emerald-950/20 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div>
+                    <h3 class="font-bold text-sm text-emerald-300 flex items-center gap-2">
+                        <i class="fa-solid fa-graduation-cap"></i> Ca Thi Trực Tuyến EOS (Trắc Nghiệm) & PEA (Thực Hành Code FPT)
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Tự động phân loại và nạp các ca thi EOS/PEA trực tiếp hoặc từ thư mục project</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button onclick="triggerFolderExamLoad()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/20">
+                        <i class="fa-solid fa-folder-open"></i> Nạp Đề Có Sẵn Từ Folder
+                    </button>
+                    <button onclick="loadFPTSectionData()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-slate-300 transition border border-slate-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-rotate"></i> Làm Mới EOS/PEA
+                    </button>
+                </div>
+            </div>
+            <div id="fpt-sessions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="col-span-full p-8 text-center text-slate-500 glass-card rounded-2xl">
+                    Chưa có ca thi EOS/PEA nào. Nhấn "Nạp Đề Có Sẵn Từ Folder" để nạp đề thi từ thư mục project!
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Ca Thi SEB Browser System -->
+        <div id="tab-seb-main" class="hidden space-y-4">
+            <div class="glass-card rounded-2xl p-4 border border-blue-500/30 bg-blue-950/20 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-sm text-blue-300 flex items-center gap-2">
+                        <i class="fa-solid fa-shield-halved"></i> Ca Thi SEB Browser System
+                    </h3>
+                    <p class="text-xs text-slate-400">Danh sách các phiên thi đang kết nối qua SEB Browser Launcher</p>
+                </div>
+                <button onclick="loadSEBSectionData()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold text-white transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrows-rotate"></i> Làm Mới SEB
+                </button>
+            </div>
+            <div id="seb-sessions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="col-span-full p-8 text-center text-slate-500 glass-card rounded-2xl">Chưa có ca thi SEB nào kết nối...</div>
+            </div>
         </div>
 
         <!-- TAB 6: Live Exam Support & Real-time Synchronizer -->
@@ -910,7 +951,8 @@
 
         async function loadLicenses() {
             try {
-                const res = await fetch("/api/admin/licenses");
+                const sysTag = currentSystemMode || 'SEB';
+                const res = await fetch(`/api/admin/licenses?system_type=${sysTag}`);
                 if (res.status === 401) { window.location.href = "/login"; return; }
                 allLicenses = await res.json();
                 renderLicenseTable(allLicenses);
@@ -1281,6 +1323,7 @@
                 if (subBarSeb) subBarSeb.classList.add('hidden');
                 if (subBarEos) subBarEos.classList.remove('hidden');
 
+                loadLicenses();
                 switchTab('tab-fpt-main');
             } else {
                 if (sebBtnDesktop) sebBtnDesktop.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-blue-600 text-white shadow-md shadow-blue-600/30';
@@ -1295,7 +1338,23 @@
                 if (subBarSeb) subBarSeb.classList.remove('hidden');
                 if (subBarEos) subBarEos.classList.add('hidden');
 
+                loadLicenses();
                 switchTab('tab-downloads');
+            }
+        }
+
+        async function triggerFolderExamLoad() {
+            try {
+                const res = await fetch('/api/admin/eos/load-folder-exams', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`Thành công! Đã quét và nạp ${data.count} đề thi có sẵn từ thư mục project vào ca thi EOS/PEA.`);
+                    location.reload();
+                } else {
+                    alert(data.message || "Lỗi khi nạp đề thi từ thư mục!");
+                }
+            } catch (e) {
+                alert("Lỗi kết nối tới server: " + e.message);
             }
         }
 

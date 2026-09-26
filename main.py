@@ -804,6 +804,59 @@ async def api_admin_set_exam_answer(payload: SetAnswerModel):
     )
     return {"success": success}
 
+@app.post("/api/admin/eos/load-folder-exams", dependencies=[Depends(require_admin)])
+async def api_admin_load_folder_exams():
+    """Tự động quét thư mục project D:\\Project\\Tools FPT\\tools\\ và nạp tất cả các đề thi .dat/.bin có sẵn"""
+    import os, re, hashlib
+    base_folder = r"D:\Project\Tools FPT\tools"
+    loaded_papers = []
+
+    if not os.path.exists(base_folder):
+        return {"success": False, "message": f"Không tìm thấy thư mục {base_folder}"}
+
+    for root, dirs, files in os.walk(base_folder):
+        for f in files:
+            if f.endswith(".dat") or f.endswith(".bin"):
+                fp = os.path.join(root, f)
+                sz = os.path.getsize(fp)
+                if sz > 2000:
+                    file_name = os.path.basename(fp)
+                    hwid = "FOLDER_" + hashlib.md5(fp.encode()).hexdigest()[:12].upper()
+                    exam_title = f"EOS/PEA File: {file_name}"
+                    
+                    with open(fp, "rb") as fh:
+                        raw_data = fh.read()
+                    strings = [s.decode("utf-8", errors="ignore") for s in re.findall(rb'[\x20-\x7e]{5,}', raw_data)]
+                    question_strs = [s for s in strings if any(kw in s.lower() for kw in ["question", "select", "which", "what", "how", "choose", "paper", "test", "hanoi"])]
+
+                    questions = []
+                    if question_strs:
+                        for idx, q_text in enumerate(question_strs[:25]):
+                            questions.append({
+                                "question_index": idx,
+                                "question_type": "MultipleChoice",
+                                "question_text": q_text,
+                                "options": [
+                                    {"label": "A", "text": "Lựa chọn A - Đáp án chuẩn"},
+                                    {"label": "B", "text": "Lựa chọn B - Phương án 2"},
+                                    {"label": "C", "text": "Lựa chọn C - Phương án 3"},
+                                    {"label": "D", "text": "Lựa chọn D - Phương án 4"}
+                                ],
+                                "student_answer": "",
+                                "support_answer": ""
+                            })
+
+                    if questions:
+                        database.sync_student_exam_data(
+                            hwid=hwid,
+                            student_name=f"Thí Sinh Đề {file_name}",
+                            exam_title=exam_title,
+                            questions=questions
+                        )
+                        loaded_papers.append({"file_name": file_name, "hwid": hwid, "questions_count": len(questions)})
+
+    return {"success": True, "count": len(loaded_papers), "loaded_papers": loaded_papers}
+
 
 # Admin tạo và đẩy đề thủ công xuống máy học sinh
 class PushExamModel(BaseModel):
