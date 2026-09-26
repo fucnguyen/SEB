@@ -6,6 +6,8 @@
     <title>Bảng Điều Khiển Quản Trị - SEB System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -380,7 +382,13 @@
                             </div>
                             <p id="current-exam-title" class="text-xs text-slate-400 mt-0.5">Chọn một thí sinh ở danh sách bên trái để xem đề và gán đáp án</p>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button id="btn-export-zip" onclick="downloadAllQuestionsZip()" class="hidden px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20" title="Tải toàn bộ câu hỏi và đáp án thành file ảnh đóng gói ZIP">
+                                <i class="fa-solid fa-file-zipper"></i> Tải trọn bộ ảnh (.ZIP)
+                            </button>
+                            <button id="btn-print-exam" onclick="printOrExportExam()" class="hidden px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition" title="In hoặc lưu đề thi ra file PDF">
+                                <i class="fa-solid fa-print"></i> In / Xuất PDF
+                            </button>
                             <button onclick="loadExamQuestions()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
                                 <i class="fa-solid fa-arrows-rotate"></i> Cập nhật câu hỏi
                             </button>
@@ -1746,6 +1754,17 @@
                 const res = await fetch(`/api/admin/exam-questions/${encodeURIComponent(currentExamHWID)}`);
                 if (!res.ok) return;
                 const questions = await res.json();
+                cachedCurrentQuestions = questions || [];
+
+                const btnZip = document.getElementById("btn-export-zip");
+                const btnPrint = document.getElementById("btn-print-exam");
+                if (cachedCurrentQuestions.length > 0) {
+                    if (btnZip) btnZip.classList.remove("hidden");
+                    if (btnPrint) btnPrint.classList.remove("hidden");
+                } else {
+                    if (btnZip) btnZip.classList.add("hidden");
+                    if (btnPrint) btnPrint.classList.add("hidden");
+                }
 
                 const container = document.getElementById("exam-questions-container");
                 if (!container) return;
@@ -1900,7 +1919,12 @@
                                 <span class="font-bold text-xs text-slate-400">Câu ${idx + 1}</span>
                                 ${typeBadge}
                             </div>
-                            ${chosenBadge}
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                ${chosenBadge}
+                                <button onclick="downloadQuestionAsImage(${idx})" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition border border-slate-700 shadow-sm" title="Tải ảnh câu hỏi và đáp án này">
+                                    <i class="fa-solid fa-camera text-sky-400"></i> Tải ảnh
+                                </button>
+                            </div>
                         </div>
                         <div class="text-xs text-white font-medium leading-relaxed">${escapeHtml(q.question_text || "(Đang tải...)")}</div>
                         ${imgHtml}
@@ -1911,6 +1935,216 @@
                     container.appendChild(card);
                 });
             } catch (err) { console.error("[ExamSync]", err); }
+        }
+
+        let cachedCurrentQuestions = [];
+
+        // ── XUẤT ẢNH CÂU HỎI & ĐÁP ÁN (DẠNG THẺ TRẮNG CHUẨN ĐỀ THI) ─────────
+        function buildExportCardElement(q, idx) {
+            const container = document.createElement("div");
+            container.style.width = "720px";
+            container.style.backgroundColor = "#ffffff";
+            container.style.color = "#111827";
+            container.style.padding = "24px 28px";
+            container.style.fontFamily = "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif";
+            container.style.boxSizing = "border-box";
+            container.style.position = "fixed";
+            container.style.left = "-9999px";
+            container.style.top = "0";
+
+            const qNum = idx + 1;
+            const chosenAns = q.support_answer || "";
+            const chosenSet = new Set(chosenAns ? chosenAns.split(",").map(s => s.trim()) : []);
+            const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+            let optionsRender = "";
+            const opts = q.options || [];
+            if (opts.length > 0) {
+                opts.forEach((opt, oi) => {
+                    const optObj = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt, image_base64: "" };
+                    const lbl = optObj.label || ALPHA[oi] || String(oi);
+                    const idxStr = String(oi);
+                    const isChosen = chosenSet.has(idxStr) || chosenSet.has(lbl);
+
+                    let optImg = "";
+                    if (optObj.image_base64) {
+                        optImg = `<div style="margin-top: 6px;"><img src="${optObj.image_base64}" style="max-height: 120px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; background: #fff;"></div>`;
+                    }
+
+                    optionsRender += `
+                        <div style="margin-bottom: 12px; padding: 8px 12px; border-radius: 8px; ${isChosen ? 'background-color: #f0fdf4; border: 1.5px solid #22c55e;' : 'background-color: #ffffff; border: 1px solid transparent;'}">
+                            <div style="font-size: 15px; font-weight: ${isChosen ? '700' : '600'}; color: ${isChosen ? '#15803d' : '#111827'}; line-height: 1.5;">
+                                <strong style="font-weight: 800; margin-right: 6px; color: ${isChosen ? '#16a34a' : '#111827'};">${escapeHtml(lbl)}.</strong>
+                                <span>${escapeHtml(optObj.text || "")}</span>
+                                ${isChosen ? '<span style="display: inline-block; margin-left: 10px; font-size: 11px; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 9999px; font-weight: 800;">✓ ĐÁP ÁN</span>' : ''}
+                            </div>
+                            ${optImg}
+                        </div>
+                    `;
+                });
+            } else if (chosenAns) {
+                optionsRender = `
+                    <div style="margin-top: 14px; padding: 12px 16px; border-radius: 8px; background: #f0fdf4; border: 1.5px solid #22c55e; font-size: 15px; font-weight: 600; color: #15803d;">
+                        <strong>✓ Đáp án hỗ trợ:</strong> ${escapeHtml(chosenAns)}
+                    </div>
+                `;
+            }
+
+            let stemImg = "";
+            if (q.image_base64) {
+                stemImg = `<div style="margin: 16px 0; text-align: center;"><img src="${q.image_base64}" style="max-width: 100%; max-height: 380px; object-fit: contain; border-radius: 8px; border: 1px solid #e5e7eb;"></div>`;
+            }
+
+            container.innerHTML = `
+                <div style="font-size: 20px; font-weight: 800; color: #111827; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>Câu ${qNum}</span>
+                    ${chosenAns ? '<span style="font-size: 12px; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 4px 10px; border-radius: 9999px;">ĐÃ CHỌN ĐÁP ÁN: ' + escapeHtml(chosenAns) + '</span>' : ''}
+                </div>
+                <div style="border: 1px solid #d1d5db; border-radius: 10px; padding: 22px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+                    <div style="font-size: 15px; font-weight: 500; color: #1f2937; line-height: 1.6; margin-bottom: 16px;">
+                        ${escapeHtml(q.question_text || "")}
+                    </div>
+                    ${stemImg}
+                    <div style="margin-top: 16px;">
+                        ${optionsRender}
+                    </div>
+                </div>
+            `;
+            return container;
+        }
+
+        async function downloadQuestionAsImage(idx) {
+            const q = cachedCurrentQuestions[idx];
+            if (!q) return;
+
+            const el = buildExportCardElement(q, idx);
+            document.body.appendChild(el);
+
+            try {
+                const imgs = el.querySelectorAll("img");
+                await Promise.all(Array.from(imgs).map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise(res => { img.onload = res; img.onerror = res; });
+                }));
+
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: "#ffffff",
+                    logging: false
+                });
+
+                const link = document.createElement("a");
+                link.download = `Cau_${idx + 1}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            } catch (err) {
+                console.error("Export image failed:", err);
+                alert("Lỗi khi xuất ảnh: " + err.message);
+            } finally {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            }
+        }
+
+        async function downloadAllQuestionsZip() {
+            if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) {
+                alert("Không có câu hỏi nào để tải!");
+                return;
+            }
+
+            const btn = document.getElementById("btn-export-zip");
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xuất ảnh 0/${cachedCurrentQuestions.length}...`;
+            btn.disabled = true;
+
+            const zip = new JSZip();
+            const studentName = (document.getElementById("current-exam-student").innerText || "ThiSinh").replace(/[\\/:*?"<>|]/g, "_");
+
+            try {
+                for (let i = 0; i < cachedCurrentQuestions.length; i++) {
+                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xuất ảnh ${i+1}/${cachedCurrentQuestions.length}...`;
+                    const q = cachedCurrentQuestions[i];
+                    const el = buildExportCardElement(q, i);
+                    document.body.appendChild(el);
+
+                    const imgs = el.querySelectorAll("img");
+                    await Promise.all(Array.from(imgs).map(img => {
+                        if (img.complete) return Promise.resolve();
+                        return new Promise(res => { img.onload = res; img.onerror = res; });
+                    }));
+
+                    const canvas = await html2canvas(el, {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: "#ffffff",
+                        logging: false
+                    });
+
+                    const base64Data = canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, "");
+                    const fileName = `Cau_${String(i + 1).padStart(2, '0')}.png`;
+                    zip.file(fileName, base64Data, { base64: true });
+
+                    if (el.parentNode) el.parentNode.removeChild(el);
+                }
+
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang nén file ZIP...`;
+                const content = await zip.generateAsync({ type: "blob" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(content);
+                link.download = `DeThi_${studentName}_${currentExamHWID || "export"}.zip`;
+                link.click();
+            } catch (err) {
+                console.error("Export all images failed:", err);
+                alert("Lỗi khi tải bộ ảnh: " + err.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function printOrExportExam() {
+            if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) {
+                alert("Không có câu hỏi nào để in!");
+                return;
+            }
+            const printWindow = window.open('', '_blank');
+            const studentName = document.getElementById("current-exam-student").innerText || "";
+            const examTitle = document.getElementById("current-exam-title").innerText || "";
+
+            let html = `<!DOCTYPE html><html><head><title>Đề thi - ${studentName}</title>
+            <style>
+                body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; padding: 30px; color: #111827; background: #fff; }
+                .q-block { margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #d1d5db; border-radius: 10px; padding: 20px; }
+                .q-title { font-size: 18px; font-weight: 800; margin-bottom: 12px; color: #111827; }
+                .q-text { font-size: 15px; line-height: 1.6; margin-bottom: 14px; }
+                .opt { margin-bottom: 8px; padding: 8px 12px; border-radius: 6px; font-size: 14px; }
+                .opt.chosen { background: #f0fdf4; border: 1.5px solid #22c55e; font-weight: 700; color: #15803d; }
+                img { max-width: 100%; max-height: 350px; object-fit: contain; }
+                @media print { button { display: none; } body { padding: 0; } }
+            </style></head><body>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 24px;">
+                <div>
+                    <h1 style="font-size: 22px; font-weight: 800; margin: 0;">ĐỀ THI TRỰC TUYẾN</h1>
+                    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">${escapeHtml(examTitle)}</p>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-weight: 700; font-size: 15px;">Thí sinh: ${escapeHtml(studentName)}</div>
+                    <button onclick="window.print()" style="margin-top: 6px; padding: 6px 16px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">In hoặc Lưu PDF</button>
+                </div>
+            </div>`;
+
+            cachedCurrentQuestions.forEach((q, idx) => {
+                const el = buildExportCardElement(q, idx);
+                el.style.position = "static";
+                el.style.width = "100%";
+                el.style.padding = "0";
+                el.style.marginBottom = "24px";
+                html += el.outerHTML;
+            });
+
+            html += `</body></html>`;
+            printWindow.document.write(html);
+            printWindow.document.close();
         }
 
         async function chooseAnswer(hwid, questionIndex, answer) {
