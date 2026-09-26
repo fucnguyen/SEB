@@ -25,34 +25,57 @@
     <!-- Top Admin Bar -->
     <header class="border-b border-slate-800 bg-slate-950/80 sticky top-0 z-50 backdrop-blur-xl">
         <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20 border border-white/10">
+            <div class="flex items-center space-x-3 sm:space-x-4">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20 border border-white/10" id="header-logo">
                     <i class="fa-solid fa-crown text-base"></i>
                 </div>
                 <div>
-                    <h1 class="font-extrabold text-base sm:text-lg leading-tight text-white flex items-center gap-2">
+                    <h1 class="font-extrabold text-base sm:text-lg leading-tight text-white flex items-center gap-2" id="header-title-text">
                         SEB Admin Console
                         <span class="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/30 font-mono font-bold">ONLINE</span>
                     </h1>
                     <p class="text-[11px] text-slate-400 hidden sm:block">Quản trị Phê duyệt Telegram & Bản quyền Mã máy (HWID)</p>
                 </div>
+
+                <!-- TOP SYSTEM MODE SWITCHER TABS (SEB vs EOS/PEA) -->
+                <div class="hidden md:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 ml-4">
+                    <button id="system-mode-seb" onclick="setSystemMode('SEB')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-blue-600 text-white shadow-md shadow-blue-600/30">
+                        <i class="fa-solid fa-shield-halved"></i> HỆ THỐNG SEB
+                    </button>
+                    <button id="system-mode-eos" onclick="setSystemMode('EOS')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white">
+                        <i class="fa-solid fa-graduation-cap"></i> HỆ THỐNG EOS & PEA
+                    </button>
+                </div>
             </div>
 
             <div class="flex items-center space-x-2 sm:space-x-3">
-                <button onclick="downloadBackupJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Tải file JSON sao lưu toàn bộ dữ liệu máy & key về máy tính">
+                <button onclick="downloadBackupJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Sao lưu toàn bộ dữ liệu">
                     <i class="fa-solid fa-download text-[11px] text-emerald-400"></i> <span class="hidden sm:inline">Sao Lưu</span>
                 </button>
-                <button onclick="triggerRestoreJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Khôi phục danh sách máy & key từ file JSON">
+                <button onclick="triggerRestoreJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Khôi phục dữ liệu">
                     <i class="fa-solid fa-upload text-[11px] text-amber-400"></i> <span class="hidden sm:inline">Khôi Phục</span>
                 </button>
                 <input type="file" id="backup-file-input" accept=".json" class="hidden" onchange="handleRestoreFile(event)">
-                <button onclick="openManualKeyModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-white shadow-md shadow-blue-600/20">
-                    <i class="fa-solid fa-key text-[11px]"></i> <span class="hidden sm:inline">Tạo Key</span> Thủ Công
+                
+                <!-- Dynamic Header Key Generator Button -->
+                <button id="header-btn-create-key" onclick="openManualKeyModal(currentSystemMode)" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-white shadow-md shadow-blue-600/20">
+                    <i class="fa-solid fa-key text-[11px]"></i> <span id="header-create-key-text">Tạo Key SEB</span>
                 </button>
+                
                 <a href="/admin/logout" class="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-xs font-semibold flex items-center gap-1 transition" title="Đăng xuất">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 </a>
             </div>
+        </div>
+
+        <!-- Mobile System Switcher Bar -->
+        <div class="flex md:hidden border-t border-slate-800 bg-slate-900/90 p-1.5 justify-center space-x-2">
+            <button id="mobile-mode-seb" onclick="setSystemMode('SEB')" class="flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-blue-600 text-white">
+                <i class="fa-solid fa-shield-halved"></i> SEB
+            </button>
+            <button id="mobile-mode-eos" onclick="setSystemMode('EOS')" class="flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400">
+                <i class="fa-solid fa-graduation-cap"></i> EOS & PEA
+            </button>
         </div>
     </header>
 
@@ -1202,6 +1225,44 @@
             if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử vào/thoát này không?")) return;
             await fetch("/api/admin/clear-access-logs", { method: "POST" });
             loadAccessLogs();
+        }
+
+        // System Mode Switcher (SEB vs EOS/PEA)
+        let currentSystemMode = 'SEB';
+
+        function setSystemMode(mode) {
+            currentSystemMode = mode;
+            const sebBtnDesktop = document.getElementById('system-mode-seb');
+            const eosBtnDesktop = document.getElementById('system-mode-eos');
+            const sebBtnMobile = document.getElementById('mobile-mode-seb');
+            const eosBtnMobile = document.getElementById('mobile-mode-eos');
+            const headerBtnText = document.getElementById('header-create-key-text');
+            const headerBtn = document.getElementById('header-btn-create-key');
+            const headerTitle = document.getElementById('header-title-text');
+
+            if (mode === 'EOS') {
+                if (sebBtnDesktop) sebBtnDesktop.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
+                if (eosBtnDesktop) eosBtnDesktop.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-emerald-600 text-white shadow-md shadow-emerald-600/30';
+                if (sebBtnMobile) sebBtnMobile.className = 'flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400';
+                if (eosBtnMobile) eosBtnMobile.className = 'flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-emerald-600 text-white';
+
+                if (headerBtnText) headerBtnText.innerText = 'Tạo Key EOS/PEA';
+                if (headerBtn) headerBtn.className = 'px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-white shadow-md shadow-emerald-600/20';
+                if (headerTitle) headerTitle.innerHTML = `EOS & PEA Admin Console <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-mono font-bold">ONLINE</span>`;
+
+                switchTab('tab-fpt-main');
+            } else {
+                if (sebBtnDesktop) sebBtnDesktop.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-blue-600 text-white shadow-md shadow-blue-600/30';
+                if (eosBtnDesktop) eosBtnDesktop.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
+                if (sebBtnMobile) sebBtnMobile.className = 'flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-blue-600 text-white';
+                if (eosBtnMobile) eosBtnMobile.className = 'flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400';
+
+                if (headerBtnText) headerBtnText.innerText = 'Tạo Key SEB';
+                if (headerBtn) headerBtn.className = 'px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-white shadow-md shadow-blue-600/20';
+                if (headerTitle) headerTitle.innerHTML = `SEB Admin Console <span class="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/30 font-mono font-bold">ONLINE</span>`;
+
+                switchTab('tab-seb-main');
+            }
         }
 
         // Manual Key Modal
