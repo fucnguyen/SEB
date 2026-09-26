@@ -877,7 +877,7 @@ async def api_admin_load_folder_exams():
                             for idx, q_text in enumerate(clean_lines[:25]):
                                 questions.append({
                                     "question_index": idx,
-                                    "question_type": "MultipleChoice",
+                                    "question_type": "radio",
                                     "question_text": q_text,
                                     "options": [
                                         {"label": "A", "text": "Phương án A - Lựa chọn trắc nghiệm"},
@@ -900,7 +900,7 @@ async def api_admin_load_folder_exams():
                                 for idx, qt in enumerate(q_titles):
                                     questions.append({
                                         "question_index": idx,
-                                        "question_type": "MultipleChoice",
+                                        "question_type": "radio",
                                         "question_text": qt,
                                         "options": [
                                             {"label": "A", "text": "Chạy thành công 100% các Test Case"},
@@ -915,7 +915,7 @@ async def api_admin_load_folder_exams():
                                 for idx in range(1, 11):
                                     questions.append({
                                         "question_index": idx - 1,
-                                        "question_type": "MultipleChoice",
+                                        "question_type": "radio",
                                         "question_text": f"Câu hỏi trắc nghiệm số {idx} (File đề thi {file_name})",
                                         "options": [
                                             {"label": "A", "text": f"Lựa chọn A - Đáp án chuẩn câu {idx}"},
