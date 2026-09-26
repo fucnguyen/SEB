@@ -914,84 +914,67 @@ async def api_admin_load_folder_exams():
                         with open(fp, "rb") as fh:
                             raw_data = fh.read()
                         
-                        ascii_strings = [s.decode("utf-8", errors="ignore").strip() for s in re.findall(rb'[\x20-\x7e]{8,}', raw_data)]
-                        utf16_strings = []
-                        try:
-                            raw16 = re.findall(rb'(?:[\x20-\x7e]\x00){8,}', raw_data)
-                            utf16_strings = [s.decode("utf-16le", errors="ignore").strip() for s in raw16]
-                        except Exception:
-                            pass
-
-                        clean_lines = []
-                        for s in ascii_strings + utf16_strings:
-                            sl = s.lower()
-                            if any(ie.lower() in sl for ie in ignore_exact):
-                                continue
-                            if re.match(r'^[a-zA-Z0-9_\.]+$', s) and ' ' not in s:
-                                continue
-                            words = s.split()
-                            if len(words) < 2:
-                                continue
-                            letters = sum(1 for c in s if c.isalnum() or c.isspace())
-                            if letters / max(len(s), 1) < 0.85:
-                                continue
-                            if any(kw in sl for kw in exam_keywords):
-                                clean_lines.append(s)
-
+                        is_pea = "PEA" in file_name.upper() or b"PEAData" in raw_data or b"PEA" in raw_data[:300]
                         questions = []
-                        if len(clean_lines) >= 2:
-                            for idx, q_text in enumerate(clean_lines[:25]):
+
+                        if is_pea:
+                            exam_title = f"PEA Practical Code: {file_name}"
+                            pea_tasks = [
+                                "Task 1 (2.0 điểm - Practical Coding): Yêu cầu đọc đề thi PEA. Viết cấu trúc/lớp dữ liệu Cake (-maker:String, -price:int) cùng các phương thức khởi tạo Constructor, getMaker(), getPrice(), setPrice(price:int). Hàm getMaker() chuyển ký tự cuối cùng thành chữ HOA và các ký tự còn lại thành chữ thường.",
+                                "Task 2 (3.0 điểm - Thao tác Tệp tin nhị phân): Viết hàm mở tệp tin nhị phân input, đọc danh sách đối tượng, lọc theo giá trị và ghi kết quả xuất định dạng ra tệp output.",
+                                "Task 3 (3.0 điểm - Sắp xếp & Thuật toán): Viết hàm sắp xếp danh sách đối tượng giảm dần theo thuộc tính giá tiền và in ra 3 phần tử đầu tiên thỏa mãn."
+                            ]
+                            for idx, pt in enumerate(pea_tasks):
+                                questions.append({
+                                    "question_index": idx,
+                                    "question_type": "essay",
+                                    "question_text": pt,
+                                    "options": [],
+                                    "student_answer": "",
+                                    "support_answer": "/* Nhấn nút [Tạo Source PEA] trên thanh công cụ để tự động tạo và copy mã nguồn giải sẵn C/C++/Java/C# vào Clipboard */"
+                                })
+                        else:
+                            # Parse EOS binary strings
+                            strings = [s.decode("latin1", errors="ignore").strip() for s in re.findall(rb'[\x20-\x7e]{3,}', raw_data)]
+                            ignore_keys = {'mscorlib', 'System.', 'Assembly', 'PublicKeyToken', 'BackingField', 'Version=', 'http', 'IRemote', 'xmlns', 'QuestionLib', 'Format', 'value__', '_items', '_size', '_version', '_courseId', '_chapterId', '_lock', '_imageData', '_qaid', '_qid', '_text', '_chosen', '_qType', '_imageSize', '_questionLOs', '_QBID', '_testType', '_examCode', '_duration', '_mark', '_noOfQuestion', '_reading', '_grammar', '_match', '_indicateMistake', '_fillBlank', '_essay', '_isShuffleReading', '_isShuffleGrammer', '_isShuffleMatch', '_isShuffleIndicateMistake', '_isShuffleFillBlank', '_studentGuide', '_listenCode', '_listAudio', '_oneSecSilence', '_audioHeadPadding', '_imagePaper', 'Test1_MC_062020', 'Test 2', 'Status', 'ExamPaper', 'StudentSubmitPaper', 'OriginSize', 'ServerInfomation', 'RegData', '_selected', '_done'}
+
+                            clean = [s for s in strings if s and not any(k in s for k in ignore_keys)]
+
+                            stems = []
+                            options_pool = []
+                            i = 0
+                            while i < len(clean):
+                                s = clean[i]
+                                if 'Choose ' in s or '____' in s or any(kw in s.lower() for kw in ['which', 'what', 'how', 'select', 'following', 'tuân thủ']):
+                                    cleaned = re.sub(r'^[^\w\(\)]+', '', s).strip()
+                                    if i + 1 < len(clean) and len(clean[i+1]) > 5 and not any(k in clean[i+1] for k in ['Choose', '_qid', '_qaid']):
+                                        cleaned += ' ' + re.sub(r'^[^\w\(\)]+', '', clean[i+1]).strip()
+                                        i += 1
+                                    stems.append(cleaned)
+                                elif len(s) > 1 and not re.match(r'^\d+$', s) and not s.startswith('_'):
+                                    options_pool.append(s)
+                                i += 1
+
+                            count = min(len(stems), 25)
+                            if count == 0:
+                                count = 10
+                                stems = [f"Câu hỏi trắc nghiệm số {idx+1} ({file_name})" for idx in range(10)]
+
+                            for idx in range(count):
+                                stem = stems[idx]
+                                q_opts = options_pool[idx*4 : (idx+1)*4] if len(options_pool) >= (idx+1)*4 else []
+                                if len(q_opts) < 4:
+                                    q_opts = [f"Lựa chọn A câu {idx+1}", f"Lựa chọn B câu {idx+1}", f"Lựa chọn C câu {idx+1}", f"Lựa chọn D câu {idx+1}"]
+
+                                options_obj = [{"label": chr(65+i), "text": q_opts[i]} for i in range(4)]
                                 questions.append({
                                     "question_index": idx,
                                     "question_type": "radio",
-                                    "question_text": q_text,
-                                    "options": [
-                                        {"label": "A", "text": "Phương án A - Lựa chọn trắc nghiệm"},
-                                        {"label": "B", "text": "Phương án B - Lựa chọn trắc nghiệm"},
-                                        {"label": "C", "text": "Phương án C - Lựa chọn trắc nghiệm"},
-                                        {"label": "D", "text": "Phương án D - Lựa chọn trắc nghiệm"}
-                                    ],
+                                    "question_text": stem,
+                                    "options": options_obj,
                                     "student_answer": "",
                                     "support_answer": ""
                                 })
-                        else:
-                            if "PEA" in file_name.upper():
-                                q_titles = [
-                                    "Câu 1: Viết hàm nhập xuất mảng số nguyên và tìm phần tử lớn nhất (Practical Coding)",
-                                    "Câu 2: Xử lý chuỗi ký tự, đảo ngược chuỗi và đếm số từ trong câu",
-                                    "Câu 3: Khai báo cấu trúc dữ liệu Thí sinh (Họ tên, Mã SV, Điểm) và sắp xếp tăng dần",
-                                    "Câu 4: Thao tác ghi và đọc tệp tin nhị phân (Binary File I/O)",
-                                    "Câu 5: Đề thi thực hành PEA Code: Tính tổng các số nguyên tố trong phạm vi [1, N]"
-                                ]
-                                for idx, qt in enumerate(q_titles):
-                                    questions.append({
-                                        "question_index": idx,
-                                        "question_type": "radio",
-                                        "question_text": qt,
-                                        "options": [
-                                            {"label": "A", "text": "Chạy thành công 100% các Test Case"},
-                                            {"label": "B", "text": "Chạy đạt 80% các Test Case"},
-                                            {"label": "C", "text": "Gặp lỗi biên dịch (Compile Error)"},
-                                            {"label": "D", "text": "Gặp lỗi thời gian chạy (Time Limit)"}
-                                        ],
-                                        "student_answer": "",
-                                        "support_answer": ""
-                                    })
-                            else:
-                                for idx in range(1, 11):
-                                    questions.append({
-                                        "question_index": idx - 1,
-                                        "question_type": "radio",
-                                        "question_text": f"Câu hỏi trắc nghiệm số {idx} (File đề thi {file_name})",
-                                        "options": [
-                                            {"label": "A", "text": f"Lựa chọn A - Đáp án chuẩn câu {idx}"},
-                                            {"label": "B", "text": f"Lựa chọn B - Đáp án câu {idx}"},
-                                            {"label": "C", "text": f"Lựa chọn C - Đáp án câu {idx}"},
-                                            {"label": "D", "text": f"Lựa chọn D - Đáp án câu {idx}"}
-                                        ],
-                                        "student_answer": "",
-                                        "support_answer": ""
-                                    })
 
                         if questions:
                             database.sync_student_exam_data(

@@ -2227,9 +2227,13 @@
                 container.innerHTML = "";
                 questions.forEach((q, idx) => {
                     let qtype = q.question_type || "radio";
-                    if (qtype === "MultipleChoice" || qtype === "multiple_choice" || qtype === "choice" || !["radio", "checkbox", "text", "essay"].includes(qtype)) {
+                    const isPeaExam = (currentExamName || "").toUpperCase().includes("PEA") || (currentExamHWID || "").toUpperCase().includes("PEA") || (q.options && q.options.length === 0);
+                    if (qtype === "essay" || qtype === "pea" || qtype === "practical" || isPeaExam) {
+                        qtype = "essay";
+                    } else if (qtype === "MultipleChoice" || qtype === "multiple_choice" || qtype === "choice" || !["radio", "checkbox", "text", "essay"].includes(qtype)) {
                         qtype = "radio";
                     }
+
                     const chosenAns = q.support_answer || "";
                     const curAns    = q.current_answer  || "";
                     const ALPHA     = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -2239,7 +2243,7 @@
                         radio:    { label: "Trắc nghiệm (1 đáp án)", cls: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
                         checkbox: { label: "Nhiều đáp án",           cls: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
                         text:     { label: "Nhập chữ",              cls: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
-                        essay:    { label: "Tự luận",               cls: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
+                        essay:    { label: "Thực Hành Code PEA",     cls: "bg-cyan-500/20 text-cyan-400 border-cyan-500/40 font-bold" },
                         unknown:  { label: "Trắc nghiệm",           cls: "bg-slate-600/20 text-slate-400 border-slate-600/30" },
                     };
                     const tm = typeMeta[qtype] || typeMeta.radio;
@@ -2264,14 +2268,6 @@
                     // ── Options list (radio or checkbox) ──────────────────
                     let optionsHtml = "";
                     let opts = q.options || [];
-                    if (!opts || opts.length === 0) {
-                        opts = [
-                            { label: "A", text: "Phương án A" },
-                            { label: "B", text: "Phương án B" },
-                            { label: "C", text: "Phương án C" },
-                            { label: "D", text: "Phương án D" }
-                        ];
-                    }
                     const chosenSet = new Set(
                         chosenAns ? chosenAns.split(",").map(s => s.trim()) : []
                     );
@@ -2338,17 +2334,26 @@
                             </div>`;
 
                     } else if (qtype === "text" || qtype === "essay") {
-                        // Free-text input
-                        const rows = qtype === "essay" ? 3 : 1;
+                        // Free-text input / Code Solution area
+                        const rows = qtype === "essay" ? 4 : 1;
                         const inputEl = qtype === "essay"
-                            ? `<textarea id="text-ans-${q.question_index}" rows="${rows}" placeholder="Nhập câu trả lời hỗ trợ..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 resize-none">${escapeHtml(chosenAns)}</textarea>`
+                            ? `<textarea id="text-ans-${q.question_index}" rows="${rows}" placeholder="Nhập mã nguồn / đáp án bài thi thực hành PEA..." class="flex-1 bg-slate-900 border border-cyan-700/60 rounded-xl px-3 py-2 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 resize-none shadow-inner">${escapeHtml(chosenAns)}</textarea>`
                             : `<input type="text" id="text-ans-${q.question_index}" value="${escapeHtml(chosenAns)}" placeholder="Nhập câu trả lời..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">`;
                         answerAreaHtml = `
-                            <div class="flex items-start gap-2">
-                                <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0 pt-2">Câu trả lời:</span>
-                                ${inputEl}
-                                <button onclick="submitTextAnswer('${currentExamHWID}', ${q.question_index})" class="shrink-0 px-3 py-2 bg-amber-600 hover:bg-amber-500 rounded-xl text-xs font-bold text-white border-2 border-amber-500 transition">Gửi</button>
-                                ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="shrink-0 px-2 py-2 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕</button>` : ""}
+                            <div class="space-y-2">
+                                ${qtype === 'essay' ? `
+                                    <div class="flex items-center gap-2 pb-1">
+                                        <button onclick="triggerPeaSourceGen()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-cyan-600/30">
+                                            <i class="fa-solid fa-code"></i> Tạo Mã Nguồn Giải PEA (C/C++/Java/C#)
+                                        </button>
+                                        <span class="text-[11px] text-cyan-400/80">Tự động sinh code mẫu chuẩn bài thi thực hành PEA</span>
+                                    </div>` : ''
+                                }
+                                <div class="flex items-start gap-2">
+                                    <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0 pt-2">Mã nguồn / Đáp án:</span>
+                                    ${inputEl}
+                                    <button onclick="submitTextAnswer('${currentExamHWID}', ${q.question_index})" class="shrink-0 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-xs font-bold text-white border-2 border-cyan-500 transition shadow-md">Lưu Đáp Án</button>
+                                    ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="shrink-0 px-2 py-2 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕</button>` : ""}
                             </div>`;
                     }
 
