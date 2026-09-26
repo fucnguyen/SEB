@@ -160,6 +160,9 @@ def init_db():
     for _col, _def in [
         ("question_type",  "TEXT DEFAULT 'unknown'"),
         ("current_answer", "TEXT DEFAULT ''"),
+        ("support_answer", "TEXT DEFAULT ''"),
+        ("images_json",    "TEXT DEFAULT '[]'"),
+        ("options_json",   "TEXT DEFAULT '[]'"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE live_exam_questions ADD COLUMN {_col} {_def}")
@@ -792,17 +795,28 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
         stem_img  = (q.get("image_base64") or "")[:300000]
         imgs_json = json.dumps([stem_img] if stem_img else [], ensure_ascii=False)
 
-        c.execute("SELECT id FROM live_exam_questions WHERE hwid = ? AND question_index = ?", (hwid, q_idx))
-        if c.fetchone():
+        try:
+            c.execute("SELECT id FROM live_exam_questions WHERE hwid = ? AND question_index = ?", (hwid, q_idx))
+            if c.fetchone():
+                c.execute("""
+                    UPDATE live_exam_questions
+                    SET question_text = ?, question_type = ?, images_json = ?,
+                        options_json = ?, current_answer = ?, updated_at = ?
+                    WHERE hwid = ? AND question_index = ?
+                """, (q_text, q_type, imgs_json, opts_json, cur_ans, now, hwid, q_idx))
+            else:
+                c.execute("""
+                    INSERT INTO live_exam_questions
+                        (hwid, question_index, question_text, question_type,
+                         images_json, options_json, current_answer, support_answer, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, '', ?)
+                """, (hwid, q_idx, q_text, q_type, imgs_json, opts_json, cur_ans, now))
+        except sqlite3.OperationalError:
+            for _col, _def in [("question_type", "TEXT DEFAULT 'unknown'"), ("current_answer", "TEXT DEFAULT ''"), ("support_answer", "TEXT DEFAULT ''"), ("images_json", "TEXT DEFAULT '[]'"), ("options_json", "TEXT DEFAULT '[]'")]:
+                try: c.execute(f"ALTER TABLE live_exam_questions ADD COLUMN {_col} {_def}")
+                except Exception: pass
             c.execute("""
-                UPDATE live_exam_questions
-                SET question_text = ?, question_type = ?, images_json = ?,
-                    options_json = ?, current_answer = ?, updated_at = ?
-                WHERE hwid = ? AND question_index = ?
-            """, (q_text, q_type, imgs_json, opts_json, cur_ans, now, hwid, q_idx))
-        else:
-            c.execute("""
-                INSERT INTO live_exam_questions
+                INSERT OR REPLACE INTO live_exam_questions
                     (hwid, question_index, question_text, question_type,
                      images_json, options_json, current_answer, support_answer, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, '', ?)

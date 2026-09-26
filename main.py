@@ -876,7 +876,7 @@ async def api_admin_copy_answers(hwid: str):
 @app.post("/api/admin/eos/load-folder-exams", dependencies=[Depends(require_admin)])
 async def api_admin_load_folder_exams():
     """Tự động quét thư mục project và thư mục sample_exams đính kèm để nạp tất cả các đề thi .dat/.bin có sẵn"""
-    import os, re, hashlib
+    import os, re, hashlib, base64
     loaded_papers = []
 
     candidate_folders = [
@@ -885,126 +885,130 @@ async def api_admin_load_folder_exams():
     ]
 
     scanned_paths = set()
-    ignore_exact = [
-        "QuestionLib", "QuestionCount", "PaperCount", "PaperImage",
-        "IRemote", "EOSData", "PEAData", "ServerInfo", "RegisterData",
-        "RegisterStatus", "_testType", "_examCode", "_noOfQuestion", "_listenCode",
-        "TEST_PEA_THOI_MA", "mscorlib", "System.", "Assembly", "BackingField", "Version=", "PublicKeyToken=",
-        "http", "xmlns", "microsoft", "runtime"
-    ]
-    exam_keywords = ["question", "select", "which", "what", "how", "choose", "paper", "test", "read", "listen", "part", "answer", "following", "order"]
+    try:
+        for base_folder in candidate_folders:
+            if not os.path.exists(base_folder):
+                continue
+            for root, dirs, files in os.walk(base_folder):
+                for f in files:
+                    if f.endswith(".dat") or f.endswith(".bin"):
+                        fp = os.path.join(root, f)
+                        if fp in scanned_paths:
+                            continue
+                        scanned_paths.add(fp)
 
-    for base_folder in candidate_folders:
-        if not os.path.exists(base_folder):
-            continue
-        for root, dirs, files in os.walk(base_folder):
-            for f in files:
-                if f.endswith(".dat") or f.endswith(".bin"):
-                    fp = os.path.join(root, f)
-                    if fp in scanned_paths:
-                        continue
-                    scanned_paths.add(fp)
+                        sz = os.path.getsize(fp)
+                        if sz > 2000:
+                            file_name = os.path.basename(fp)
+                            hwid = "FOLDER_" + hashlib.md5(fp.encode()).hexdigest()[:12].upper()
+                            exam_title = f"EOS/PEA File: {file_name}"
+                            
+                            with open(fp, "rb") as fh:
+                                raw_data = fh.read()
+                            
+                            is_pea = "PEA" in file_name.upper() or b"PEAData" in raw_data or b"PEA" in raw_data[:300]
+                            questions = []
 
-                    sz = os.path.getsize(fp)
-                    if sz > 2000:
-                        file_name = os.path.basename(fp)
-                        hwid = "FOLDER_" + hashlib.md5(fp.encode()).hexdigest()[:12].upper()
-                        exam_title = f"EOS/PEA File: {file_name}"
-                        
-                        with open(fp, "rb") as fh:
-                            raw_data = fh.read()
-                        
-                        is_pea = "PEA" in file_name.upper() or b"PEAData" in raw_data or b"PEA" in raw_data[:300]
-                        questions = []
+                            if is_pea:
+                                exam_title = f"PEA Practical Code: {file_name}"
+                                pea_tasks = [
+                                    "Task 1 (2.0 điểm - Practical Coding): Yêu cầu đọc đề thi PEA. Viết cấu trúc/lớp dữ liệu Cake (-maker:String, -price:int) cùng các phương thức khởi tạo Constructor, getMaker(), getPrice(), setPrice(price:int). Hàm getMaker() chuyển ký tự cuối cùng thành chữ HOA và các ký tự còn lại thành chữ thường.",
+                                    "Task 2 (3.0 điểm - Thao tác Tệp tin nhị phân): Viết hàm mở tệp tin nhị phân input, đọc danh sách đối tượng, lọc theo giá trị và ghi kết quả xuất định dạng ra tệp output.",
+                                    "Task 3 (3.0 điểm - Sắp xếp & Thuật toán): Viết hàm sắp xếp danh sách đối tượng giảm dần theo thuộc tính giá tiền và in ra 3 phần tử đầu tiên thỏa mãn."
+                                ]
+                                for idx, pt in enumerate(pea_tasks):
+                                    questions.append({
+                                        "question_index": idx,
+                                        "question_type": "essay",
+                                        "question_text": pt,
+                                        "options": [],
+                                        "student_answer": "",
+                                        "support_answer": "/* Nhấn nút [Tạo Source PEA] trên thanh công cụ để tự động tạo và copy mã nguồn giải sẵn C/C++/Java/C# vào Clipboard */"
+                                    })
+                            else:
+                                # Parse EOS binary strings
+                                strings = [s.decode("latin1", errors="ignore").strip() for s in re.findall(rb'[\x20-\x7e]{3,}', raw_data)]
+                                ignore_keys = {'mscorlib', 'System.', 'Assembly', 'PublicKeyToken', 'BackingField', 'Version=', 'http', 'IRemote', 'xmlns', 'QuestionLib', 'Format', 'value__', '_items', '_size', '_version', '_courseId', '_chapterId', '_lock', '_imageData', '_qaid', '_qid', '_text', '_chosen', '_qType', '_imageSize', '_questionLOs', '_QBID', '_testType', '_examCode', '_duration', '_mark', '_noOfQuestion', '_reading', '_grammar', '_match', '_indicateMistake', '_fillBlank', '_essay', '_isShuffleReading', '_isShuffleGrammer', '_isShuffleMatch', '_isShuffleIndicateMistake', '_isShuffleFillBlank', '_studentGuide', '_listenCode', '_listAudio', '_oneSecSilence', '_audioHeadPadding', '_imagePaper', 'Test1_MC_062020', 'Test 2', 'Status', 'ExamPaper', 'StudentSubmitPaper', 'OriginSize', 'ServerInfomation', 'RegData', '_selected', '_done'}
 
-                        if is_pea:
-                            exam_title = f"PEA Practical Code: {file_name}"
-                            pea_tasks = [
-                                "Task 1 (2.0 điểm - Practical Coding): Yêu cầu đọc đề thi PEA. Viết cấu trúc/lớp dữ liệu Cake (-maker:String, -price:int) cùng các phương thức khởi tạo Constructor, getMaker(), getPrice(), setPrice(price:int). Hàm getMaker() chuyển ký tự cuối cùng thành chữ HOA và các ký tự còn lại thành chữ thường.",
-                                "Task 2 (3.0 điểm - Thao tác Tệp tin nhị phân): Viết hàm mở tệp tin nhị phân input, đọc danh sách đối tượng, lọc theo giá trị và ghi kết quả xuất định dạng ra tệp output.",
-                                "Task 3 (3.0 điểm - Sắp xếp & Thuật toán): Viết hàm sắp xếp danh sách đối tượng giảm dần theo thuộc tính giá tiền và in ra 3 phần tử đầu tiên thỏa mãn."
-                            ]
-                            for idx, pt in enumerate(pea_tasks):
-                                questions.append({
-                                    "question_index": idx,
-                                    "question_type": "essay",
-                                    "question_text": pt,
-                                    "options": [],
-                                    "student_answer": "",
-                                    "support_answer": "/* Nhấn nút [Tạo Source PEA] trên thanh công cụ để tự động tạo và copy mã nguồn giải sẵn C/C++/Java/C# vào Clipboard */"
-                                })
-                        else:
-                            # Parse EOS binary strings
-                            strings = [s.decode("latin1", errors="ignore").strip() for s in re.findall(rb'[\x20-\x7e]{3,}', raw_data)]
-                            ignore_keys = {'mscorlib', 'System.', 'Assembly', 'PublicKeyToken', 'BackingField', 'Version=', 'http', 'IRemote', 'xmlns', 'QuestionLib', 'Format', 'value__', '_items', '_size', '_version', '_courseId', '_chapterId', '_lock', '_imageData', '_qaid', '_qid', '_text', '_chosen', '_qType', '_imageSize', '_questionLOs', '_QBID', '_testType', '_examCode', '_duration', '_mark', '_noOfQuestion', '_reading', '_grammar', '_match', '_indicateMistake', '_fillBlank', '_essay', '_isShuffleReading', '_isShuffleGrammer', '_isShuffleMatch', '_isShuffleIndicateMistake', '_isShuffleFillBlank', '_studentGuide', '_listenCode', '_listAudio', '_oneSecSilence', '_audioHeadPadding', '_imagePaper', 'Test1_MC_062020', 'Test 2', 'Status', 'ExamPaper', 'StudentSubmitPaper', 'OriginSize', 'ServerInfomation', 'RegData', '_selected', '_done'}
+                                clean = [s for s in strings if s and not any(k in s for k in ignore_keys)]
 
-                            clean = [s for s in strings if s and not any(k in s for k in ignore_keys)]
+                                stems = []
+                                options_pool = []
+                                i = 0
+                                while i < len(clean):
+                                    s = clean[i]
+                                    if 'Choose ' in s or '____' in s or any(kw in s.lower() for kw in ['which', 'what', 'how', 'select', 'following', 'tuân thủ']):
+                                        cleaned = re.sub(r'^[^\w\(\)]+', '', s).strip()
+                                        if i + 1 < len(clean) and len(clean[i+1]) > 5 and not any(k in clean[i+1] for k in ['Choose', '_qid', '_qaid']):
+                                            cleaned += ' ' + re.sub(r'^[^\w\(\)]+', '', clean[i+1]).strip()
+                                            i += 1
+                                        stems.append(cleaned)
+                                    elif len(s) > 1 and not re.match(r'^\d+$', s) and not s.startswith('_'):
+                                        options_pool.append(s)
+                                    i += 1
 
-                            stems = []
-                            options_pool = []
-                            i = 0
-                            while i < len(clean):
-                                s = clean[i]
-                                if 'Choose ' in s or '____' in s or any(kw in s.lower() for kw in ['which', 'what', 'how', 'select', 'following', 'tuân thủ']):
-                                    cleaned = re.sub(r'^[^\w\(\)]+', '', s).strip()
-                                    if i + 1 < len(clean) and len(clean[i+1]) > 5 and not any(k in clean[i+1] for k in ['Choose', '_qid', '_qaid']):
-                                        cleaned += ' ' + re.sub(r'^[^\w\(\)]+', '', clean[i+1]).strip()
-                                        i += 1
-                                    stems.append(cleaned)
-                                elif len(s) > 1 and not re.match(r'^\d+$', s) and not s.startswith('_'):
-                                    options_pool.append(s)
-                                i += 1
+                                count = min(len(stems), 25)
+                                if count == 0:
+                                    count = 10
+                                    stems = [f"Câu hỏi trắc nghiệm số {idx+1} ({file_name})" for idx in range(10)]
 
-                            count = min(len(stems), 25)
-                            if count == 0:
-                                count = 10
-                                stems = [f"Câu hỏi trắc nghiệm số {idx+1} ({file_name})" for idx in range(10)]
+                                for idx in range(count):
+                                    stem = stems[idx]
+                                    q_opts = options_pool[idx*4 : (idx+1)*4] if len(options_pool) >= (idx+1)*4 else []
+                                    if len(q_opts) < 4:
+                                        q_opts = [f"Lựa chọn A câu {idx+1}", f"Lựa chọn B câu {idx+1}", f"Lựa chọn C câu {idx+1}", f"Lựa chọn D câu {idx+1}"]
 
-                            for idx in range(count):
-                                stem = stems[idx]
-                                q_opts = options_pool[idx*4 : (idx+1)*4] if len(options_pool) >= (idx+1)*4 else []
-                                if len(q_opts) < 4:
-                                    q_opts = [f"Lựa chọn A câu {idx+1}", f"Lựa chọn B câu {idx+1}", f"Lựa chọn C câu {idx+1}", f"Lựa chọn D câu {idx+1}"]
+                                    options_obj = [{"label": chr(65+i), "text": q_opts[i]} for i in range(4)]
+                                    questions.append({
+                                        "question_index": idx,
+                                        "question_type": "radio",
+                                        "question_text": stem,
+                                        "options": options_obj,
+                                        "student_answer": "",
+                                        "support_answer": ""
+                                    })
 
-                        # Extract any embedded JPEG or PNG images from binary stream
-                        extracted_images = []
-                        for m in re.finditer(rb'\xff\xd8\xff', raw_data):
-                            start = m.start()
-                            end = raw_data.find(b'\xff\xd9', start)
-                            if end != -1 and end > start + 100:
-                                img_b = raw_data[start:end+2]
-                                extracted_images.append('data:image/jpeg;base64,' + base64.b64encode(img_b).decode())
-                                if len(extracted_images) >= 5: break
-
-                        if not extracted_images:
-                            for m in re.finditer(rb'\x89PNG\r\n\x1a\n', raw_data):
+                            # Extract any embedded JPEG or PNG images from binary stream
+                            extracted_images = []
+                            for m in re.finditer(rb'\xff\xd8\xff', raw_data):
                                 start = m.start()
-                                end = raw_data.find(rb'IEND\xae\x42\x60\x82', start)
-                                if end != -1 and end > start + 50:
-                                    img_b = raw_data[start:end+12]
-                                    extracted_images.append('data:image/png;base64,' + base64.b64encode(img_b).decode())
+                                end = raw_data.find(b'\xff\xd9', start)
+                                if end != -1 and end > start + 100:
+                                    img_b = raw_data[start:end+2]
+                                    extracted_images.append('data:image/jpeg;base64,' + base64.b64encode(img_b).decode())
                                     if len(extracted_images) >= 5: break
 
-                        if extracted_images and questions:
-                            for i, q in enumerate(questions):
-                                if i < len(extracted_images):
-                                    q["image_base64"] = extracted_images[i]
-                                else:
-                                    q["image_base64"] = extracted_images[0]
+                            if not extracted_images:
+                                for m in re.finditer(rb'\x89PNG\r\n\x1a\n', raw_data):
+                                    start = m.start()
+                                    end = raw_data.find(rb'IEND\xae\x42\x60\x82', start)
+                                    if end != -1 and end > start + 50:
+                                        img_b = raw_data[start:end+12]
+                                        extracted_images.append('data:image/png;base64,' + base64.b64encode(img_b).decode())
+                                        if len(extracted_images) >= 5: break
 
-                        if questions:
-                            database.sync_student_exam_data(
-                                hwid=hwid,
-                                student_name=f"Thí Sinh Đề {file_name}",
-                                exam_title=exam_title,
-                                questions=questions
-                            )
-                            loaded_papers.append({"file_name": file_name, "hwid": hwid, "questions_count": len(questions)})
+                            if extracted_images and questions:
+                                for i, q in enumerate(questions):
+                                    if i < len(extracted_images):
+                                        q["image_base64"] = extracted_images[i]
+                                    else:
+                                        q["image_base64"] = extracted_images[0]
 
-    if not loaded_papers:
-        return {"success": False, "message": "Không tìm thấy file đề thi nào trong các thư mục mẫu!"}
+                            if questions:
+                                database.sync_student_exam_data(
+                                    hwid=hwid,
+                                    student_name=f"Thí Sinh Đề {file_name}",
+                                    exam_title=exam_title,
+                                    questions=questions
+                                )
+                                loaded_papers.append({"file_name": file_name, "hwid": hwid, "questions_count": len(questions)})
 
-    return {"success": True, "count": len(loaded_papers), "loaded_papers": loaded_papers}
+        if not loaded_papers:
+            return {"success": False, "message": "Không tìm thấy file đề thi nào trong các thư mục mẫu!"}
+
+        return {"success": True, "count": len(loaded_papers), "loaded_papers": loaded_papers}
+    except Exception as err:
+        return {"success": False, "message": f"Lỗi đọc file đề thi: {str(err)}"}
 
 
 # Admin tạo và đẩy đề thủ công xuống máy học sinh
