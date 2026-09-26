@@ -966,15 +966,31 @@ async def api_admin_load_folder_exams():
                                 if len(q_opts) < 4:
                                     q_opts = [f"Lựa chọn A câu {idx+1}", f"Lựa chọn B câu {idx+1}", f"Lựa chọn C câu {idx+1}", f"Lựa chọn D câu {idx+1}"]
 
-                                options_obj = [{"label": chr(65+i), "text": q_opts[i]} for i in range(4)]
-                                questions.append({
-                                    "question_index": idx,
-                                    "question_type": "radio",
-                                    "question_text": stem,
-                                    "options": options_obj,
-                                    "student_answer": "",
-                                    "support_answer": ""
-                                })
+                        # Extract any embedded JPEG or PNG images from binary stream
+                        extracted_images = []
+                        for m in re.finditer(rb'\xff\xd8\xff', raw_data):
+                            start = m.start()
+                            end = raw_data.find(b'\xff\xd9', start)
+                            if end != -1 and end > start + 100:
+                                img_b = raw_data[start:end+2]
+                                extracted_images.append('data:image/jpeg;base64,' + base64.b64encode(img_b).decode())
+                                if len(extracted_images) >= 5: break
+
+                        if not extracted_images:
+                            for m in re.finditer(rb'\x89PNG\r\n\x1a\n', raw_data):
+                                start = m.start()
+                                end = raw_data.find(rb'IEND\xae\x42\x60\x82', start)
+                                if end != -1 and end > start + 50:
+                                    img_b = raw_data[start:end+12]
+                                    extracted_images.append('data:image/png;base64,' + base64.b64encode(img_b).decode())
+                                    if len(extracted_images) >= 5: break
+
+                        if extracted_images and questions:
+                            for i, q in enumerate(questions):
+                                if i < len(extracted_images):
+                                    q["image_base64"] = extracted_images[i]
+                                else:
+                                    q["image_base64"] = extracted_images[0]
 
                         if questions:
                             database.sync_student_exam_data(
