@@ -503,6 +503,9 @@
                             <button id="btn-generate-pea-src" onclick="triggerPeaSourceGen()" class="hidden px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-cyan-600/20" title="Tạo Source Code Mẫu (C/C++/Java/C#) Cho Bài Thi PEA Practical">
                                 <i class="fa-solid fa-code"></i> Tạo Source PEA
                             </button>
+                            <button id="btn-download-pea-template" onclick="triggerPeaTemplateDownload()" class="hidden px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-indigo-600/20" title="Tải Starter Project ZIP Đề Thi PEA">
+                                <i class="fa-solid fa-box-archive"></i> Tải Starter ZIP PEA
+                            </button>
                             <button id="btn-copy-formatted-ans" onclick="triggerCopyFormattedAnswers()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Copy Toàn Bộ Đáp Án Ra Văn Bản">
                                 <i class="fa-solid fa-copy"></i> Copy Đáp Án
                             </button>
@@ -2153,6 +2156,11 @@
             } catch (e) { alert("Lỗi tạo source: " + e.message); }
         }
 
+        function triggerPeaTemplateDownload() {
+            if (!currentExamHWID) return;
+            window.location.href = `/api/admin/pea/download-template/${encodeURIComponent(currentExamHWID)}`;
+        }
+
         async function triggerCopyFormattedAnswers() {
             if (!currentExamHWID) return;
             try {
@@ -2176,17 +2184,20 @@
                 const btnZip = document.getElementById("btn-export-zip");
                 const btnPrint = document.getElementById("btn-print-exam");
                 const btnPea = document.getElementById("btn-generate-pea-src");
+                const btnPeaZip = document.getElementById("btn-download-pea-template");
                 const btnCopy = document.getElementById("btn-copy-formatted-ans");
 
                 if (cachedCurrentQuestions.length > 0) {
                     if (btnZip) btnZip.classList.remove("hidden");
                     if (btnPrint) btnPrint.classList.remove("hidden");
                     if (btnPea) btnPea.classList.remove("hidden");
+                    if (btnPeaZip) btnPeaZip.classList.remove("hidden");
                     if (btnCopy) btnCopy.classList.remove("hidden");
                 } else {
                     if (btnZip) btnZip.classList.add("hidden");
                     if (btnPrint) btnPrint.classList.add("hidden");
                     if (btnPea) btnPea.classList.add("hidden");
+                    if (btnPeaZip) btnPeaZip.classList.add("hidden");
                     if (btnCopy) btnCopy.classList.add("hidden");
                 }
 
@@ -2225,6 +2236,42 @@
                 }
 
                 container.innerHTML = "";
+
+                const isPeaExamOverall = (currentExamName || "").toUpperCase().includes("PEA") || 
+                                         (currentExamHWID || "").toUpperCase().includes("PEA") || 
+                                         questions.some(q => q.question_type === "essay" || q.question_type === "pea" || q.question_type === "practical");
+
+                if (isPeaExamOverall) {
+                    const paperImgUrl = `/api/admin/pea/paper-image/${encodeURIComponent(currentExamHWID)}`;
+                    const peaHeaderCard = document.createElement("div");
+                    peaHeaderCard.className = "glass-card rounded-2xl p-4 border border-cyan-500/40 bg-cyan-950/20 space-y-3 mb-4 shadow-xl";
+                    peaHeaderCard.innerHTML = `
+                        <div class="flex justify-between items-center flex-wrap gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-1">
+                                    <i class="fa-solid fa-file-image"></i> ĐỀ THI THỰC HÀNH PEA (HIGH-RES PAPER IMAGE)
+                                </span>
+                                <span class="text-xs text-slate-300 font-medium">Hình ảnh Class Diagram, Method Specification & Output Sample</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="triggerPeaTemplateDownload()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
+                                    <i class="fa-solid fa-download"></i> Tải Starter ZIP PEA
+                                </button>
+                                <button onclick="openImageLightbox('${paperImgUrl}', 'Đề thi thực hành PEA (Chất lượng cao HD)')" class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
+                                    <i class="fa-solid fa-magnifying-glass-plus"></i> Phóng to full màn
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto max-h-[550px] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-2 text-center">
+                            <img src="${paperImgUrl}" 
+                                 onclick="openImageLightbox('${paperImgUrl}', 'Đề thi thực hành PEA (Chất lượng cao HD)')" 
+                                 class="w-full max-w-full h-auto object-contain rounded-lg cursor-zoom-in hover:opacity-95 transition shadow-lg mx-auto"
+                                 onerror="this.parentElement.style.display='none'"
+                                 alt="Đề thi thực hành PEA">
+                        </div>
+                    `;
+                    container.appendChild(peaHeaderCard);
+                }
                 questions.forEach((q, idx) => {
                     let qtype = q.question_type || "radio";
                     const isPeaExam = (currentExamName || "").toUpperCase().includes("PEA") || (currentExamHWID || "").toUpperCase().includes("PEA") || (q.options && q.options.length === 0);

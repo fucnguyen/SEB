@@ -873,6 +873,67 @@ async def api_admin_copy_answers(hwid: str):
         lines.append(f"Câu {idx:02d}: {ans}")
     return {"success": True, "formatted_text": "\n".join(lines)}
 
+@app.get("/api/admin/pea/download-template/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_pea_download_template(hwid: str):
+    """Tải file ZIP mẫu dự án (Starter Project Template) của bài thi thực hành PEA"""
+    import os, re, io, zipfile
+    candidate_files = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "sample_exams", "PEA_peaData_dump.bin"),
+        r"D:\Project\Tools FPT\tools\PEA_peaData_dump.bin"
+    ]
+    zip_data = None
+    for fp in candidate_files:
+        if os.path.exists(fp):
+            with open(fp, "rb") as fh:
+                data = fh.read()
+            zip_offsets = [m.start() for m in re.finditer(rb'PK\x03\x04', data)]
+            for offset in zip_offsets:
+                try:
+                    zf = zipfile.ZipFile(io.BytesIO(data[offset:]))
+                    if len(zf.namelist()) > 3:
+                        zip_data = data[offset:]
+                        break
+                except Exception:
+                    pass
+            if zip_data:
+                break
+
+    if not zip_data:
+        return Response(content=b"ZIP Template not found", status_code=404)
+
+    return Response(
+        content=zip_data,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=PEA_Starter_Template_{hwid[:8]}.zip"}
+    )
+
+@app.get("/api/admin/pea/paper-image/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_pea_paper_image(hwid: str):
+    """Tải/Hiển thị ảnh đề thi dài độ phân giải cao của bài thi thực hành PEA"""
+    import os, re
+    candidate_files = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "sample_exams", "PEA_peaData_dump.bin"),
+        r"D:\Project\Tools FPT\tools\PEA_peaData_dump.bin"
+    ]
+    img_bytes = None
+    for fp in candidate_files:
+        if os.path.exists(fp):
+            with open(fp, "rb") as fh:
+                data = fh.read()
+            jpegs = [m.start() for m in re.finditer(rb'\xff\xd8\xff', data)]
+            for start in jpegs:
+                end = data.find(b'\xff\xd9', start)
+                if end != -1 and end > start + 5000:
+                    img_bytes = data[start:end+2]
+                    break
+            if img_bytes:
+                break
+
+    if not img_bytes:
+        return Response(content=b"Paper Image not found", status_code=404)
+
+    return Response(content=img_bytes, media_type="image/jpeg")
+
 @app.post("/api/admin/eos/load-folder-exams", dependencies=[Depends(require_admin)])
 async def api_admin_load_folder_exams():
     """Tự động quét thư mục project và thư mục sample_exams đính kèm để nạp tất cả các đề thi .dat/.bin có sẵn"""
@@ -911,6 +972,16 @@ async def api_admin_load_folder_exams():
 
                             if is_pea:
                                 exam_title = f"PEA Practical Code: {file_name}"
+                                # Extract embedded 7.6MB JPEG paper image
+                                pea_img = ""
+                                jpegs = [m.start() for m in re.finditer(rb'\xff\xd8\xff', raw_data)]
+                                for start in jpegs:
+                                    end = raw_data.find(b'\xff\xd9', start)
+                                    if end != -1 and end > start + 5000:
+                                        img_b = raw_data[start:end+2]
+                                        pea_img = 'data:image/jpeg;base64,' + base64.b64encode(img_b).decode()
+                                        break
+
                                 pea_tasks = [
                                     "Task 1 (2.0 điểm - Practical Coding): Yêu cầu đọc đề thi PEA. Viết cấu trúc/lớp dữ liệu Cake (-maker:String, -price:int) cùng các phương thức khởi tạo Constructor, getMaker(), getPrice(), setPrice(price:int). Hàm getMaker() chuyển ký tự cuối cùng thành chữ HOA và các ký tự còn lại thành chữ thường.",
                                     "Task 2 (3.0 điểm - Thao tác Tệp tin nhị phân): Viết hàm mở tệp tin nhị phân input, đọc danh sách đối tượng, lọc theo giá trị và ghi kết quả xuất định dạng ra tệp output.",
@@ -921,6 +992,7 @@ async def api_admin_load_folder_exams():
                                         "question_index": idx,
                                         "question_type": "essay",
                                         "question_text": pt,
+                                        "image_base64": pea_img if idx == 0 else "",
                                         "options": [],
                                         "student_answer": "",
                                         "support_answer": "/* Nhấn nút [Tạo Source PEA] trên thanh công cụ để tự động tạo và copy mã nguồn giải sẵn C/C++/Java/C# vào Clipboard */"
