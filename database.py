@@ -135,13 +135,25 @@ def init_db():
         hwid TEXT NOT NULL,
         question_index INTEGER NOT NULL,
         question_text TEXT NOT NULL,
+        question_type TEXT DEFAULT 'unknown', -- radio, checkbox, text, essay, unknown
         images_json TEXT DEFAULT '[]',
-        options_json TEXT NOT NULL,
-        support_answer TEXT DEFAULT '', -- Đáp án do Support chọn: A, B, C, D
+        options_json TEXT NOT NULL DEFAULT '[]',
+        current_answer TEXT DEFAULT '',       -- Câu trả lời hiện tại của thí sinh
+        support_answer TEXT DEFAULT '',       -- Đáp án do Support chọn
         updated_at TEXT NOT NULL,
         UNIQUE(hwid, question_index)
     )
     """)
+
+    # Migration: thêm cột mới nếu DB cũ chưa có
+    for _col, _def in [
+        ("question_type",  "TEXT DEFAULT 'unknown'"),
+        ("current_answer", "TEXT DEFAULT ''"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE live_exam_questions ADD COLUMN {_col} {_def}")
+        except Exception:
+            pass  # Column already exists
 
     # Các giá trị mặc định cho settings
     default_settings = {
@@ -713,94 +725,145 @@ def import_all_data(data: Dict[str, Any], overwrite: bool = False) -> Dict[str, 
 # ────────────────── Live Exam Sync & Support API ──────────────────
 
 def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questions: list) -> Dict[str, str]:
-    """Cập nhật toàn bộ câu hỏi/ảnh từ thí sinh lên và trả về các đáp án do Support chỉ định"""
-    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    """
+    Nhận toàn bộ danh sách câu hỏi từ thí sinh, lưu vào DB, trả về dict đáp án Support đã chọn.
+    Mỗi question object từ client có:
+      question_index, question_text, question_type, options (list of {label,text,image_base64}),
+      image_base64 (stem), current_answer
+    """
+    import json
+    now  = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    hwid = hwid.strip()
     conn = get_connection()
-    c = conn.cursor()
+    c    = conn.cursor()
 
-    # 1. Cập nhật session
-    c.execute("SELECT id FROM live_exam_sessions WHERE hwid = ?", (hwid.strip(),))
-    sess = c.fetchone()
-    if sess:
+    # 1. Upsert session
+    c.execute("SELECT id FROM live_exam_sessions WHERE hwid = ?", (hwid,))
+    if c.fetchone():
         c.execute("""
             UPDATE live_exam_sessions
             SET student_name = ?, exam_title = ?, total_questions = ?, last_sync = ?, status = 'active'
             WHERE hwid = ?
-        """, (student_name.strip(), exam_title.strip(), len(questions), now, hwid.strip()))
+        """, (student_name.strip(), exam_title.strip(), len(questions), now, hwid))
     else:
         c.execute("""
             INSERT INTO live_exam_sessions (hwid, student_name, exam_title, total_questions, status, last_sync, created_at)
             VALUES (?, ?, ?, ?, 'active', ?, ?)
-        """, (hwid.strip(), student_name.strip(), exam_title.strip(), len(questions), now, now))
+        """, (hwid, student_name.strip(), exam_title.strip(), len(questions), now, now))
 
-    # 2. Cập nhật danh sách câu hỏi
-    import json
+    # 2. Upsert each question
     for q in questions:
-        q_idx = q.get("index") or 0
-        if not q_idx:
-            continue
-        q_text = (q.get("question_text") or "").strip()
-        imgs = json.dumps(q.get("images", []), ensure_ascii=False)
-        opts = json.dumps(q.get("options", []), ensure_ascii=False)
+        q_idx   = int(q.get("question_index", 0))
+        q_text  = (q.get("question_text") or "").strip()[:1000]
+        q_type  = (q.get("question_type") or "unknown").strip()
+        cur_ans = (q.get("current_answer") or "").strip()
 
-        c.execute("SELECT id FROM live_exam_questions WHERE hwid = ? AND question_index = ?", (hwid.strip(), q_idx))
-        existing_q = c.fetchone()
-        if existing_q:
+        # options: list of {label, text, image_base64}  OR legacy list of strings
+        raw_opts = q.get("options") or []
+        if raw_opts and isinstance(raw_opts[0], str):
+            ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            raw_opts = [{"label": ALPHA[i] if i < 26 else str(i), "text": o, "image_base64": ""}
+                        for i, o in enumerate(raw_opts)]
+
+        # Cap per-option image size to 100 KB base64
+        opts_clean = []
+        for o in raw_opts:
+            oc = dict(o)
+            b64 = oc.get("image_base64", "")
+            oc["image_base64"] = b64[:100000] if b64 else ""
+            opts_clean.append(oc)
+
+        opts_json = json.dumps(opts_clean, ensure_ascii=False)
+        stem_img  = (q.get("image_base64") or "")[:300000]
+        imgs_json = json.dumps([stem_img] if stem_img else [], ensure_ascii=False)
+
+        c.execute("SELECT id FROM live_exam_questions WHERE hwid = ? AND question_index = ?", (hwid, q_idx))
+        if c.fetchone():
             c.execute("""
                 UPDATE live_exam_questions
-                SET question_text = ?, images_json = ?, options_json = ?, updated_at = ?
+                SET question_text = ?, question_type = ?, images_json = ?,
+                    options_json = ?, current_answer = ?, updated_at = ?
                 WHERE hwid = ? AND question_index = ?
-            """, (q_text, imgs, opts, now, hwid.strip(), q_idx))
+            """, (q_text, q_type, imgs_json, opts_json, cur_ans, now, hwid, q_idx))
         else:
             c.execute("""
-                INSERT INTO live_exam_questions (hwid, question_index, question_text, images_json, options_json, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (hwid.strip(), q_idx, q_text, imgs, opts, now))
+                INSERT INTO live_exam_questions
+                    (hwid, question_index, question_text, question_type,
+                     images_json, options_json, current_answer, support_answer, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, '', ?)
+            """, (hwid, q_idx, q_text, q_type, imgs_json, opts_json, cur_ans, now))
 
-    # 3. Lấy toàn bộ đáp án Support đã chọn cho thí sinh này
-    c.execute("SELECT question_index, support_answer FROM live_exam_questions WHERE hwid = ? AND support_answer != ''", (hwid.strip(),))
+    # 3. Return support answers already set for this student
+    c.execute("""
+        SELECT question_index, support_answer
+        FROM live_exam_questions
+        WHERE hwid = ? AND support_answer != ''
+    """, (hwid,))
     answers = {str(r["question_index"]): r["support_answer"] for r in c.fetchall()}
 
     conn.commit()
     conn.close()
     return answers
 
+
 def set_question_support_answer(hwid: str, question_index: int, support_answer: str) -> bool:
-    """Support chọn đáp án trên web: A, B, C, D"""
-    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    """
+    Admin chọn đáp án hỗ trợ.
+    - radio/checkbox: index-based string "0" hoặc "0,2,3"
+    - text/essay: chuỗi câu trả lời literal (không ép upper())
+    """
+    now  = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    hwid = hwid.strip() if isinstance(hwid, str) else hwid
+    ans  = (support_answer or "").strip()
     conn = get_connection()
-    c = conn.cursor()
+    c    = conn.cursor()
     c.execute("""
         UPDATE live_exam_questions
         SET support_answer = ?, updated_at = ?
         WHERE hwid = ? AND question_index = ?
-    """, (support_answer.strip().upper(), now, hwid.strip(), question_index))
+    """, (ans, now, hwid, question_index))
     affected = c.rowcount > 0
     conn.commit()
     conn.close()
     return affected
 
+
 def list_live_exam_sessions(limit: int = 50) -> List[Dict[str, Any]]:
     conn = get_connection()
-    c = conn.cursor()
+    c    = conn.cursor()
     c.execute("SELECT * FROM live_exam_sessions ORDER BY last_sync DESC LIMIT ?", (limit,))
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
     return rows
 
+
 def get_live_exam_questions(hwid: str) -> List[Dict[str, Any]]:
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM live_exam_questions WHERE hwid = ? ORDER BY question_index ASC", (hwid.strip(),))
+    """
+    Trả về danh sách câu hỏi với options parse thành list of {label,text,image_base64}.
+    """
     import json
+    conn = get_connection()
+    c    = conn.cursor()
+    c.execute("SELECT * FROM live_exam_questions WHERE hwid = ? ORDER BY question_index ASC", (hwid.strip(),))
     rows = []
     for r in c.fetchall():
         d = dict(r)
-        d["images"] = json.loads(d["images_json"]) if d.get("images_json") else []
-        d["options"] = json.loads(d["options_json"]) if d.get("options_json") else []
+        try:
+            opts = json.loads(d.get("options_json") or "[]")
+        except Exception:
+            opts = []
+        d["options"] = opts
+
+        try:
+            imgs = json.loads(d.get("images_json") or "[]")
+        except Exception:
+            imgs = []
+        d["image_base64"] = imgs[0] if imgs else ""
+
+        # Backward compat: rows created before question_type column
+        if not d.get("question_type"):
+            d["question_type"] = "radio" if opts else "unknown"
+
         rows.append(d)
     conn.close()
     return rows
-
-
-
