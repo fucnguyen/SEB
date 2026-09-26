@@ -114,6 +114,35 @@ def init_db():
     )
     """)
 
+    # 6. Bảng lưu phiên thi trực tuyến của thí sinh
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS live_exam_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hwid TEXT UNIQUE NOT NULL,
+        student_name TEXT NOT NULL,
+        exam_title TEXT,
+        total_questions INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'active', -- active, finished
+        last_sync TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    # 7. Bảng lưu danh sách câu hỏi, ảnh và đáp án của từng câu
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS live_exam_questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hwid TEXT NOT NULL,
+        question_index INTEGER NOT NULL,
+        question_text TEXT NOT NULL,
+        images_json TEXT DEFAULT '[]',
+        options_json TEXT NOT NULL,
+        support_answer TEXT DEFAULT '', -- Đáp án do Support chọn: A, B, C, D
+        updated_at TEXT NOT NULL,
+        UNIQUE(hwid, question_index)
+    )
+    """)
+
     # Các giá trị mặc định cho settings
     default_settings = {
         "admin_password": "Nguyenphuc1234@",
@@ -680,5 +709,98 @@ def import_all_data(data: Dict[str, Any], overwrite: bool = False) -> Dict[str, 
     conn.close()
     sync_seed_file()
     return stats
+
+# ────────────────── Live Exam Sync & Support API ──────────────────
+
+def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questions: list) -> Dict[str, str]:
+    """Cập nhật toàn bộ câu hỏi/ảnh từ thí sinh lên và trả về các đáp án do Support chỉ định"""
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_connection()
+    c = conn.cursor()
+
+    # 1. Cập nhật session
+    c.execute("SELECT id FROM live_exam_sessions WHERE hwid = ?", (hwid.strip(),))
+    sess = c.fetchone()
+    if sess:
+        c.execute("""
+            UPDATE live_exam_sessions
+            SET student_name = ?, exam_title = ?, total_questions = ?, last_sync = ?, status = 'active'
+            WHERE hwid = ?
+        """, (student_name.strip(), exam_title.strip(), len(questions), now, hwid.strip()))
+    else:
+        c.execute("""
+            INSERT INTO live_exam_sessions (hwid, student_name, exam_title, total_questions, status, last_sync, created_at)
+            VALUES (?, ?, ?, ?, 'active', ?, ?)
+        """, (hwid.strip(), student_name.strip(), exam_title.strip(), len(questions), now, now))
+
+    # 2. Cập nhật danh sách câu hỏi
+    import json
+    for q in questions:
+        q_idx = q.get("index") or 0
+        if not q_idx:
+            continue
+        q_text = (q.get("question_text") or "").strip()
+        imgs = json.dumps(q.get("images", []), ensure_ascii=False)
+        opts = json.dumps(q.get("options", []), ensure_ascii=False)
+
+        c.execute("SELECT id FROM live_exam_questions WHERE hwid = ? AND question_index = ?", (hwid.strip(), q_idx))
+        existing_q = c.fetchone()
+        if existing_q:
+            c.execute("""
+                UPDATE live_exam_questions
+                SET question_text = ?, images_json = ?, options_json = ?, updated_at = ?
+                WHERE hwid = ? AND question_index = ?
+            """, (q_text, imgs, opts, now, hwid.strip(), q_idx))
+        else:
+            c.execute("""
+                INSERT INTO live_exam_questions (hwid, question_index, question_text, images_json, options_json, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (hwid.strip(), q_idx, q_text, imgs, opts, now))
+
+    # 3. Lấy toàn bộ đáp án Support đã chọn cho thí sinh này
+    c.execute("SELECT question_index, support_answer FROM live_exam_questions WHERE hwid = ? AND support_answer != ''", (hwid.strip(),))
+    answers = {str(r["question_index"]): r["support_answer"] for r in c.fetchall()}
+
+    conn.commit()
+    conn.close()
+    return answers
+
+def set_question_support_answer(hwid: str, question_index: int, support_answer: str) -> bool:
+    """Support chọn đáp án trên web: A, B, C, D"""
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE live_exam_questions
+        SET support_answer = ?, updated_at = ?
+        WHERE hwid = ? AND question_index = ?
+    """, (support_answer.strip().upper(), now, hwid.strip(), question_index))
+    affected = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
+
+def list_live_exam_sessions(limit: int = 50) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM live_exam_sessions ORDER BY last_sync DESC LIMIT ?", (limit,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def get_live_exam_questions(hwid: str) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM live_exam_questions WHERE hwid = ? ORDER BY question_index ASC", (hwid.strip(),))
+    import json
+    rows = []
+    for r in c.fetchall():
+        d = dict(r)
+        d["images"] = json.loads(d["images_json"]) if d.get("images_json") else []
+        d["options"] = json.loads(d["options_json"]) if d.get("options_json") else []
+        rows.append(d)
+    conn.close()
+    return rows
+
 
 

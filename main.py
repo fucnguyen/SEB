@@ -47,6 +47,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SEB Licensing Portal", lifespan=lifespan)
 
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
@@ -120,6 +129,17 @@ class SessionLogModel(BaseModel):
     machine_name: Optional[str] = ""
     event_type: str # START_EXAM, EXIT_NORMAL, EXIT_LOCKED, EXIT_DELETED, EXIT_EXPIRED
     details: Optional[str] = ""
+
+class StudentExamSyncModel(BaseModel):
+    hwid: str
+    student_name: Optional[str] = "Thí sinh"
+    exam_title: Optional[str] = "Bài thi trực tuyến"
+    questions: list
+
+class SetAnswerModel(BaseModel):
+    hwid: str
+    question_index: int
+    answer: str
 
 def calculate_expiration(duration: str, custom_datetime: Optional[str] = None, current_exp: Optional[datetime] = None) -> datetime:
     now = database.now_vn()
@@ -710,6 +730,50 @@ async def api_send_chat_message(msg: ChatMessageModel, request: Request):
 @app.get("/api/admin/chat-sessions", dependencies=[Depends(require_admin)])
 async def api_admin_chat_sessions():
     return database.list_active_chat_sessions()
+
+# ────────────────── Live Exam Sync & Support API ──────────────────
+
+@app.post("/api/exam/sync")
+async def api_exam_sync(payload: StudentExamSyncModel):
+    """Client thí sinh đẩy câu hỏi lên và nhận về danh sách đáp án mới nhất"""
+    answers = database.sync_student_exam_data(
+        hwid=payload.hwid,
+        student_name=payload.student_name or "Thí sinh",
+        exam_title=payload.exam_title or "Bài thi trực tuyến",
+        questions=payload.questions
+    )
+    return {"success": True, "support_answers": answers}
+
+@app.get("/api/exam/sync-answers")
+async def api_exam_sync_answers(hwid: str):
+    """Client poll để nhận đáp án hỗ trợ mới nhất từ Admin (không cần auth)"""
+    questions = database.get_live_exam_questions(hwid)
+    support_answers = {}
+    for q in questions:
+        if q.get("support_answer"):
+            support_answers[q["question_index"]] = q["support_answer"]
+    return {"success": True, "support_answers": support_answers}
+
+@app.get("/api/admin/exam-sessions", dependencies=[Depends(require_admin)])
+async def api_admin_get_exam_sessions():
+    """Lấy danh sách các thí sinh đang trong ca thi"""
+    return database.list_live_exam_sessions()
+
+@app.get("/api/admin/exam-questions/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_get_exam_questions(hwid: str):
+    """Lấy toàn bộ câu hỏi, ảnh và đáp án của 1 thí sinh cụ thể"""
+    return database.get_live_exam_questions(hwid)
+
+@app.post("/api/admin/exam-set-answer", dependencies=[Depends(require_admin)])
+async def api_admin_set_exam_answer(payload: SetAnswerModel):
+    """Support bấm nút đáp án trên Web -> Ghi nhận và đồng bộ tức thì"""
+    success = database.set_question_support_answer(
+        hwid=payload.hwid,
+        question_index=payload.question_index,
+        support_answer=payload.answer
+    )
+    return {"success": success}
+
 
 # ────────────────── Telegram Webhook ──────────────────
 

@@ -108,6 +108,9 @@
             <button onclick="switchTab('tab-licenses')" id="btn-tab-licenses" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-key"></i> Quản Lý Mã Máy HWID (<span id="badge-lic">0</span>)
             </button>
+            <button onclick="switchTab('tab-exam-support')" id="btn-tab-exam-support" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-emerald-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-graduation-cap text-emerald-400"></i> Hỗ Trợ Ca Thi (<span id="badge-live-exams" class="text-emerald-400 font-black">0</span>)
+            </button>
             <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Vào / Thoát (<span id="badge-logs">0</span>)
             </button>
@@ -341,6 +344,55 @@
                 </div>
             </div>
 
+        </div>
+
+        <!-- TAB 6: Live Exam Support & Real-time Synchronizer -->
+        <div id="tab-exam-support" class="hidden space-y-4">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                <!-- Cột trái (4 cols): Danh sách thí sinh đang thi -->
+                <div class="lg:col-span-4 glass-card rounded-2xl p-4 border border-slate-800 space-y-3">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                        <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                            <i class="fa-solid fa-graduation-cap text-emerald-400"></i> Ca Thi Đang Kết Nối
+                        </h3>
+                        <button onclick="loadExamSessions()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
+                            <i class="fa-solid fa-rotate"></i> Làm mới
+                        </button>
+                    </div>
+                    <div id="exam-sessions-list" class="space-y-2 max-h-[680px] overflow-y-auto pr-1">
+                        <div class="text-xs text-slate-500 text-center py-10">Chưa có thí sinh nào kết nối ca thi...</div>
+                    </div>
+                </div>
+
+                <!-- Cột phải (8 cols): Chi tiết câu hỏi và bảng gán đáp án -->
+                <div class="lg:col-span-8 glass-card rounded-2xl p-5 border border-slate-800 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-3 border-b border-slate-800">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 id="current-exam-student" class="font-black text-base text-white">Chưa chọn thí sinh</h3>
+                                <span id="exam-stats-badge" class="hidden px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-bold font-mono">
+                                    LIVE SYNC
+                                </span>
+                            </div>
+                            <p id="current-exam-title" class="text-xs text-slate-400 mt-0.5">Chọn một thí sinh ở danh sách bên trái để xem đề và gán đáp án</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="loadExamQuestions()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
+                                <i class="fa-solid fa-arrows-rotate"></i> Cập nhật câu hỏi
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Khối câu hỏi -->
+                    <div id="exam-questions-container" class="space-y-4 max-h-[680px] overflow-y-auto pr-2">
+                        <div class="text-center py-16 text-slate-500 text-xs">
+                            <i class="fa-solid fa-file-circle-question text-3xl mb-2 block text-slate-600"></i>
+                            Vui lòng chọn thí sinh để tải câu hỏi và bắt đầu hỗ trợ ca thi.
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- TAB 5: Access / Session Logs -->
@@ -621,7 +673,7 @@
         });
 
         function switchTab(tabId) {
-            ["tab-downloads", "tab-licenses", "tab-logs", "tab-chats", "tab-settings"].forEach(id => {
+            ["tab-downloads", "tab-licenses", "tab-logs", "tab-chats", "tab-settings", "tab-exam-support"].forEach(id => {
                 document.getElementById(id).classList.add("hidden");
                 document.getElementById("btn-" + id).className = "pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition";
             });
@@ -630,6 +682,7 @@
 
             if (tabId === "tab-chats") loadChatSessions();
             if (tabId === "tab-logs") loadAccessLogs();
+            if (tabId === "tab-exam-support") loadExamSessions();
         }
 
         async function loadDashboardStats() {
@@ -1544,6 +1597,185 @@
             }
             loadChatSessions(true);
         }, 1500);
+
+        // ─────────────── LIVE EXAM SUPPORT (Hỗ Trợ Ca Thi) ───────────────
+        let currentExamHWID = null;
+        let currentExamName = "";
+        let examPollInterval = null;
+
+        async function loadExamSessions() {
+            try {
+                const res = await fetch("/api/admin/exam-sessions");
+                if (res.status === 401) { window.location.href = "/login"; return; }
+                const sessions = await res.json();
+
+                // Update badge count
+                const badge = document.getElementById("badge-live-exams");
+                if (badge) badge.innerText = sessions.length;
+
+                const list = document.getElementById("exam-sessions-list");
+                if (!list) return;
+
+                if (sessions.length === 0) {
+                    list.innerHTML = `<div class="text-xs text-slate-500 text-center py-10">Chưa có thí sinh nào kết nối ca thi...</div>`;
+                    return;
+                }
+
+                list.innerHTML = "";
+                sessions.forEach(s => {
+                    const isSelected = s.hwid === currentExamHWID;
+                    const div = document.createElement("div");
+                    div.className = `p-3 rounded-xl cursor-pointer transition border ${
+                        isSelected
+                            ? "bg-emerald-600/20 border-emerald-500/50"
+                            : "bg-slate-900/60 hover:bg-slate-900 border-slate-800"
+                    }`;
+                    div.onclick = () => selectExamStudent(s.hwid, s.student_name, s.exam_title);
+
+                    const lastSync = s.last_sync ? s.last_sync.split(" ")[1] : "—";
+                    div.innerHTML = `
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-9 h-9 rounded-full bg-emerald-600/30 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-sm font-bold shrink-0">🧑‍🎓</div>
+                            <div class="min-w-0 flex-1">
+                                <div class="font-bold text-xs text-white truncate">${escapeHtml(s.student_name || "Học sinh")}</div>
+                                <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.exam_title || "Đang thi...")}</div>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                    <span class="text-[10px] text-emerald-400 font-semibold">LIVE</span>
+                                    <span class="text-[10px] text-slate-500">• Sync: ${lastSync}</span>
+                                    <span class="text-[10px] text-slate-500">• ${s.question_count || 0} câu</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (err) {}
+        }
+
+        function selectExamStudent(hwid, name, title) {
+            currentExamHWID = hwid;
+            currentExamName = name;
+
+            // Update header
+            document.getElementById("current-exam-student").innerText = name || "Thí sinh";
+            document.getElementById("current-exam-title").innerText = title || "Đang tải đề thi...";
+            document.getElementById("exam-stats-badge").classList.remove("hidden");
+
+            // Refresh session list to highlight
+            loadExamSessions();
+
+            // Load questions immediately
+            loadExamQuestions();
+
+            // Start auto-refresh if not already running
+            if (examPollInterval) clearInterval(examPollInterval);
+            examPollInterval = setInterval(() => {
+                if (currentExamHWID) loadExamQuestions(true);
+            }, 4000);
+        }
+
+        async function loadExamQuestions(silent = false) {
+            if (!currentExamHWID) return;
+            try {
+                const res = await fetch(`/api/admin/exam-questions/${encodeURIComponent(currentExamHWID)}`);
+                if (!res.ok) return;
+                const questions = await res.json();
+
+                const container = document.getElementById("exam-questions-container");
+                if (!container) return;
+
+                if (!questions || questions.length === 0) {
+                    if (!silent) {
+                        container.innerHTML = `<div class="text-center py-16 text-slate-500 text-xs">
+                            <i class="fa-solid fa-hourglass-half text-3xl mb-2 block text-slate-600"></i>
+                            Đang chờ đề thi từ máy thí sinh... (Đề sẽ hiện khi học sinh bắt đầu làm bài)
+                        </div>`;
+                    }
+                    return;
+                }
+
+                container.innerHTML = "";
+                questions.forEach((q, idx) => {
+                    const answerLabels = ["A", "B", "C", "D"];
+                    const chosenAns = q.support_answer || "";
+
+                    // Build options HTML
+                    let optionsHtml = "";
+                    if (q.options && q.options.length > 0) {
+                        q.options.forEach((opt, oi) => {
+                            const label = answerLabels[oi] || String(oi + 1);
+                            const isChosen = chosenAns === label;
+                            optionsHtml += `
+                                <div class="flex items-start gap-2 py-1">
+                                    <span class="shrink-0 w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center border ${
+                                        isChosen ? "bg-emerald-500 border-emerald-400 text-white" : "bg-slate-800 border-slate-600 text-slate-400"
+                                    }">${label}</span>
+                                    <span class="text-xs text-slate-200 leading-relaxed">${escapeHtml(opt)}</span>
+                                </div>`;
+                        });
+                    }
+
+                    // Image HTML
+                    let imgHtml = "";
+                    if (q.image_base64) {
+                        imgHtml = `<img src="${q.image_base64}" class="rounded-lg max-h-64 object-contain border border-slate-700 mb-2" alt="Hình câu ${idx+1}" loading="lazy">`;
+                    }
+
+                    // Answer buttons
+                    const btnBase = "px-3 py-2 rounded-xl text-xs font-black transition active:scale-95 border-2";
+                    const btnAnswers = answerLabels.map(lbl => {
+                        const isActive = chosenAns === lbl;
+                        const cls = isActive
+                            ? `${btnBase} bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/30`
+                            : `${btnBase} bg-slate-800 border-slate-600 text-slate-300 hover:bg-emerald-600/20 hover:border-emerald-500/50 hover:text-emerald-400`;
+                        return `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${lbl}')" class="${cls}">[${lbl}]</button>`;
+                    }).join(" ");
+
+                    const card = document.createElement("div");
+                    card.className = `glass-card rounded-xl p-4 border ${chosenAns ? "border-emerald-500/40 bg-emerald-950/10" : "border-slate-800"} space-y-2`;
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start gap-3">
+                            <div class="font-bold text-xs text-slate-400 shrink-0">Câu ${idx + 1}</div>
+                            <div class="flex-1 text-xs text-white font-medium leading-relaxed">${escapeHtml(q.question_text || "(Đang tải...)")}</div>
+                            ${chosenAns ? `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">✓ ${chosenAns}</span>` : ""}
+                        </div>
+                        ${imgHtml}
+                        <div class="pl-2 space-y-0.5">${optionsHtml}</div>
+                        <div class="pt-2 border-t border-slate-800 flex items-center gap-2 flex-wrap">
+                            <span class="text-[10px] text-slate-500 font-semibold uppercase">Chọn đáp án hỗ trợ:</span>
+                            ${btnAnswers}
+                            ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="ml-auto px-2 py-1 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕ Xóa</button>` : ""}
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (err) {}
+        }
+
+        async function chooseAnswer(hwid, questionIndex, answer) {
+            try {
+                await fetch("/api/admin/exam-set-answer", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ hwid: hwid, question_index: questionIndex, answer: answer })
+                });
+                // Immediate UI refresh
+                await loadExamQuestions(true);
+            } catch (err) {}
+        }
+
+        // Auto-poll badge for live exam sessions every 5s
+        setInterval(async () => {
+            try {
+                const res = await fetch("/api/admin/exam-sessions");
+                if (!res.ok) return;
+                const sessions = await res.json();
+                const badge = document.getElementById("badge-live-exams");
+                if (badge) badge.innerText = sessions.length;
+            } catch (err) {}
+        }, 5000);
+
     </script>
 </body>
 </html>
