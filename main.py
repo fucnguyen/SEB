@@ -506,7 +506,7 @@ async def api_admin_list_downloads():
 async def api_admin_approve_download(payload: dict):
     req_id = payload.get("request_id")
     token = str(uuid.uuid4())
-    expires_at = (database.now_vn() + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+    expires_at = (database.now_vn() + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
     success = database.approve_download_request(req_id, token, expires_at)
     return {"success": success}
 
@@ -777,6 +777,59 @@ async def api_admin_set_exam_answer(payload: SetAnswerModel):
         support_answer=payload.answer
     )
     return {"success": success}
+
+
+# Admin tạo và đẩy đề thủ công xuống máy học sinh
+class PushExamModel(BaseModel):
+    hwid: str
+    student_name: Optional[str] = "Thí sinh"
+    exam_title: Optional[str] = "Bài thi trực tuyến"
+    questions: list  # list of {question_text, question_type, options: [str], correct_answer: str}
+
+@app.post("/api/admin/push-exam", dependencies=[Depends(require_admin)])
+async def api_admin_push_exam(payload: PushExamModel):
+    """Admin tạo đề thủ công và đẩy vào session của học sinh (HWID bất kỳ)"""
+    formatted = []
+    for idx, q in enumerate(payload.questions):
+        opts = q.get("options", [])
+        ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        options_obj = [{"label": ALPHA[i] if i < len(ALPHA) else str(i+1), "text": str(o), "image_base64": ""} for i, o in enumerate(opts)]
+        formatted.append({
+            "question_index": idx,
+            "question_type": q.get("question_type", "radio"),
+            "question_text": q.get("question_text", ""),
+            "options": options_obj,
+            "image_base64": "",
+            "selected_answer": "",
+            "support_answer": q.get("correct_answer", ""),
+        })
+
+    answers = database.sync_student_exam_data(
+        hwid=payload.hwid,
+        student_name=payload.student_name,
+        exam_title=payload.exam_title,
+        questions=formatted
+    )
+    # Nếu có đáp án đúng thì set luôn support_answer
+    for idx, q in enumerate(formatted):
+        if q.get("support_answer"):
+            database.set_question_support_answer(
+                hwid=payload.hwid,
+                question_index=idx,
+                support_answer=q["support_answer"]
+            )
+    return {"success": True, "pushed": len(formatted)}
+
+@app.delete("/api/admin/exam-session/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_delete_exam_session(hwid: str):
+    """Xoá sạch phiên thi của một học sinh"""
+    try:
+        database.db.execute("DELETE FROM live_exam_questions WHERE hwid=?", (hwid,))
+        database.db.execute("DELETE FROM live_exam_sessions WHERE hwid=?", (hwid,))
+        database.db.commit()
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 # ────────────────── Telegram Webhook ──────────────────

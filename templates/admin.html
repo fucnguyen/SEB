@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi" class="dark">
 <head>
     <meta charset="UTF-8">
@@ -110,6 +110,9 @@
             </button>
             <button onclick="switchTab('tab-exam-support')" id="btn-tab-exam-support" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-emerald-400 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-graduation-cap text-emerald-400"></i> Hỗ Trợ Ca Thi (<span id="badge-live-exams" class="text-emerald-400 font-black">0</span>)
+            </button>
+            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-exam-builder" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-orange-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-pen-to-square text-orange-400"></i> Tạo Đề Thi
             </button>
             <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Vào / Thoát (<span id="badge-logs">0</span>)
@@ -395,7 +398,42 @@
             </div>
         </div>
 
-        <!-- TAB 5: Access / Session Logs -->
+        
+        <!-- TAB: Tao De Thi -->
+        <div id="tab-exam-builder" class="hidden space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-orange-400"></i> Tao De Thi Thu Cong</h2>
+          </div>
+          <div class="glass-card rounded-2xl p-5 border border-slate-800 space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">HWID hoc sinh (de trong = day cho tat ca)</label>
+                <input id="eb-hwid" type="text" placeholder="De trong hoac nhap HWID cu the" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Ten bai thi</label>
+                <input id="eb-title" type="text" value="Bai thi kiem tra" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Ten thi sinh</label>
+              <input id="eb-name" type="text" value="Thi sinh" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500">
+            </div>
+          </div>
+          <div id="eb-question-list" class="space-y-3"></div>
+          <div class="flex gap-2 flex-wrap">
+            <button onclick="ebAddQuestion('radio')" class="px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-xl text-sm font-semibold border border-blue-600 transition">+ Trac nghiem (1 dap an)</button>
+            <button onclick="ebAddQuestion('checkbox')" class="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-xl text-sm font-semibold border border-purple-600 transition">+ Trac nghiem (nhieu dap an)</button>
+            <button onclick="ebAddQuestion('text')" class="px-4 py-2 bg-amber-700 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold border border-amber-600 transition">+ Dien tu</button>
+            <button onclick="ebAddQuestion('essay')" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-semibold border border-slate-600 transition">+ Tu luan</button>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="ebPushExam()" class="px-6 py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl font-bold text-sm border-2 border-orange-500 transition shadow-lg">Day De Xuong May Hoc Sinh</button>
+            <button onclick="ebClear()" class="px-4 py-2 bg-slate-800 hover:bg-red-900/40 text-slate-300 hover:text-red-400 rounded-xl text-sm border border-slate-700 transition">Xoa tat ca</button>
+          </div>
+          <div id="eb-status" class="text-sm font-semibold text-emerald-400 hidden"></div>
+        </div>
+<!-- TAB 5: Access / Session Logs -->
         <div id="tab-logs" class="hidden space-y-4">
             <div class="glass-card rounded-2xl overflow-hidden shadow-xl border border-slate-800">
                 <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-slate-900/60">
@@ -1876,6 +1914,140 @@
         }
 
 
+        
+        // ── Exam Builder ──────────────────────────────────────────────
+        let ebQuestions = [];
+        let ebQidx = 0;
+
+        function ebAddQuestion(qtype) {
+            const id = ebQidx++;
+            const q = { id, qtype, text: "", options: ["", "", "", ""], answer: "" };
+            ebQuestions.push(q);
+            ebRender();
+        }
+
+        function ebRemoveQuestion(id) {
+            ebQuestions = ebQuestions.filter(q => q.id !== id);
+            ebRender();
+        }
+
+        function ebRender() {
+            const list = document.getElementById("eb-question-list");
+            list.innerHTML = "";
+            ebQuestions.forEach((q, idx) => {
+                const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                let optionsHtml = "";
+                if (q.qtype === "radio" || q.qtype === "checkbox") {
+                    optionsHtml = q.options.map((opt, oi) => `
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400 w-4 shrink-0">${ALPHA[oi]||oi+1}.</span>
+                            <input type="text" value="${escapeHtml(opt)}" placeholder="Dap an ${ALPHA[oi]||oi+1}"
+                                onchange="ebQuestions[${idx}].options[${oi}]=this.value"
+                                class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-orange-500">
+                        </div>`).join("");
+                    optionsHtml += `<button onclick="ebQuestions[${idx}].options.push('');ebRender()" class="mt-1 text-xs text-orange-400 hover:text-orange-300">+ Them lua chon</button>`;
+                    optionsHtml += `<div class="mt-2"><label class="text-xs text-slate-400">Dap an dung (VD: A hoac 0,2 hoac A,C): </label>
+                        <input type="text" value="${escapeHtml(q.answer)}" placeholder="A"
+                            onchange="ebQuestions[${idx}].answer=this.value"
+                            class="ml-1 w-32 bg-slate-900 border border-emerald-600 rounded-lg px-2 py-1 text-xs text-emerald-400 focus:outline-none"></div>`;
+                } else {
+                    optionsHtml = `<div><label class="text-xs text-slate-400">Dap an mau: </label>
+                        <input type="text" value="${escapeHtml(q.answer)}" placeholder="..."
+                            onchange="ebQuestions[${idx}].answer=this.value"
+                            class="ml-1 w-full bg-slate-900 border border-emerald-600 rounded-lg px-2 py-1 text-xs text-emerald-400 focus:outline-none mt-1"></div>`;
+                }
+                const typeColor = { radio:"bg-blue-500/20 text-blue-400", checkbox:"bg-purple-500/20 text-purple-400", text:"bg-amber-500/20 text-amber-400", essay:"bg-slate-500/20 text-slate-300" };
+                const typeLabel = { radio:"Trac nghiem", checkbox:"Nhieu dap an", text:"Dien tu", essay:"Tu luan" };
+                const card = document.createElement("div");
+                card.className = "glass-card rounded-xl p-4 border border-slate-800 space-y-2";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-slate-400">Cau ${idx+1}</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${typeColor[q.qtype]}">${typeLabel[q.qtype]}</span>
+                        </div>
+                        <button onclick="ebRemoveQuestion(${q.id})" class="text-xs text-red-400 hover:text-red-300">Xoa</button>
+                    </div>
+                    <textarea placeholder="Noi dung cau hoi..." rows="2" onchange="ebQuestions[${idx}].text=this.value"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-orange-500 resize-none">${escapeHtml(q.text)}</textarea>
+                    <div class="space-y-1">${optionsHtml}</div>`;
+                list.appendChild(card);
+            });
+        }
+
+        async function ebPushExam() {
+            const hwid = document.getElementById("eb-hwid").value.trim();
+            const title = document.getElementById("eb-title").value.trim() || "Bai thi kiem tra";
+            const name  = document.getElementById("eb-name").value.trim() || "Thi sinh";
+            const status = document.getElementById("eb-status");
+
+            if (ebQuestions.length === 0) { alert("Chua co cau hoi nao!"); return; }
+
+            // Collect updated values from DOM inputs
+            const list = document.getElementById("eb-question-list");
+            list.querySelectorAll("textarea").forEach((ta, ti) => { if (ebQuestions[ti]) ebQuestions[ti].text = ta.value; });
+
+            const questions = ebQuestions.map(q => ({
+                question_text: q.text,
+                question_type: q.qtype,
+                options: (q.qtype === "radio" || q.qtype === "checkbox") ? q.options.filter(o => o.trim()) : [],
+                correct_answer: q.answer
+            }));
+
+            // If HWID is empty, push to all online sessions
+            let targets = [];
+            if (!hwid) {
+                try {
+                    const r = await fetch("/api/admin/exam-sessions");
+                    const sessions = await r.json();
+                    targets = sessions.map(s => s.hwid);
+                } catch(e) { targets = []; }
+            } else {
+                targets = [hwid];
+            }
+
+            if (targets.length === 0) {
+                // Still push with placeholder HWID for when student joins
+                targets = [hwid || "MANUAL-" + Date.now()];
+            }
+
+            status.classList.remove("hidden");
+            status.textContent = "Dang day de...";
+            let ok = 0;
+            for (const h of targets) {
+                try {
+                    const res = await fetch("/api/admin/push-exam", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({ hwid: h, student_name: name, exam_title: title, questions })
+                    });
+                    if (res.ok) ok++;
+                } catch(e) {}
+            }
+            status.textContent = `Da day ${questions.length} cau hoi toi ${ok} phien hoc sinh thanh cong!`;
+            setTimeout(() => status.classList.add("hidden"), 5000);
+        }
+
+        function ebClear() {
+            ebQuestions = [];
+            ebQidx = 0;
+            ebRender();
+        }
+
+        // Register tab-exam-builder in switchTab
+        const _origSwitchTab = window.switchTab;
+        window.switchTab = function(tabId) {
+            const allTabs = document.querySelectorAll("[id^='tab-']");
+            allTabs.forEach(t => t.classList.add("hidden"));
+            const allBtns = document.querySelectorAll("[id^='btn-tab-']");
+            allBtns.forEach(b => { b.classList.remove("border-orange-400","border-blue-400","border-emerald-400","border-slate-200","border-amber-400","border-rose-400","border-purple-400","text-orange-400","text-blue-400","text-emerald-400","text-white","text-amber-400","text-rose-400","text-purple-400"); b.classList.add("border-transparent","text-slate-400"); });
+            const tabEl = document.getElementById(tabId);
+            if (tabEl) tabEl.classList.remove("hidden");
+            const btnEl = document.getElementById("btn-" + tabId);
+            if (btnEl) { btnEl.classList.remove("border-transparent","text-slate-400"); btnEl.classList.add("border-orange-400","text-orange-400"); }
+            if (_origSwitchTab && tabId !== "tab-exam-builder") _origSwitchTab(tabId);
+        };
+
         // Auto-poll badge for live exam sessions every 5s
         setInterval(async () => {
             try {
@@ -1890,3 +2062,5 @@
     </script>
 </body>
 </html>
+
+
