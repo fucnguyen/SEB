@@ -40,9 +40,15 @@ def init_db():
         download_token TEXT,
         token_expires_at TEXT,
         created_at TEXT NOT NULL,
-        approved_at TEXT
+        approved_at TEXT,
+        system_type TEXT DEFAULT 'SEB'
     )
     """)
+
+    try:
+        cursor.execute("ALTER TABLE download_requests ADD COLUMN system_type TEXT DEFAULT 'SEB'")
+    except Exception:
+        pass
 
     # 2. Bảng quản lý bản quyền & kích hoạt mã máy (HWID)
     cursor.execute("""
@@ -168,6 +174,8 @@ def init_db():
         "telegram_chat_id": "6396371761",
         "telegram_notifications_enabled": "true",
         "external_download_url": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_v2.exe",
+        "external_download_url_seb": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_v2.exe",
+        "external_download_url_eos": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_EOS_v2.exe",
         "r2_endpoint_url": "",
         "r2_access_key": "",
         "r2_secret_key": "",
@@ -193,14 +201,14 @@ def init_db():
 
 # ────────────────── Download Requests API ──────────────────
 
-def create_download_request(request_id: str, full_name: str, email: str, note: str, ip_address: str) -> Dict[str, Any]:
+def create_download_request(request_id: str, full_name: str, email: str, note: str, ip_address: str, system_type: str = "SEB") -> Dict[str, Any]:
     now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
-        INSERT INTO download_requests (request_id, full_name, email, note, ip_address, status, created_at)
-        VALUES (?, ?, ?, ?, ?, 'pending', ?)
-    """, (request_id, full_name, email, note, ip_address, now))
+        INSERT INTO download_requests (request_id, full_name, email, note, ip_address, status, created_at, system_type)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+    """, (request_id, full_name, email, note, ip_address, now, system_type))
     conn.commit()
     conn.close()
     return get_download_request(request_id)
@@ -236,10 +244,13 @@ def reject_download_request(request_id: str) -> bool:
     conn.close()
     return affected
 
-def list_download_requests(limit: int = 50) -> List[Dict[str, Any]]:
+def list_download_requests(limit: int = 50, system_type: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM download_requests ORDER BY id DESC LIMIT ?", (limit,))
+    if system_type:
+        c.execute("SELECT * FROM download_requests WHERE (system_type = ? OR system_type IS NULL) ORDER BY id DESC LIMIT ?", (system_type.upper(), limit))
+    else:
+        c.execute("SELECT * FROM download_requests ORDER BY id DESC LIMIT ?", (limit,))
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
     return rows

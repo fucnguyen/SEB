@@ -26,7 +26,7 @@ def get_s3_client():
     except Exception:
         return None
 
-def generate_download_url(token: str, expiration_seconds: int = 1800) -> Tuple[str, bool]:
+def generate_download_url(token: str, expiration_seconds: int = 1800, system_type: str = "SEB") -> Tuple[str, bool]:
     """
     Sinh đường dẫn tải file cài đặt.
     Trả về (url, is_presigned_cloud).
@@ -49,7 +49,11 @@ def generate_download_url(token: str, expiration_seconds: int = 1800) -> Tuple[s
             pass
 
     # 2. Link lưu trữ đám mây ngoài (GitHub Release, S3, Drive, v.v.)
-    external_url = database.get_setting("external_download_url").strip()
+    if system_type and system_type.upper() == "EOS":
+        external_url = database.get_setting("external_download_url_eos").strip() or database.get_setting("external_download_url").strip()
+    else:
+        external_url = database.get_setting("external_download_url_seb").strip() or database.get_setting("external_download_url").strip()
+
     if external_url:
         return external_url, True
 

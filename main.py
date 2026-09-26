@@ -188,6 +188,8 @@ class SettingsModel(BaseModel):
     telegram_bot_token: Optional[str] = ""
     telegram_chat_id: Optional[str] = ""
     external_download_url: Optional[str] = ""
+    external_download_url_seb: Optional[str] = ""
+    external_download_url_eos: Optional[str] = ""
     r2_endpoint_url: Optional[str] = ""
     r2_bucket_name: Optional[str] = ""
     r2_access_key: Optional[str] = ""
@@ -340,8 +342,9 @@ async def api_stream_local_file(token: str, request: Request):
                        f"IP của máy hiện tại là ({current_ip}). Bạn tuyệt đối KHÔNG ĐƯỢC chia sẻ link tải cho máy khác!"
             )
 
-    # 3. Nếu cấu hình Cloudflare R2, redirect sang presigned URL bảo mật
-    cloud_url, is_cloud = storage.generate_download_url(token)
+    # 3. Nếu cấu hình Cloudflare R2 hoặc external URL, redirect sang presigned/external URL bảo mật
+    sys_type = row.get("system_type", "SEB") or "SEB"
+    cloud_url, is_cloud = storage.generate_download_url(token, system_type=sys_type)
     if is_cloud:
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=cloud_url)
@@ -500,8 +503,8 @@ async def api_admin_stats():
     }
 
 @app.get("/api/admin/download-requests", dependencies=[Depends(require_admin)])
-async def api_admin_list_downloads():
-    return database.list_download_requests(50)
+async def api_admin_list_downloads(system_type: Optional[str] = None):
+    return database.list_download_requests(50, system_type=system_type)
 
 @app.post("/api/admin/approve-download", dependencies=[Depends(require_admin)])
 async def api_admin_approve_download(payload: dict):
