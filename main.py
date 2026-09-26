@@ -807,6 +807,72 @@ async def api_admin_set_exam_answer(payload: SetAnswerModel):
     )
     return {"success": success}
 
+@app.get("/api/admin/generate-pea-source/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_generate_pea_source(hwid: str):
+    """Tạo mã nguồn mẫu C / C++ / Java / C# cho bài thi thực hành PEA Code"""
+    session = database.get_live_exam_session(hwid) if hasattr(database, 'get_live_exam_session') else None
+    title = (session.get("exam_title") if session else "PEA Code") or "PEA Code"
+    
+    pea_code_template = f"""/*
+ *  FPT UNIVERSITY - PEA PRACTICAL EXAM SOURCE CODE TEMPLATE
+ *  Exam Session: {title}
+ *  HWID: {hwid}
+ *  Generated for Support Engine
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+// Class / Struct Definition for PEA Task:
+typedef struct {{
+    char maker[100];
+    int price;
+}} Cake;
+
+void formatMaker(char *maker) {{
+    int len = strlen(maker);
+    if (len > 0) {{
+        maker[len - 1] = toupper(maker[len - 1]);
+        for (int i = 0; i < len - 1; i++) {{
+            maker[i] = tolower(maker[i]);
+        }}
+    }}
+}}
+
+int main() {{
+    Cake cake;
+    printf("Enter maker: ");
+    if (scanf("%s", cake.maker) == 1) {{
+        printf("Enter price: ");
+        scanf("%d", &cake.price);
+        
+        formatMaker(cake.maker);
+        printf("OUTPUT:\\n");
+        printf("%s\\n", cake.maker);
+        printf("%d\\n", cake.price);
+    }}
+    return 0;
+}}
+"""
+    return {
+        "success": True,
+        "filename": "PEA_Cake_Solution.c",
+        "code": pea_code_template
+    }
+
+@app.get("/api/admin/copy-answers/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_copy_answers(hwid: str):
+    """Lấy danh sách đáp án định dạng văn bản để copy nhanh sang tệp tạm"""
+    questions = database.get_live_exam_questions(hwid)
+    lines = []
+    for q in questions:
+        idx = q.get("question_index", 0) + 1
+        ans = q.get("support_answer") or q.get("current_answer") or "Chưa chọn"
+        lines.append(f"Câu {idx:02d}: {ans}")
+    return {"success": True, "formatted_text": "\n".join(lines)}
+
 @app.post("/api/admin/eos/load-folder-exams", dependencies=[Depends(require_admin)])
 async def api_admin_load_folder_exams():
     """Tự động quét thư mục project và thư mục sample_exams đính kèm để nạp tất cả các đề thi .dat/.bin có sẵn"""

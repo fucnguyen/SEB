@@ -423,7 +423,7 @@
                     <h3 class="font-bold text-sm text-emerald-300 flex items-center gap-2">
                         <i class="fa-solid fa-graduation-cap"></i> Ca Thi Trực Tuyến EOS (Trắc Nghiệm) & PEA (Thực Hành Code FPT)
                     </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Tự động phân loại và nạp các ca thi EOS/PEA trực tiếp hoặc từ thư mục project</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Quản lý đồng thời nhiều ca thi trực tuyến • Hỗ trợ tạo Source PEA & Copy đáp án tức thì</p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <button onclick="triggerFolderExamLoad()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/20">
@@ -434,7 +434,16 @@
                     </button>
                 </div>
             </div>
-            <div id="fpt-sessions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            <!-- Thanh tìm kiếm ca thi EOS/PEA đa ca thi -->
+            <div class="flex items-center gap-3">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                    <input id="fpt-search-input" onkeyup="filterFPTSessions()" type="text" placeholder="🔍 Tìm kiếm nhanh theo mã đề thi (MGT103, PRF192...) hoặc tên học sinh..." class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 shadow-inner transition">
+                </div>
+            </div>
+
+            <div id="fpt-sessions-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div class="col-span-full p-8 text-center text-slate-500 glass-card rounded-2xl">
                     Chưa có ca thi EOS/PEA nào. Nhấn "Nạp Đề Có Sẵn Từ Folder" để nạp đề thi từ thư mục project!
                 </div>
@@ -491,6 +500,12 @@
                             <p id="current-exam-title" class="text-xs text-slate-400 mt-0.5">Chọn một thí sinh ở danh sách bên trái để xem đề và gán đáp án</p>
                         </div>
                         <div class="flex items-center gap-2 flex-wrap">
+                            <button id="btn-generate-pea-src" onclick="triggerPeaSourceGen()" class="hidden px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-cyan-600/20" title="Tạo Source Code Mẫu (C/C++/Java/C#) Cho Bài Thi PEA Practical">
+                                <i class="fa-solid fa-code"></i> Tạo Source PEA
+                            </button>
+                            <button id="btn-copy-formatted-ans" onclick="triggerCopyFormattedAnswers()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Copy Toàn Bộ Đáp Án Ra Văn Bản">
+                                <i class="fa-solid fa-copy"></i> Copy Đáp Án
+                            </button>
                             <button id="btn-export-zip" onclick="downloadAllQuestionsZip()" class="hidden px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20" title="Tải toàn bộ câu hỏi và đáp án thành file ảnh đóng gói ZIP">
                                 <i class="fa-solid fa-file-zipper"></i> Tải trọn bộ ảnh (.ZIP)
                             </button>
@@ -502,6 +517,9 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- Bảng Ma Trận Nhanh Chuyển Đến Câu Hỏi (Viper Jump Grid) -->
+                    <div id="exam-question-matrix" class="hidden flex-wrap gap-1.5 p-3 bg-slate-900/90 rounded-xl border border-slate-800/80 my-2 items-center shadow-inner"></div>
 
                     <!-- Khối câu hỏi -->
                     <div id="exam-questions-container" class="space-y-4 max-h-[680px] overflow-y-auto pr-2">
@@ -892,53 +910,118 @@
             if (tabId === "tab-seb-main") loadSEBSectionData();
         }
 
+        let cachedFPTSessions = [];
+
+        function filterFPTSessions() {
+            const q = (document.getElementById("fpt-search-input")?.value || "").toLowerCase().trim();
+            const filtered = cachedFPTSessions.filter(s => 
+                (s.student_name && s.student_name.toLowerCase().includes(q)) ||
+                (s.exam_title && s.exam_title.toLowerCase().includes(q)) ||
+                (s.hwid && s.hwid.toLowerCase().includes(q))
+            );
+            renderFPTSessionsGrid(filtered);
+        }
+
+        function renderFPTSessionsGrid(sessions) {
+            const grid = document.getElementById("fpt-sessions-grid");
+            if (!grid) return;
+            if (sessions.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full p-8 text-center text-slate-500 glass-card rounded-2xl space-y-3">
+                        <i class="fa-solid fa-folder-open text-3xl text-emerald-500/50 block mb-1"></i>
+                        <div>Không tìm thấy ca thi EOS/PEA nào...</div>
+                        <button onclick="triggerFolderExamLoad()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-emerald-600/20">
+                            <i class="fa-solid fa-folder-open mr-1"></i> Bấm Vào Đây Để Nạp Đề Có Sẵn Từ Folder
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            grid.innerHTML = "";
+            sessions.forEach(s => {
+                const card = document.createElement("div");
+                card.className = "glass-card rounded-2xl p-4 border border-slate-800 space-y-3 hover:border-emerald-500/50 transition cursor-pointer flex flex-col justify-between shadow-lg hover:shadow-emerald-500/10";
+                card.onclick = () => {
+                    switchTab('tab-exam-support');
+                    selectExamStudent(s.hwid, s.student_name, s.exam_title);
+                };
+
+                const lastSync = s.last_sync ? s.last_sync.split(' ')[1] : '—';
+                const qCount = s.total_questions || 0;
+                const examTitle = s.exam_title || 'Bài thi EOS/PEA';
+
+                card.innerHTML = `
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-start gap-2">
+                            <div class="font-black text-sm text-emerald-300 truncate" title="${escapeHtml(examTitle)}">
+                                <i class="fa-solid fa-graduation-cap text-emerald-400 mr-1"></i> ${escapeHtml(examTitle)}
+                            </div>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold shrink-0 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> LIVE
+                            </span>
+                        </div>
+                        <div class="text-xs text-white font-bold truncate flex items-center gap-1.5">
+                            <span class="text-slate-400 text-[11px]">Thí sinh:</span> ${escapeHtml(s.student_name || 'Học sinh')}
+                        </div>
+                        <div class="flex justify-between items-center text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/80">
+                            <span>Số câu: <strong class="text-emerald-400 font-mono">${qCount}</strong></span>
+                            <span class="text-slate-500 font-mono">Sync: ${lastSync}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="pt-2 flex items-center gap-1.5 flex-wrap">
+                        <button onclick="event.stopPropagation(); switchTab('tab-exam-support'); selectExamStudent('${s.hwid}', '${escapeHtml(s.student_name)}', '${escapeHtml(s.exam_title)}')" class="flex-1 min-w-[90px] py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 shadow-md shadow-emerald-600/20">
+                            <i class="fa-solid fa-bolt"></i> Hỗ Trợ
+                        </button>
+                        <button onclick="event.stopPropagation(); triggerPeaSourceGenCard('${s.hwid}')" class="px-2 py-1.5 bg-cyan-900/40 hover:bg-cyan-600 text-cyan-300 hover:text-white rounded-xl text-xs font-semibold transition border border-cyan-500/30" title="Tạo Source PEA">
+                            <i class="fa-solid fa-code"></i> Source
+                        </button>
+                        <button onclick="event.stopPropagation(); triggerCopyFormattedAnswersCard('${s.hwid}')" class="px-2 py-1.5 bg-amber-900/40 hover:bg-amber-600 text-amber-300 hover:text-white rounded-xl text-xs font-semibold transition border border-amber-500/30" title="Copy Đáp Án">
+                            <i class="fa-solid fa-copy"></i> Đáp Án
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
         async function loadFPTSectionData() {
             try {
                 const res = await fetch("/api/admin/fpt-sessions");
                 if (res.status === 401) return;
                 const data = await res.json();
-                const grid = document.getElementById("fpt-sessions-grid");
                 const badge = document.getElementById("badge-fpt-count");
                 if (badge) badge.innerText = data.count || 0;
-                if (!grid) return;
-                const sessions = data.sessions || [];
-                if (sessions.length === 0) {
-                    grid.innerHTML = `
-                        <div class="col-span-full p-8 text-center text-slate-500 glass-card rounded-2xl space-y-3">
-                            <i class="fa-solid fa-folder-open text-3xl text-emerald-500/50 block mb-1"></i>
-                            <div>Chưa có ca thi EOS/PEA nào trong hệ thống.</div>
-                            <button onclick="triggerFolderExamLoad()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-emerald-600/20">
-                                <i class="fa-solid fa-folder-open mr-1"></i> Bấm Vào Đây Để Nạp Đề Có Sẵn Từ Folder
-                            </button>
-                        </div>
-                    `;
-                    return;
-                }
-                grid.innerHTML = "";
-                sessions.forEach(s => {
-                    const card = document.createElement("div");
-                    card.className = "glass-card rounded-2xl p-4 border border-slate-800 space-y-3 hover:border-emerald-500/50 transition cursor-pointer";
-                    card.onclick = () => {
-                        switchTab('tab-exam-support');
-                        selectExamSession(s.hwid, s.student_name, s.exam_title);
-                    };
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div class="font-bold text-sm text-white flex items-center gap-1.5 truncate">
-                                <i class="fa-solid fa-graduation-cap text-emerald-400"></i> ${escapeHtml(s.student_name)}
-                            </div>
-                            <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold shrink-0">ONLINE</span>
-                        </div>
-                        <div class="text-xs text-slate-300 font-medium truncate">${escapeHtml(s.exam_title || 'Bài thi EOS')}</div>
-                        <div class="flex justify-between items-center text-[11px] text-slate-400 pt-2 border-t border-slate-800/60">
-                            <span>Số câu: <strong class="text-emerald-400">${s.total_questions || 0}</strong></span>
-                            <span class="text-slate-500">${s.last_sync ? s.last_sync.split(' ')[1] : ''}</span>
-                        </div>
-                    `;
-                    grid.appendChild(card);
-                });
+                cachedFPTSessions = data.sessions || [];
+                filterFPTSessions();
             } catch (err) {}
         }
+
+        async function triggerPeaSourceGenCard(hwid) {
+            if (!hwid) return;
+            try {
+                const res = await fetch(`/api/admin/generate-pea-source/${encodeURIComponent(hwid)}`);
+                const data = await res.json();
+                if (data.success) {
+                    navigator.clipboard.writeText(data.code);
+                    alert(`✅ Đã tạo Source Code PEA (${data.filename}) và copy vào Clipboard!\n\nBạn có thể dán (Ctrl + V) trực tiếp vào IDE làm bài.`);
+                }
+            } catch (e) { alert("Lỗi tạo source: " + e.message); }
+        }
+
+        async function triggerCopyFormattedAnswersCard(hwid) {
+            if (!hwid) return;
+            try {
+                const res = await fetch(`/api/admin/copy-answers/${encodeURIComponent(hwid)}`);
+                const data = await res.json();
+                if (data.success) {
+                    navigator.clipboard.writeText(data.formatted_text);
+                    alert(`📋 Đã copy toàn bộ đáp án của ca thi vào Clipboard!\n\nNội dung:\n${data.formatted_text.substring(0, 150)}...`);
+                }
+            } catch (e) { alert("Lỗi copy đáp án: " + e.message); }
+        }
+
+        const selectExamSession = (hwid, name, title) => selectExamStudent(hwid, name, title);
 
         async function loadSEBSectionData() {
             try {
@@ -2058,6 +2141,30 @@
             }, 4000);
         }
 
+        async function triggerPeaSourceGen() {
+            if (!currentExamHWID) return;
+            try {
+                const res = await fetch(`/api/admin/generate-pea-source/${encodeURIComponent(currentExamHWID)}`);
+                const data = await res.json();
+                if (data.success) {
+                    navigator.clipboard.writeText(data.code);
+                    alert(`✅ Đã tạo Source Code PEA (${data.filename}) và copy sẵn vào Bộ nhớ tạm (Clipboard)!\n\nBạn có thể Ctrl + V dán trực tiếp vào file code.`);
+                }
+            } catch (e) { alert("Lỗi tạo source: " + e.message); }
+        }
+
+        async function triggerCopyFormattedAnswers() {
+            if (!currentExamHWID) return;
+            try {
+                const res = await fetch(`/api/admin/copy-answers/${encodeURIComponent(currentExamHWID)}`);
+                const data = await res.json();
+                if (data.success) {
+                    navigator.clipboard.writeText(data.formatted_text);
+                    alert(`📋 Đã copy toàn bộ đáp án của bài thi này vào Bộ nhớ tạm (Clipboard)!\n\nNội dung:\n${data.formatted_text.substring(0, 200)}...`);
+                }
+            } catch (e) { alert("Lỗi copy đáp án: " + e.message); }
+        }
+
         async function loadExamQuestions(silent = false) {
             if (!currentExamHWID) return;
             try {
@@ -2068,12 +2175,40 @@
 
                 const btnZip = document.getElementById("btn-export-zip");
                 const btnPrint = document.getElementById("btn-print-exam");
+                const btnPea = document.getElementById("btn-generate-pea-src");
+                const btnCopy = document.getElementById("btn-copy-formatted-ans");
+
                 if (cachedCurrentQuestions.length > 0) {
                     if (btnZip) btnZip.classList.remove("hidden");
                     if (btnPrint) btnPrint.classList.remove("hidden");
+                    if (btnPea) btnPea.classList.remove("hidden");
+                    if (btnCopy) btnCopy.classList.remove("hidden");
                 } else {
                     if (btnZip) btnZip.classList.add("hidden");
                     if (btnPrint) btnPrint.classList.add("hidden");
+                    if (btnPea) btnPea.classList.add("hidden");
+                    if (btnCopy) btnCopy.classList.add("hidden");
+                }
+
+                const matrixEl = document.getElementById("exam-question-matrix");
+                if (matrixEl) {
+                    if (cachedCurrentQuestions.length > 0) {
+                        matrixEl.classList.remove("hidden");
+                        matrixEl.classList.add("flex");
+                        let mHtml = `<span class="text-[10px] text-slate-400 font-bold uppercase mr-1 flex items-center gap-1 shrink-0"><i class="fa-solid fa-list-check text-emerald-400"></i> Bảng Ma Trận (${cachedCurrentQuestions.length} câu):</span>`;
+                        cachedCurrentQuestions.forEach((q, idx) => {
+                            const qNum = idx + 1;
+                            const hasAns = !!(q.support_answer || q.current_answer);
+                            const bgCls = hasAns 
+                                ? "bg-emerald-600 hover:bg-emerald-500 border-emerald-400 text-white font-black shadow-sm" 
+                                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 font-semibold";
+                            mHtml += `<button onclick="scrollToQuestionCard(${idx})" class="w-7 h-7 rounded-lg text-[11px] flex items-center justify-center border transition active:scale-95 ${bgCls}">${qNum}</button>`;
+                        });
+                        matrixEl.innerHTML = mHtml;
+                    } else {
+                        matrixEl.classList.add("hidden");
+                        matrixEl.classList.remove("flex");
+                    }
                 }
 
                 const container = document.getElementById("exam-questions-container");
@@ -2233,7 +2368,8 @@
                     }
 
                     const card = document.createElement("div");
-                    card.className = `glass-card rounded-xl p-4 border ${chosenAns ? "border-emerald-500/40 bg-emerald-950/10" : "border-slate-800"} space-y-2`;
+                    card.id = `q-card-${idx}`;
+                    card.className = `glass-card rounded-xl p-4 border ${chosenAns ? "border-emerald-500/40 bg-emerald-950/10" : "border-slate-800"} space-y-2 transition-all duration-300`;
                     card.innerHTML = `
                         <div class="flex justify-between items-start gap-2">
                             <div class="flex items-center gap-2 shrink-0">
@@ -2261,6 +2397,15 @@
         let cachedCurrentQuestions = [];
 
         // ── XUẤT ẢNH CÂU HỎI & ĐÁP ÁN (DẠNG THẺ TRẮNG CHUẨN ĐỀ THI) ─────────
+        function scrollToQuestionCard(idx) {
+            const el = document.getElementById(`q-card-${idx}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-2', 'ring-emerald-400', 'shadow-emerald-500/20');
+                setTimeout(() => el.classList.remove('ring-2', 'ring-emerald-400', 'shadow-emerald-500/20'), 2500);
+            }
+        }
+
         function buildExportCardElement(q, idx) {
             const container = document.createElement("div");
             container.style.width = "720px";
