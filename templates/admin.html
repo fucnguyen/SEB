@@ -125,36 +125,59 @@
             </div>
         </div>
 
-        <!-- Navigation Tabs (Horizontally scrollable on mobile) -->
-        <div class="flex border-b border-slate-800 space-x-4 sm:space-x-6 text-xs sm:text-sm font-bold overflow-x-auto whitespace-nowrap pb-0.5 scrollbar-none">
-            <!-- SEB SYSTEM SUB-TABS -->
-            <button onclick="switchTab('tab-downloads')" id="btn-tab-downloads" class="subtab-item subtab-seb pb-3 border-b-2 border-blue-500 text-blue-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-download"></i> Yêu Cầu Tải SEB (<span id="badge-dl">0</span>)
+        <!-- SUB-NAVIGATION BAR FOR SEB SYSTEM MODE -->
+        <div id="subtab-bar-seb" class="flex border-b border-slate-800 space-x-4 sm:space-x-6 text-xs sm:text-sm font-bold overflow-x-auto whitespace-nowrap pb-0.5 scrollbar-none">
+            <button onclick="switchTab('tab-downloads')" id="btn-tab-downloads" class="pb-3 border-b-2 border-blue-500 text-blue-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-download text-blue-400"></i> Yêu Cầu Tải (<span id="badge-dl">0</span>)
             </button>
-            <button onclick="switchTab('tab-licenses')" id="btn-tab-licenses" class="subtab-item subtab-seb pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-key"></i> Bản Quyền SEB HWID (<span id="badge-lic">0</span>)
+            <button onclick="switchTab('tab-licenses')" id="btn-tab-licenses" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-key text-blue-400"></i> Quản Lý Mã Máy HWID (<span id="badge-lic">0</span>)
             </button>
-            <button onclick="switchTab('tab-seb-main')" id="btn-tab-seb-main" class="subtab-item subtab-seb pb-3 border-b-2 border-transparent text-slate-400 hover:text-blue-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-shield-halved text-blue-400"></i> Ca Thi SEB (<span id="badge-seb-count" class="font-black text-blue-400">0</span>)
+            <button onclick="switchTab('tab-seb-main')" id="btn-tab-seb-main" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-blue-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-shield-halved text-blue-400"></i> Hỗ Trợ Ca Thi SEB (<span id="badge-seb-count">0</span>)
             </button>
-
-            <!-- EOS & PEA FPT SYSTEM SUB-TABS -->
-            <button onclick="switchTab('tab-fpt-main')" id="btn-tab-fpt-main" class="subtab-item subtab-eos hidden pb-3 border-b-2 border-transparent text-slate-400 hover:text-emerald-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-graduation-cap text-emerald-400"></i> Ca Thi EOS & PEA (<span id="badge-fpt-count" class="font-black text-emerald-400">0</span>)
+            <button onclick="switchTab('tab-exam-support')" id="btn-tab-exam-support" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-blue-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-layer-group text-blue-400"></i> Tất Cả Ca Thi (<span id="badge-live-exams">0</span>)
             </button>
-            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-exam-builder" class="subtab-item subtab-eos hidden pb-3 border-b-2 border-transparent text-slate-400 hover:text-orange-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-pen-to-square text-orange-400"></i> Tạo Đề Thi FPT
+            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-exam-builder" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-orange-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-pen-to-square text-orange-400"></i> Tạo Đề Thi SEB
             </button>
-
-            <!-- COMMON SYSTEM SUB-TABS -->
-            <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="subtab-item subtab-common pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+            <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Vào / Thoát (<span id="badge-logs">0</span>)
             </button>
-            <button onclick="switchTab('tab-chats')" id="btn-tab-chats" class="subtab-item subtab-common pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+            <button onclick="switchTab('tab-chats')" id="btn-tab-chats" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-comments"></i> Tin Nhắn Chat (<span id="badge-chat">0</span>)
             </button>
-            <button onclick="switchTab('tab-settings')" id="btn-tab-settings" class="subtab-item subtab-common pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+            <button onclick="switchTab('tab-settings')" id="btn-tab-settings" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-gears"></i> Cấu Hình Hệ Thống
+            </button>
+        </div>
+
+        <!-- SUB-NAVIGATION BAR FOR EOS & PEA SYSTEM MODE -->
+        <div id="subtab-bar-eos" class="hidden flex border-b border-slate-800 space-x-4 sm:space-x-6 text-xs sm:text-sm font-bold overflow-x-auto whitespace-nowrap pb-0.5 scrollbar-none">
+            <button onclick="switchTab('tab-fpt-main')" id="btn-tab-fpt-main" class="pb-3 border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-graduation-cap text-emerald-400"></i> Hỗ Trợ Ca Thi EOS & PEA (<span id="badge-fpt-count">0</span>)
+            </button>
+            <button onclick="switchTab('tab-licenses')" id="btn-tab-eos-licenses" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-key text-emerald-400"></i> Quản Lý Mã Máy EOS/PEA
+            </button>
+            <button onclick="switchTab('tab-downloads')" id="btn-tab-eos-downloads" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-download text-emerald-400"></i> Yêu Cầu Tải EOS/PEA
+            </button>
+            <button onclick="switchTab('tab-exam-support')" id="btn-tab-eos-all-exams" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-emerald-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-layer-group text-emerald-400"></i> Tất Cả Ca Thi FPT
+            </button>
+            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-eos-builder" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-orange-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-pen-to-square text-orange-400"></i> Tạo Đề Thi FPT
+            </button>
+            <button onclick="switchTab('tab-logs')" id="btn-tab-eos-logs" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Vào / Thoát
+            </button>
+            <button onclick="switchTab('tab-chats')" id="btn-tab-eos-chats" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-comments"></i> Tin Nhắn Chat FPT
+            </button>
+            <button onclick="switchTab('tab-settings')" id="btn-tab-eos-settings" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-gears"></i> Cấu Hình EOS/PEA
             </button>
         </div>
 
@@ -1242,8 +1265,8 @@
             const headerBtn = document.getElementById('header-btn-create-key');
             const headerTitle = document.getElementById('header-title-text');
 
-            const sebSubTabs = document.querySelectorAll('.subtab-seb');
-            const eosSubTabs = document.querySelectorAll('.subtab-eos');
+            const subBarSeb = document.getElementById('subtab-bar-seb');
+            const subBarEos = document.getElementById('subtab-bar-eos');
 
             if (mode === 'EOS') {
                 if (sebBtnDesktop) sebBtnDesktop.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
@@ -1255,9 +1278,8 @@
                 if (headerBtn) headerBtn.className = 'px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-white shadow-md shadow-emerald-600/20';
                 if (headerTitle) headerTitle.innerHTML = `EOS & PEA Admin Console <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-mono font-bold">ONLINE</span>`;
 
-                // Show EOS sub-tabs, hide SEB sub-tabs
-                sebSubTabs.forEach(el => el.classList.add('hidden'));
-                eosSubTabs.forEach(el => el.classList.remove('hidden'));
+                if (subBarSeb) subBarSeb.classList.add('hidden');
+                if (subBarEos) subBarEos.classList.remove('hidden');
 
                 switchTab('tab-fpt-main');
             } else {
@@ -1270,9 +1292,8 @@
                 if (headerBtn) headerBtn.className = 'px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-white shadow-md shadow-blue-600/20';
                 if (headerTitle) headerTitle.innerHTML = `SEB Admin Console <span class="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/30 font-mono font-bold">ONLINE</span>`;
 
-                // Show SEB sub-tabs, hide EOS sub-tabs
-                sebSubTabs.forEach(el => el.classList.remove('hidden'));
-                eosSubTabs.forEach(el => el.classList.add('hidden'));
+                if (subBarSeb) subBarSeb.classList.remove('hidden');
+                if (subBarEos) subBarEos.classList.add('hidden');
 
                 switchTab('tab-downloads');
             }
