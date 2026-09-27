@@ -766,6 +766,29 @@
         } catch (e) {}
     }
 
+    function setCheckboxState(chk, shouldCheck) {
+        if (!chk) return;
+        var inp = chk.tagName === "INPUT" ? chk : chk.querySelector("input[type='checkbox']");
+        if (inp) {
+            if (inp.checked !== shouldCheck) {
+                inp.checked = shouldCheck;
+                inp.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+                inp.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+                inp.click();
+                if (inp.checked !== shouldCheck) {
+                    inp.checked = shouldCheck;
+                }
+                inp.dispatchEvent(new Event("input",  { bubbles: true }));
+                inp.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+        } else {
+            var isChecked = chk.classList.contains("ant-checkbox-checked") || chk.getAttribute("aria-checked") === "true";
+            if (isChecked !== shouldCheck) {
+                chk.click();
+            }
+        }
+    }
+
     function applyAnswerForQuestion(block, qtype, answer) {
         if (answer === undefined || answer === null || String(answer).trim() === "") return;
         var ansStr = String(answer).trim();
@@ -831,21 +854,20 @@
             if (checks.length > 0) {
                 checks.forEach(function (chk, i) {
                     var shouldCheck = targetIdxs.indexOf(i) !== -1;
-                    if (chk.checked !== shouldCheck) {
-                        triggerElementClick(chk);
-                    }
+                    setCheckboxState(chk, shouldCheck);
                 });
             } else {
                 var checkContainers = block.querySelectorAll("[role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper");
-                targetIdxs.forEach(function (idx) {
-                    if (checkContainers[idx]) triggerElementClick(checkContainers[idx]);
+                checkContainers.forEach(function (cBox, i) {
+                    var shouldCheck = targetIdxs.indexOf(i) !== -1;
+                    setCheckboxState(cBox, shouldCheck);
                 });
             }
             return;
         }
 
         if (qtype === "text") {
-            var inp = block.querySelector("input[type='text'], input[type='number'], input[type='email']");
+            var inp = block.querySelector("input[type='text'], input[type='number'], input[type='email'], input[type='search'], input:not([type]), .ant-input");
             if (inp) {
                 try {
                     var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
@@ -858,12 +880,16 @@
         }
 
         if (qtype === "essay") {
-            var ta = block.querySelector("textarea");
+            var ta = block.querySelector("textarea, [contenteditable='true']");
             if (ta) {
-                try {
-                    var nativeSetter2 = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
-                    nativeSetter2.call(ta, ansStr);
-                } catch (e) { ta.value = ansStr; }
+                if (ta.tagName === "TEXTAREA") {
+                    try {
+                        var nativeSetter2 = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                        nativeSetter2.call(ta, ansStr);
+                    } catch (e) { ta.value = ansStr; }
+                } else {
+                    ta.innerText = ansStr;
+                }
                 ta.dispatchEvent(new Event("input",  { bubbles: true }));
                 ta.dispatchEvent(new Event("change", { bubbles: true }));
             }
