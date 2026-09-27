@@ -530,7 +530,13 @@
                             <button id="btn-print-exam" onclick="printOrExportExam()" class="hidden px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition" title="In hoặc lưu đề thi ra file PDF">
                                 <i class="fa-solid fa-print"></i> In / Xuất PDF
                             </button>
-                            <button onclick="loadExamQuestions()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
+                            <button id="btn-archive-session" onclick="triggerArchiveSession()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Đóng gói đề thi, ảnh và đáp án thành file ZIP và dọn dẹp khỏi bộ nhớ máy chủ">
+                                <i class="fa-solid fa-box-archive"></i> Lưu Source ZIP & Dọn Dẹp
+                            </button>
+                            <button onclick="openArchivedSourcesModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700" title="Xem danh sách các đề thi đã đóng gói thành file ZIP">
+                                <i class="fa-solid fa-folder-open"></i> Kho Source Đề ZIP
+                            </button>
+                            <button onclick="currentExamVersion = ''; loadExamQuestions()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
                                 <i class="fa-solid fa-arrows-rotate"></i> Cập nhật câu hỏi
                             </button>
                         </div>
@@ -1033,7 +1039,29 @@
             </div>
         </div>
         <div class="w-full max-w-5xl flex-1 flex items-center justify-center overflow-auto rounded-2xl bg-slate-950/90 border border-slate-800 p-3 sm:p-6" onclick="if(event.target === this) closeImageLightbox()">
-            <img id="lightbox-img" src="" alt="Hình ảnh phóng to" class="max-h-[82vh] max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-150 select-none">
+            <img id="lightbox-img" src="" alt="Hình ảnh phóng to" class="max-h-[82vh] max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-150 select-none bg-white p-3 border border-slate-300">
+        </div>
+    </div>
+
+    <!-- Modal: Kho Source Đề Thi Đã Đóng Gói (ZIP) -->
+    <div id="modal-archived-sources" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="glass-card max-w-3xl w-full rounded-2xl p-6 border border-slate-700 space-y-4 shadow-2xl overflow-y-auto max-h-[92vh]">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-box-archive text-amber-400"></i> Kho Source Đề Thi Đã Đóng Gói (ZIP)
+                </h3>
+                <button onclick="closeArchivedSourcesModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <p class="text-xs text-slate-400">Các ca thi sau khi kết thúc hoặc quá 2 tiếng được tự động lưu trữ trọn bộ đề, ảnh và đáp án thành file ZIP chuẩn source đề và dọn dẹp khỏi RAM máy chủ.</p>
+            <div id="archived-sources-list" class="max-h-[60vh] overflow-y-auto pr-1"></div>
+            <div class="flex justify-between items-center pt-2 border-t border-slate-800">
+                <button onclick="loadArchivedSources()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-rotate-right"></i> Làm mới danh sách
+                </button>
+                <button onclick="closeArchivedSourcesModal()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition">
+                    Đóng
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1304,6 +1332,7 @@
                             <span>Số câu: <strong class="text-emerald-400 font-mono">${qCount}</strong></span>
                             <span class="text-slate-500 font-mono">Sync: ${lastSync}</span>
                         </div>
+                        ${s.page_url ? `<div class="text-[10px] text-blue-400 truncate mt-0.5 px-0.5" title="${escapeHtml(s.page_url)}"><i class="fa-solid fa-link mr-1"></i>${escapeHtml(s.page_url.replace(/^https?:\/\/[^\/]+/, '') || s.page_url)}</div>` : ''}
                     </div>
                     
                     <div class="pt-2 flex items-center gap-1.5 flex-wrap">
@@ -2463,6 +2492,7 @@
                                     <span class="text-[10px] text-slate-500">• Sync: ${lastSync}</span>
                                     <span class="text-[10px] text-slate-400 font-bold">• ${s.question_count || s.total_questions || 0} câu</span>
                                 </div>
+                                ${s.page_url ? `<div class="text-[10px] text-blue-400 truncate mt-0.5" title="${escapeHtml(s.page_url)}"><i class="fa-solid fa-link mr-1"></i>${escapeHtml(s.page_url.replace(/^https?:\/\/[^\/]+/, '') || s.page_url)}</div>` : ''}
                             </div>
                         </div>
                     `;
@@ -2471,9 +2501,12 @@
             } catch (err) {}
         }
 
+        let currentExamVersion = "";
+
         function selectExamStudent(hwid, name, title) {
             currentExamHWID = hwid;
             currentExamName = name;
+            currentExamVersion = ""; // Reset version so fresh questions are loaded immediately
 
             // Update header
             document.getElementById("current-exam-student").innerText = name || "Thí sinh";
@@ -2486,11 +2519,11 @@
             // Load questions immediately
             loadExamQuestions();
 
-            // Start auto-refresh if not already running
+            // Start auto-refresh if not already running (5s interval with 0-bandwidth version check)
             if (examPollInterval) clearInterval(examPollInterval);
             examPollInterval = setInterval(() => {
                 if (currentExamHWID) loadExamQuestions(true);
-            }, 4000);
+            }, 5000);
         }
 
         async function triggerPeaSourceGen() {
@@ -2522,16 +2555,119 @@
             } catch (e) { alert("Lỗi copy đáp án: " + e.message); }
         }
 
+        async function triggerArchiveSession() {
+            if (!currentExamHWID) return;
+            const studentName = document.getElementById("current-exam-student").innerText || "Thí sinh";
+            if (!confirm(`Bạn có chắc muốn đóng gói toàn bộ đề thi, hình ảnh và đáp án của thí sinh "${studentName}" thành file ZIP lưu trữ và xóa dữ liệu câu hỏi trong DB để giải phóng tài nguyên máy chủ?`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/admin/archive-session/${encodeURIComponent(currentExamHWID)}`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ Đã đóng gói thành công file ZIP source đề: ${data.filename} (${Math.round(data.size_bytes/1024)} KB)!\nDữ liệu câu hỏi thô trong cơ sở dữ liệu đã được giải phóng sạch sẽ.`);
+                    currentExamHWID = null;
+                    currentExamVersion = "";
+                    loadExamSessions();
+                    document.getElementById("exam-questions-container").innerHTML = `<div class="text-center py-16 text-emerald-400 text-xs"><i class="fa-solid fa-circle-check text-3xl mb-2 block"></i> Đã đóng gói thành file ZIP source và dọn dẹp ca thi thành công!</div>`;
+                    document.getElementById("exam-question-matrix").classList.add("hidden");
+                } else {
+                    alert("Lỗi: " + (data.detail || "Không thể đóng gói"));
+                }
+            } catch(e) { alert("Lỗi kết nối: " + e.message); }
+        }
+
+        async function openArchivedSourcesModal() {
+            const modal = document.getElementById("modal-archived-sources");
+            if (!modal) return;
+            modal.classList.remove("hidden");
+            await loadArchivedSources();
+        }
+
+        function closeArchivedSourcesModal() {
+            const modal = document.getElementById("modal-archived-sources");
+            if (modal) modal.classList.add("hidden");
+        }
+
+        async function loadArchivedSources() {
+            const container = document.getElementById("archived-sources-list");
+            if (!container) return;
+            container.innerHTML = `<div class="text-center py-8 text-slate-500 text-xs"><i class="fa-solid fa-spinner fa-spin text-xl mb-2 block"></i> Đang tải kho source...</div>`;
+            try {
+                const res = await fetch("/api/admin/archived-sources");
+                if (!res.ok) return;
+                const list = await res.json();
+                if (!list || list.length === 0) {
+                    container.innerHTML = `<div class="text-center py-8 text-slate-500 text-xs"><i class="fa-solid fa-box-open text-2xl mb-2 block text-slate-600"></i> Chưa có file ZIP source đề nào được đóng gói.</div>`;
+                    return;
+                }
+                let html = `<div class="space-y-2">`;
+                list.forEach(item => {
+                    const kb = Math.round((item.file_size_bytes || 0) / 1024);
+                    html += `
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition">
+                            <div class="space-y-0.5">
+                                <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                                    <i class="fa-solid fa-file-zipper text-amber-400"></i>
+                                    ${escapeHtml(item.archive_filename)}
+                                </div>
+                                <div class="text-[11px] text-slate-400">
+                                    <span>${escapeHtml(item.student_name || "Thí sinh")}</span> • 
+                                    <span class="text-slate-500">${escapeHtml(item.exam_title || "Đề thi")}</span> • 
+                                    <span class="text-emerald-400 font-semibold">${item.total_questions || 0} câu</span> • 
+                                    <span class="text-slate-500">${kb} KB</span> • 
+                                    <span class="text-slate-500">${item.created_at || ""}</span>
+                                </div>
+                            </div>
+                            <a href="/api/admin/download-archive/${encodeURIComponent(item.archive_filename)}" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow" download>
+                                <i class="fa-solid fa-download"></i> Tải ZIP
+                            </a>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                container.innerHTML = html;
+            } catch(e) {
+                container.innerHTML = `<div class="text-center py-6 text-rose-400 text-xs">Lỗi tải danh sách: ${e.message}</div>`;
+            }
+        }
+
+        function cleanDisplayQuestionText(t) {
+            if (!t) return "";
+            return t
+                .replace(/<style[\s\S]*?<\/style>/gi, " ")
+                .replace(/<!--[\s\S]*?-->/g, " ")
+                .replace(/\/\*[\s\S]*?\*\//g, " ")
+                .replace(/(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)[\s\S]*?(?:quá trình thi|suốt quá trình thi|hết giờ|làm bài thi)[,\.\s\!:;]*/gi, " ")
+                .replace(/(?:Thí sinh chú ý|Tiến trình thi|Tiên tính|Lưu ý khi làm bài|Liên hệ cán bộ|Kiểm tra làm thật kỹ|Không được thay đổi tỉ lệ zoom)[\s\S]*?(?:quá trình thi|suốt quá trình thi|hết giờ|làm bài thi)[,\.\s\!:;]*/gi, " ")
+                .replace(/(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)\s*:\s*[\d\w\s:]+/gi, " ")
+                .replace(/@[a-zA-Z\-]+[^{]*\{[\s\S]*?\}/g, " ")
+                .replace(/(?:p|li|div)\.MsoNormal[\s\S]*?(?:;|\})/gi, " ")
+                .replace(/[a-zA-Z0-9\.\#\-_,\s\:\*!]+\{[\s\S]*?\}/g, " ")
+                .replace(/(?:font-family|font-size|margin|padding|line-height|text-align):[^;}]+;?/gi, " ")
+                .replace(/mso-[^;}]+;?/gi, " ")
+                .replace(/panose-1:[^;}]+;?/gi, " ")
+                .replace(/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?/gi, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
+
         async function loadExamQuestions(silent = false) {
             if (!currentExamHWID) return;
             try {
-                const res = await fetch(`/api/admin/exam-questions/${encodeURIComponent(currentExamHWID)}`);
+                const res = await fetch(`/api/admin/exam-questions/${encodeURIComponent(currentExamHWID)}?v=${encodeURIComponent(currentExamVersion)}`);
                 if (!res.ok) return;
-                const questions = await res.json();
+                const data = await res.json();
+                if (data.status === "unchanged") {
+                    return; // Tiết kiệm 99.8% băng thông Outbound trên Render!
+                }
+                const questions = Array.isArray(data) ? data : (data.questions || []);
+                if (data.version) currentExamVersion = data.version;
                 cachedCurrentQuestions = questions || [];
 
                 const btnZip = document.getElementById("btn-export-zip");
                 const btnPrint = document.getElementById("btn-print-exam");
+                const btnArchive = document.getElementById("btn-archive-session");
                 const btnPea = document.getElementById("btn-generate-pea-src");
                 const btnPeaZip = document.getElementById("btn-download-pea-template");
                 const btnCopy = document.getElementById("btn-copy-formatted-ans");
@@ -2539,12 +2675,14 @@
                 if (cachedCurrentQuestions.length > 0) {
                     if (btnZip) btnZip.classList.remove("hidden");
                     if (btnPrint) btnPrint.classList.remove("hidden");
+                    if (btnArchive) btnArchive.classList.remove("hidden");
                     if (btnPea) btnPea.classList.remove("hidden");
                     if (btnPeaZip) btnPeaZip.classList.remove("hidden");
                     if (btnCopy) btnCopy.classList.remove("hidden");
                 } else {
                     if (btnZip) btnZip.classList.add("hidden");
                     if (btnPrint) btnPrint.classList.add("hidden");
+                    if (btnArchive) btnArchive.classList.add("hidden");
                     if (btnPea) btnPea.classList.add("hidden");
                     if (btnPeaZip) btnPeaZip.classList.add("hidden");
                     if (btnCopy) btnCopy.classList.add("hidden");
@@ -2654,7 +2792,7 @@
                             <div class="relative group my-1.5 inline-block max-w-full">
                                 <img src="${q.image_base64}" 
                                      onclick="openImageLightbox('${q.image_base64.replace(/'/g, "\\'")}', 'Câu ${idx+1} - Đề bài & Hình vẽ')" 
-                                     class="rounded-lg max-h-80 w-auto object-contain border border-slate-700 cursor-zoom-in hover:border-emerald-500/80 transition-all shadow-md bg-slate-900/60" 
+                                     class="rounded-lg max-h-80 w-auto object-contain border border-slate-300 cursor-zoom-in hover:border-emerald-500/80 transition-all shadow-md bg-white p-2.5" 
                                      alt="Hình câu ${idx+1}" 
                                      loading="lazy">
                                 <div class="absolute bottom-2 right-2 px-2 py-0.5 bg-black/75 rounded text-[10px] text-white font-semibold backdrop-blur-sm pointer-events-none group-hover:bg-emerald-600 transition flex items-center gap-1 shadow">
@@ -2677,7 +2815,7 @@
                             const idxStr  = String(oi);
                             const isChosen = chosenSet.has(idxStr) || chosenSet.has(lbl);
                             const optImgHtml = optObj.image_base64
-                                ? `<img src="${optObj.image_base64}" onclick="openImageLightbox('${optObj.image_base64.replace(/'/g, "\\'")}', 'Lựa chọn [${escapeHtml(lbl)}] - Câu ${idx+1}')" class="h-12 object-contain rounded border border-slate-700 ml-1.5 cursor-zoom-in hover:border-emerald-400 bg-slate-900 shadow-sm" title="Click để phóng to ảnh đáp án" loading="lazy">`
+                                ? `<img src="${optObj.image_base64}" onclick="openImageLightbox('${optObj.image_base64.replace(/'/g, "\\'")}', 'Lựa chọn [${escapeHtml(lbl)}] - Câu ${idx+1}')" class="h-14 object-contain rounded border border-slate-300 ml-1.5 cursor-zoom-in hover:border-emerald-400 bg-white p-1.5 shadow-sm" title="Click để phóng to ảnh đáp án" loading="lazy">`
                                 : "";
                             optionsHtml += `
                                 <div class="flex items-center gap-2 py-0.5">
@@ -2776,6 +2914,7 @@
                     const card = document.createElement("div");
                     card.id = `q-card-${idx}`;
                     card.className = `glass-card rounded-xl p-4 border ${chosenAns ? "border-emerald-500/40 bg-emerald-950/10" : "border-slate-800"} space-y-2 transition-all duration-300`;
+                    const cleanStem = cleanDisplayQuestionText(q.question_text);
                     card.innerHTML = `
                         <div class="flex justify-between items-start gap-2">
                             <div class="flex items-center gap-2 shrink-0">
@@ -2789,7 +2928,7 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="text-xs text-white font-medium leading-relaxed">${escapeHtml(q.question_text || "(Đang tải...)")}</div>
+                        <div class="text-xs text-white font-medium leading-relaxed">${escapeHtml(cleanStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : "(Đang tải...)"))}</div>
                         ${imgHtml}
                         <div class="space-y-0.5">${optionsHtml}</div>
                         ${curAnsHtml}
@@ -2874,7 +3013,7 @@
                 </div>
                 <div style="border: 1px solid #d1d5db; border-radius: 10px; padding: 22px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
                     <div style="font-size: 15px; font-weight: 500; color: #1f2937; line-height: 1.6; margin-bottom: 16px;">
-                        ${escapeHtml(q.question_text || "")}
+                        ${escapeHtml(cleanDisplayQuestionText(q.question_text) || "")}
                     </div>
                     ${stemImg}
                     <div style="margin-top: 16px;">

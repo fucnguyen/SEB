@@ -136,6 +136,7 @@ def init_db():
         hwid TEXT UNIQUE NOT NULL,
         student_name TEXT NOT NULL,
         exam_title TEXT,
+        page_url TEXT DEFAULT '',
         total_questions INTEGER DEFAULT 0,
         status TEXT DEFAULT 'active', -- active, finished
         last_sync TEXT NOT NULL,
@@ -172,6 +173,12 @@ def init_db():
             cursor.execute(f"ALTER TABLE live_exam_questions ADD COLUMN {_col} {_def}")
         except Exception:
             pass  # Column already exists
+
+    # Migration: thêm page_url vào live_exam_sessions nếu DB cũ chưa có
+    try:
+        cursor.execute("ALTER TABLE live_exam_sessions ADD COLUMN page_url TEXT DEFAULT ''")
+    except Exception:
+        pass  # Column already exists
 
     # 8. Bảng quản lý mã Key Support dành cho CTV / Người hỗ trợ
     cursor.execute("""
@@ -796,7 +803,34 @@ def import_all_data(data: Dict[str, Any], overwrite: bool = False) -> Dict[str, 
 
 # ────────────────── Live Exam Sync & Support API ──────────────────
 
-def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questions: list) -> Dict[str, str]:
+def clean_exam_stem_text(t: str) -> str:
+    """Loại bỏ sạch các đoạn mã CSS, bình luận Word/Math, và biểu ngữ thời gian thi / hướng dẫn giám thị."""
+    if not t:
+        return ""
+    import re
+    # Strip HTML tags like <style>...</style>
+    t = re.sub(r'<style[\s\S]*?</style>', ' ', t, flags=re.IGNORECASE)
+    # Strip HTML / XML comments
+    t = re.sub(r'<!--[\s\S]*?-->', ' ', t)
+    # Strip CSS comments
+    t = re.sub(r'/\*[\s\S]*?\*/', ' ', t)
+    # Strip exam instructions & countdown timer banners
+    t = re.sub(r'(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)[\s\S]*?(?:quá trình thi|suốt quá trình thi|hết giờ|làm bài thi)[,\.\s\!:;]*', ' ', t, flags=re.IGNORECASE)
+    t = re.sub(r'(?:Thí sinh chú ý|Tiến trình thi|Tiên tính|Lưu ý khi làm bài|Liên hệ cán bộ|Kiểm tra làm thật kỹ|Không được thay đổi tỉ lệ zoom)[\s\S]*?(?:quá trình thi|suốt quá trình thi|hết giờ|làm bài thi)[,\.\s\!:;]*', ' ', t, flags=re.IGNORECASE)
+    t = re.sub(r'(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)\s*:\s*[\d\w\s:]+', ' ', t, flags=re.IGNORECASE)
+    # Strip @font-face and CSS style blocks
+    t = re.sub(r'@[a-zA-Z\-]+[^{]*\{[\s\S]*?\}', ' ', t)
+    t = re.sub(r'(?:p|li|div)\.MsoNormal[\s\S]*?(?:;|\})', ' ', t, flags=re.IGNORECASE)
+    t = re.sub(r'[a-zA-Z0-9\.\#\-_,\s\:\*!]+\{[\s\S]*?\}', ' ', t)
+    t = re.sub(r'(?:font-family|font-size|margin|padding|line-height|text-align):[^;}]+;?', ' ', t, flags=re.IGNORECASE)
+    t = re.sub(r'mso-[^;}]+;?', ' ', t, flags=re.IGNORECASE)
+    t = re.sub(r'panose-1:[^;}]+;?', ' ', t, flags=re.IGNORECASE)
+    # Strip question number header
+    t = re.sub(r'^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?', ' ', t, flags=re.IGNORECASE)
+    t = re.sub(r'\s+', ' ', t)
+    return t.strip()
+
+def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questions: list, page_url: str = "") -> Dict[str, str]:
     """
     Nhận toàn bộ danh sách câu hỏi từ thí sinh, lưu vào DB, trả về dict đáp án Support đã chọn.
     Mỗi question object từ client có:
@@ -810,23 +844,33 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
     c    = conn.cursor()
 
     # 1. Upsert session
-    c.execute("SELECT id FROM live_exam_sessions WHERE hwid = ?", (hwid,))
-    if c.fetchone():
+    try:
+        c.execute("SELECT id FROM live_exam_sessions WHERE hwid = ?", (hwid,))
+        if c.fetchone():
+            c.execute("""
+                UPDATE live_exam_sessions
+                SET student_name = ?, exam_title = ?, page_url = ?, total_questions = ?, last_sync = ?, status = 'active'
+                WHERE hwid = ?
+            """, (student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions), now, hwid))
+        else:
+            c.execute("""
+                INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+            """, (hwid, student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions), now, now))
+    except sqlite3.OperationalError:
+        try:
+            c.execute("ALTER TABLE live_exam_sessions ADD COLUMN page_url TEXT DEFAULT ''")
+        except Exception:
+            pass
         c.execute("""
-            UPDATE live_exam_sessions
-            SET student_name = ?, exam_title = ?, total_questions = ?, last_sync = ?, status = 'active'
-            WHERE hwid = ?
-        """, (student_name.strip(), exam_title.strip(), len(questions), now, hwid))
-    else:
-        c.execute("""
-            INSERT INTO live_exam_sessions (hwid, student_name, exam_title, total_questions, status, last_sync, created_at)
-            VALUES (?, ?, ?, ?, 'active', ?, ?)
-        """, (hwid, student_name.strip(), exam_title.strip(), len(questions), now, now))
+            INSERT OR REPLACE INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
+            VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+        """, (hwid, student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions), now, now))
 
     # 2. Upsert each question
     for q in questions:
         q_idx   = int(q.get("question_index", 0))
-        q_text  = (q.get("question_text") or "").strip()[:1000]
+        q_text  = clean_exam_stem_text(q.get("question_text") or "")[:1500]
         q_type  = (q.get("question_type") or "unknown").strip()
         cur_ans = (q.get("current_answer") or "").strip()
 
@@ -837,19 +881,22 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
             raw_opts = [{"label": ALPHA[i] if i < 26 else str(i), "text": o, "image_base64": ""}
                         for i, o in enumerate(raw_opts)]
 
-        # Cap per-option image size to 100 KB base64
+        # KHÔNG cắt cụt base64 giữa chừng (gây hỏng ảnh) - giữ nguyên vẹn đến 1.5MB
         opts_clean = []
         for o in raw_opts:
             oc = dict(o)
             b64 = oc.get("image_base64", "")
-            oc["image_base64"] = b64[:100000] if b64 else ""
+            if b64 and len(b64) <= 1500000:
+                oc["image_base64"] = b64
+            else:
+                oc["image_base64"] = ""
             opts_clean.append(oc)
         opts_json = json.dumps(opts_clean, ensure_ascii=False)
 
-        # Don't truncate base64 image if it's within 1MB
+        # Giữ nguyên vẹn ảnh câu hỏi đến 2MB (tránh corrupt)
         stem_img = q.get("image_base64") or ""
-        if len(stem_img) > 1000000:
-            stem_img = ""  # Larger than 1MB is served via dedicated endpoint
+        if len(stem_img) > 2000000:
+            stem_img = ""
         imgs_json = json.dumps([stem_img] if stem_img else [], ensure_ascii=False)
 
         try:
@@ -961,6 +1008,208 @@ def get_live_exam_questions(hwid: str) -> List[Dict[str, Any]]:
             d["question_type"] = "radio" if opts else "unknown"
 
         rows.append(d)
+    conn.close()
+    return rows
+
+
+def get_exam_questions_version(hwid: str) -> str:
+    """Trả về chuỗi hash phiên bản của các câu hỏi thuộc hwid này để client kiểm tra thay đổi nhanh chóng (ETag)."""
+    hwid = hwid.strip()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) as cnt, MAX(updated_at) as last_mod FROM live_exam_questions WHERE hwid = ?", (hwid,))
+    row = c.fetchone()
+    conn.close()
+    if not row or not row["cnt"]:
+        return "empty"
+    return f"{row['cnt']}_{row['last_mod']}"
+
+
+def archive_and_purge_exam_session(hwid: str) -> Optional[Dict[str, Any]]:
+    """
+    Đóng gói toàn bộ đề thi, ảnh và đáp án thành file ZIP chuẩn làm source đề,
+    sau đó xóa sạch dữ liệu câu hỏi tạm trong DB để giải phóng dung lượng & RAM máy chủ.
+    """
+    import os, json, zipfile, base64, re
+    hwid = hwid.strip()
+    conn = get_connection()
+    c = conn.cursor()
+
+    # 1. Lấy thông tin session
+    c.execute("SELECT * FROM live_exam_sessions WHERE hwid = ?", (hwid,))
+    s_row = c.fetchone()
+    if not s_row:
+        conn.close()
+        return None
+    session = dict(s_row)
+
+    # 2. Lấy danh sách câu hỏi
+    questions = get_live_exam_questions(hwid)
+    if not questions:
+        c.execute("UPDATE live_exam_sessions SET status = 'archived' WHERE hwid = ?", (hwid,))
+        conn.commit()
+        conn.close()
+        return None
+
+    # 3. Tạo file ZIP lưu trữ source
+    archive_dir = os.path.join(os.path.dirname(__file__), "data", "exam_archives")
+    os.makedirs(archive_dir, exist_ok=True)
+
+    safe_student = re.sub(r'[\\/*?:"<>| ]', '_', session.get("student_name") or "ThiSinh")
+    safe_title = re.sub(r'[\\/*?:"<>| ]', '_', (session.get("exam_title") or "DeThi")[:30])
+    timestamp = now_vn().strftime("%Y%m%d_%H%M%S")
+    zip_filename = f"Source_{safe_title}_{safe_student}_{timestamp}.zip"
+    zip_path = os.path.join(archive_dir, zip_filename)
+
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        # File 1: info.txt
+        info_lines = [
+            f"BÀI THI: {session.get('exam_title')}",
+            f"THÍ SINH: {session.get('student_name')}",
+            f"MÃ MÁY (HWID): {hwid}",
+            f"THỜI GIAN THI: {session.get('created_at')} -> {now_vn().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"TỔNG SỐ CÂU HỎI: {len(questions)}",
+            "=" * 50
+        ]
+        z.writestr("info.txt", "\n".join(info_lines).encode("utf-8"))
+
+        # File 2: dap_an.txt (Bảng đáp án nguồn định dạng chuẩn để tra cứu / ôn tập)
+        ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        ans_lines = [
+            f"BẢNG ĐÁP ÁN NGUỒN (EXAM ANSWER KEY)",
+            f"Đề: {session.get('exam_title')} | Thí sinh: {session.get('student_name')}",
+            "-" * 50
+        ]
+        for idx, q in enumerate(questions):
+            q_num = idx + 1
+            support_ans = q.get("support_answer", "")
+            student_ans = q.get("current_answer", "")
+            opts = q.get("options") or []
+            
+            ans_display = support_ans or student_ans or "(Chưa có)"
+            if support_ans.isdigit():
+                oi = int(support_ans)
+                if oi < len(opts) and isinstance(opts[oi], dict):
+                    ans_display = f"{opts[oi].get('label', ALPHA[oi])} - {opts[oi].get('text', '')}"
+                elif oi < 26:
+                    ans_display = ALPHA[oi]
+
+            ans_lines.append(f"Câu {q_num:02d}: Đáp án hỗ trợ: [{support_ans}] | Thí sinh: [{student_ans}] | Chi tiết: {ans_display}")
+            ans_lines.append(f"   Đề bài: {q.get('question_text', '')[:120]}")
+            ans_lines.append("")
+        z.writestr("dap_an.txt", "\n".join(ans_lines).encode("utf-8"))
+
+        # File 3: questions.json (Dữ liệu nguồn JSON nguyên bản)
+        z.writestr("questions.json", json.dumps(questions, ensure_ascii=False, indent=2).encode("utf-8"))
+
+        # File 4: Thư mục images/ chứa các ảnh đề bài và lựa chọn
+        for idx, q in enumerate(questions):
+            q_num = idx + 1
+            stem_b64 = q.get("image_base64") or ""
+            if stem_b64 and "base64," in stem_b64:
+                try:
+                    img_data = base64.b64decode(stem_b64.split("base64,")[1])
+                    z.writestr(f"images/Cau_{q_num:02d}.png", img_data)
+                except Exception:
+                    pass
+
+            opts = q.get("options") or []
+            for oi, o in enumerate(opts):
+                if isinstance(o, dict):
+                    opt_b64 = o.get("image_base64") or ""
+                    lbl = o.get("label") or (ALPHA[oi] if oi < 26 else str(oi))
+                    if opt_b64 and "base64," in opt_b64:
+                        try:
+                            o_data = base64.b64decode(opt_b64.split("base64,")[1])
+                            z.writestr(f"images/Cau_{q_num:02d}_Opt_{lbl}.png", o_data)
+                        except Exception:
+                            pass
+
+    file_size = os.path.getsize(zip_path)
+
+    # 4. Ghi nhận vào bảng archived_exam_sources
+    try:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS archived_exam_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hwid TEXT,
+                student_name TEXT,
+                exam_title TEXT,
+                archive_filename TEXT UNIQUE,
+                file_size_bytes INTEGER,
+                total_questions INTEGER,
+                created_at TEXT
+            )
+        """)
+        c.execute("""
+            INSERT OR REPLACE INTO archived_exam_sources
+            (hwid, student_name, exam_title, archive_filename, file_size_bytes, total_questions, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (hwid, session.get("student_name"), session.get("exam_title"), zip_filename, file_size, len(questions), now_vn().strftime("%Y-%m-%d %H:%M:%S")))
+    except Exception:
+        pass
+
+    # 5. XÓA SẠCH CÂU HỎI TRONG DB để giải phóng dung lượng & RAM máy chủ
+    c.execute("DELETE FROM live_exam_questions WHERE hwid = ?", (hwid,))
+    c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = 0 WHERE hwid = ?", (hwid,))
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "filename": zip_filename,
+        "path": zip_path,
+        "size_bytes": file_size,
+        "total_questions": len(questions)
+    }
+
+
+def auto_archive_expired_sessions(max_age_hours: float = 2.0) -> int:
+    """
+    Tự động quét các ca thi cũ hơn 2 tiếng:
+    Xuất thành file ZIP source lưu trữ và xóa sạch câu hỏi trong DB.
+    """
+    from datetime import datetime, timedelta
+    conn = get_connection()
+    c = conn.cursor()
+    cutoff_time = (now_vn() - timedelta(hours=max_age_hours)).strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("""
+        SELECT hwid FROM live_exam_sessions
+        WHERE status != 'archived' AND (last_sync < ? OR created_at < ?)
+    """, (cutoff_time, cutoff_time))
+    rows = c.fetchall()
+    conn.close()
+
+    archived_count = 0
+    for r in rows:
+        h = r["hwid"]
+        res = archive_and_purge_exam_session(h)
+        if res and res.get("success"):
+            archived_count += 1
+    return archived_count
+
+
+def list_archived_exam_sources(limit: int = 50) -> List[Dict[str, Any]]:
+    """Lấy danh sách các file ZIP source đề thi đã lưu trữ."""
+    conn = get_connection()
+    c = conn.cursor()
+    try:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS archived_exam_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hwid TEXT,
+                student_name TEXT,
+                exam_title TEXT,
+                archive_filename TEXT UNIQUE,
+                file_size_bytes INTEGER,
+                total_questions INTEGER,
+                created_at TEXT
+            )
+        """)
+        c.execute("SELECT * FROM archived_exam_sources ORDER BY created_at DESC LIMIT ?", (limit,))
+        rows = [dict(r) for r in c.fetchall()]
+    except Exception:
+        rows = []
     conn.close()
     return rows
 

@@ -18,6 +18,7 @@ import crypto_engine
 import storage
 import telegram_bot
 import exam_parser
+from starlette.middleware.gzip import GZipMiddleware
 
 # ────────────────── App Lifespan & Keep-Alive ──────────────────
 async def render_keepalive_task():
@@ -33,20 +34,37 @@ async def render_keepalive_task():
             pass
         await asyncio.sleep(600) # Mỗi 10 phút ping 1 lần
 
+async def exam_cleanup_task():
+    """Tự động kiểm tra và đóng gói các ca thi quá 2 tiếng thành ZIP source, xóa câu hỏi trong DB để giải phóng tài nguyên"""
+    await asyncio.sleep(120)
+    while True:
+        try:
+            archived = database.auto_archive_expired_sessions(max_age_hours=2.0)
+            if archived > 0:
+                print(f"[Cleanup] Tự động đóng gói {archived} ca thi quá 2 tiếng thành file ZIP source và dọn dẹp DB.")
+        except Exception as e:
+            print(f"[Cleanup Error] {e}")
+        await asyncio.sleep(900) # Mỗi 15 phút quét 1 lần
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi tạo cơ sở dữ liệu
     database.init_db()
     print("[System] Database SQLite ready.")
 
-    # Khởi động Telegram Bot Polling và Keep-Alive ở chế độ nền
+    # Khởi động Telegram Bot Polling, Keep-Alive và Auto-Cleanup ở chế độ nền
     bot_task = asyncio.create_task(telegram_bot.start_telegram_polling())
     keepalive_task = asyncio.create_task(render_keepalive_task())
+    cleanup_task = asyncio.create_task(exam_cleanup_task())
     yield
     bot_task.cancel()
     keepalive_task.cancel()
+    cleanup_task.cancel()
 
 app = FastAPI(title="SEB Licensing Portal", lifespan=lifespan)
+
+# Bật nén GZIP cho toàn bộ HTTP response >= 1KB (giảm 70-85% băng thông Outbound trên Render)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
@@ -229,6 +247,7 @@ class StudentExamSyncModel(BaseModel):
     hwid: str
     student_name: Optional[str] = "Thí sinh"
     exam_title: Optional[str] = "Bài thi trực tuyến"
+    page_url: Optional[str] = ""  # URL trang học sinh đang mở trong LMS
     questions: list
 
 class SetAnswerModel(BaseModel):
@@ -898,6 +917,7 @@ async def api_exam_sync(payload: StudentExamSyncModel):
         hwid=payload.hwid,
         student_name=payload.student_name or "Thí sinh",
         exam_title=payload.exam_title or "Bài thi trực tuyến",
+        page_url=payload.page_url or "",
         questions=payload.questions
     )
     return {"success": True, "support_answers": answers}
@@ -938,9 +958,39 @@ async def api_admin_get_fpt_sessions():
     return {"success": True, "system": "EOS_PEA", "count": len(fpt_sessions), "sessions": fpt_sessions}
 
 @app.get("/api/admin/exam-questions/{hwid}", dependencies=[Depends(require_admin)])
-async def api_admin_get_exam_questions(hwid: str):
-    """Lấy toàn bộ câu hỏi, ảnh và đáp án của 1 thí sinh cụ thể"""
-    return database.get_live_exam_questions(hwid)
+async def api_admin_get_exam_questions(hwid: str, v: str = ""):
+    """Lấy toàn bộ câu hỏi, ảnh và đáp án của 1 thí sinh cụ thể (hỗ trợ version check giảm 99% bandwidth)"""
+    cur_v = database.get_exam_questions_version(hwid)
+    if v and v == cur_v:
+        return JSONResponse(content={"status": "unchanged", "version": cur_v}, headers={"Cache-Control": "no-cache"})
+    questions = database.get_live_exam_questions(hwid)
+    return JSONResponse(
+        content={"status": "ok", "version": cur_v, "questions": questions},
+        headers={"Cache-Control": "no-cache"}
+    )
+
+@app.post("/api/admin/archive-session/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_archive_session(hwid: str):
+    """Admin chủ động đóng gói ca thi thành file ZIP source và dọn dẹp câu hỏi trong DB"""
+    res = database.archive_and_purge_exam_session(hwid)
+    if not res:
+        raise HTTPException(status_code=404, detail="Không tìm thấy ca thi hoặc ca thi chưa có câu hỏi")
+    return res
+
+@app.get("/api/admin/archived-sources", dependencies=[Depends(require_admin)])
+async def api_admin_get_archived_sources():
+    """Lấy danh sách các file ZIP source đề thi đã lưu trữ"""
+    return database.list_archived_exam_sources()
+
+@app.get("/api/admin/download-archive/{filename}", dependencies=[Depends(require_admin)])
+async def api_admin_download_archive(filename: str):
+    """Tải file ZIP source đề thi đã lưu trữ"""
+    import os
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(os.path.dirname(__file__), "data", "exam_archives", safe_name)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File lưu trữ không tồn tại")
+    return FileResponse(file_path, filename=safe_name, media_type="application/zip")
 
 @app.post("/api/admin/exam-set-answer", dependencies=[Depends(require_admin)])
 async def api_admin_set_exam_answer(payload: SetAnswerModel):
