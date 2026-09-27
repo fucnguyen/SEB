@@ -99,6 +99,30 @@
                         Để đảm bảo an toàn phòng thi, vui lòng điền thông tin để Quản trị viên duyệt quyền tải về máy tính của bạn:
                     </p>
 
+                    <div class="mb-3">
+                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+                            <i class="fa-solid fa-laptop text-blue-400"></i> Chọn Hệ Điều Hành Của Máy Bạn *
+                        </label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label id="lbl-os-win" class="cursor-pointer border-2 border-blue-500 bg-blue-500/10 rounded-xl p-3 flex items-center gap-3 transition">
+                                <input type="radio" name="system_type_radio" value="SEB" checked class="hidden" onchange="onSelectOS('SEB')">
+                                <i class="fa-brands fa-windows text-2xl text-blue-400"></i>
+                                <div>
+                                    <p class="font-bold text-sm text-white">Windows</p>
+                                    <p class="text-[11px] text-slate-400">Win 10, 11 (.exe ~205MB)</p>
+                                </div>
+                            </label>
+                            <label id="lbl-os-mac" class="cursor-pointer border-2 border-slate-700 hover:border-slate-600 bg-slate-900/60 rounded-xl p-3 flex items-center gap-3 transition">
+                                <input type="radio" name="system_type_radio" value="MAC" class="hidden" onchange="onSelectOS('MAC')">
+                                <i class="fa-brands fa-apple text-2xl text-slate-300"></i>
+                                <div>
+                                    <p class="font-bold text-sm text-white">macOS</p>
+                                    <p class="text-[11px] text-slate-400">MacBook / iMac (.zip ~11MB)</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="space-y-3.5">
                         <div>
                             <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Họ và tên của bạn *</label>
@@ -372,6 +396,27 @@
             }
         }
 
+        let selectedOS = localStorage.getItem("seb_selected_os") || "SEB";
+
+        function onSelectOS(os) {
+            selectedOS = os;
+            localStorage.setItem("seb_selected_os", os);
+            const lblWin = document.getElementById("lbl-os-win");
+            const lblMac = document.getElementById("lbl-os-mac");
+            if (lblWin && lblMac) {
+                if (os === "SEB") {
+                    lblWin.className = "cursor-pointer border-2 border-blue-500 bg-blue-500/10 rounded-xl p-3 flex items-center gap-3 transition";
+                    lblMac.className = "cursor-pointer border-2 border-slate-700 hover:border-slate-600 bg-slate-900/60 rounded-xl p-3 flex items-center gap-3 transition";
+                } else {
+                    lblMac.className = "cursor-pointer border-2 border-blue-500 bg-blue-500/10 rounded-xl p-3 flex items-center gap-3 transition";
+                    lblWin.className = "cursor-pointer border-2 border-slate-700 hover:border-slate-600 bg-slate-900/60 rounded-xl p-3 flex items-center gap-3 transition";
+                }
+            }
+        }
+
+        // Khởi tạo trạng thái OS đã chọn
+        setTimeout(() => onSelectOS(selectedOS), 50);
+
         // Tự động kiểm tra trạng thái yêu cầu nếu đã lưu
         if (currentRequestId) {
             document.getElementById("request-form-section").classList.add("hidden");
@@ -401,6 +446,7 @@
                         full_name: name,
                         email: email,
                         note: note,
+                        system_type: selectedOS,
                         session_id: SESSION_ID
                     })
                 });
@@ -445,6 +491,11 @@
 
                     const btnDl = document.getElementById("btn-download-file");
                     btnDl.href = data.download_url;
+                    if (selectedOS === "MAC") {
+                        btnDl.innerHTML = '<i class="fa-brands fa-apple text-2xl animate-bounce"></i><span>BẤM VÀO ĐÂY ĐỂ TẢI BẢN MACOS (~11 MB)</span>';
+                    } else {
+                        btnDl.innerHTML = '<i class="fa-brands fa-windows text-2xl animate-bounce"></i><span>BẤM VÀO ĐÂY ĐỂ TẢI BẢN WINDOWS (~205 MB)</span>';
+                    }
                 } else if (data.status === "rejected") {
                     // Hiển thị từ chối nhưng vẫn tiếp tục kiểm tra để nếu Admin duyệt lại thì tự động chuyển sang approved
                     document.getElementById("status-pending-box").classList.add("hidden");

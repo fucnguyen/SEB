@@ -321,18 +321,26 @@
                 <p class="text-xs text-slate-300 leading-relaxed">
                     Định cấu hình đường link tải riêng cho 2 hệ thống. Khi học sinh được duyệt tải, hệ thống sẽ xác minh địa chỉ IP rồi chuyển hướng tải trực tiếp từ link tương ứng:
                 </p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="p-4 bg-blue-950/30 border border-blue-500/30 rounded-xl space-y-2">
                         <label class="block text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <i class="fa-solid fa-shield-halved"></i> Link Tải Hệ Thống SEB Browser
+                            <i class="fa-brands fa-windows text-base"></i> Link Tải SEB Windows (.exe)
                         </label>
                         <input type="text" id="setting-ext-download-seb" 
                             placeholder="https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_v2.exe" 
                             class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-blue-300 font-mono focus:outline-none focus:border-blue-500">
                     </div>
+                    <div class="p-4 bg-purple-950/30 border border-purple-500/30 rounded-xl space-y-2">
+                        <label class="block text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-brands fa-apple text-base"></i> Link Tải SEB macOS (.zip)
+                        </label>
+                        <input type="text" id="setting-ext-download-mac" 
+                            placeholder="https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_macOS.zip" 
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-purple-300 font-mono focus:outline-none focus:border-purple-500">
+                    </div>
                     <div class="p-4 bg-emerald-950/30 border border-emerald-500/30 rounded-xl space-y-2">
                         <label class="block text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <i class="fa-solid fa-graduation-cap"></i> Link Tải Hệ Thống EOS & PEA (FPT)
+                            <i class="fa-solid fa-graduation-cap"></i> Link Tải EOS & PEA (FPT)
                         </label>
                         <input type="text" id="setting-ext-download-eos" 
                             placeholder="https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_EOS_v2.exe" 
@@ -1691,20 +1699,24 @@
                 document.getElementById("setting-tg-token").value = s.telegram_bot_token || "";
                 document.getElementById("setting-tg-chat-id").value = s.telegram_chat_id || "";
                 const sebInput = document.getElementById("setting-ext-download-seb");
+                const macInput = document.getElementById("setting-ext-download-mac");
                 const eosInput = document.getElementById("setting-ext-download-eos");
                 if (sebInput) sebInput.value = s.external_download_url_seb || s.external_download_url || "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_v2.exe";
+                if (macInput) macInput.value = s.external_download_url_mac || "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_macOS.zip";
                 if (eosInput) eosInput.value = s.external_download_url_eos || "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_EOS_v2.exe";
             } catch (err) {}
         }
 
         async function saveSettings() {
             const sebVal = document.getElementById("setting-ext-download-seb")?.value.trim() || "";
+            const macVal = document.getElementById("setting-ext-download-mac")?.value.trim() || "";
             const eosVal = document.getElementById("setting-ext-download-eos")?.value.trim() || "";
             const payload = {
                 telegram_bot_token: document.getElementById("setting-tg-token").value.trim(),
                 telegram_chat_id: document.getElementById("setting-tg-chat-id").value.trim(),
                 external_download_url: sebVal,
                 external_download_url_seb: sebVal,
+                external_download_url_mac: macVal,
                 external_download_url_eos: eosVal,
             };
             await fetch("/api/admin/settings", {

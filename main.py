@@ -97,6 +97,8 @@ class DownloadRequestModel(BaseModel):
     email: Optional[str] = ""
     note: Optional[str] = ""
     session_id: Optional[str] = ""
+    system_type: Optional[str] = "SEB"
+
 
 class ActivationRequestModel(BaseModel):
     hwid: str
@@ -190,6 +192,7 @@ class SettingsModel(BaseModel):
     telegram_chat_id: Optional[str] = ""
     external_download_url: Optional[str] = ""
     external_download_url_seb: Optional[str] = ""
+    external_download_url_mac: Optional[str] = ""
     external_download_url_eos: Optional[str] = ""
     r2_endpoint_url: Optional[str] = ""
     r2_bucket_name: Optional[str] = ""
@@ -287,7 +290,8 @@ async def api_request_download(req: DownloadRequestModel, request: Request, bg_t
         full_name=req.full_name,
         email=req.email or "",
         note=req.note or "",
-        ip_address=client_ip
+        ip_address=client_ip,
+        system_type=req.system_type or "SEB"
     )
 
     # Gửi thông báo đến Telegram Admin
@@ -351,13 +355,13 @@ async def api_stream_local_file(token: str, request: Request):
         return RedirectResponse(url=cloud_url)
 
     # 4. Stream file từ máy chủ
-    file_path = storage.get_local_setup_file()
+    file_path, filename = storage.get_local_setup_file(sys_type)
     if not file_path or not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File cài đặt chưa được tải lên máy chủ!")
 
     return FileResponse(
         path=file_path,
-        filename="Setup_ThiTrucTuyen_v2.exe",
+        filename=filename,
         media_type="application/octet-stream"
     )
 

@@ -49,7 +49,9 @@ def generate_download_url(token: str, expiration_seconds: int = 1800, system_typ
             pass
 
     # 2. Link lưu trữ đám mây ngoài (GitHub Release, S3, Drive, v.v.)
-    if system_type and system_type.upper() == "EOS":
+    if system_type and system_type.upper() in ["MAC", "MACOS", "SEB_MAC"]:
+        external_url = database.get_setting("external_download_url_mac").strip() or database.get_setting("external_download_url").strip()
+    elif system_type and system_type.upper() == "EOS":
         external_url = database.get_setting("external_download_url_eos").strip() or database.get_setting("external_download_url").strip()
     else:
         external_url = database.get_setting("external_download_url_seb").strip() or database.get_setting("external_download_url").strip()
@@ -60,16 +62,26 @@ def generate_download_url(token: str, expiration_seconds: int = 1800, system_typ
     # 3. Fallback to local server stream
     return f"/api/download/stream?token={token}", False
 
-def get_local_setup_file() -> Optional[str]:
-    # Kiểm tra file ở các vị trí khả dĩ (cả Windows và Linux Server)
-    candidates = [
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "Setup_ThiTrucTuyen_v2.exe"),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "Setup_ThiTrucTuyen_v2.exe"),
-        LOCAL_SETUP_PATH,
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Setup_ThiTrucTuyen_v2.exe"),
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Output", "Setup_ThiTrucTuyen_v2.exe")
-    ]
+def get_local_setup_file(system_type: str = "SEB") -> Tuple[Optional[str], str]:
+    if system_type and system_type.upper() in ["MAC", "MACOS", "SEB_MAC"]:
+        filename = "Setup_ThiTrucTuyen_macOS.zip"
+        candidates = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "Setup_ThiTrucTuyen_macOS.zip"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "Setup_ThiTrucTuyen_macOS.zip"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Output", "Setup_ThiTrucTuyen_macOS.zip"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "SEB_Mac_Build_Package", "Setup_ThiTrucTuyen_macOS.zip")
+        ]
+    else:
+        filename = "Setup_ThiTrucTuyen_v2.exe"
+        candidates = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "Setup_ThiTrucTuyen_v2.exe"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "Setup_ThiTrucTuyen_v2.exe"),
+            LOCAL_SETUP_PATH,
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Setup_ThiTrucTuyen_v2.exe"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Output", "Setup_ThiTrucTuyen_v2.exe")
+        ]
     for p in candidates:
         if os.path.exists(p):
-            return p
-    return None
+            return p, filename
+    return None, filename
+

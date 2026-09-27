@@ -43,9 +43,14 @@ async def notify_download_request(req: Dict[str, Any]):
     if not chat_id or not enabled:
         return
 
+    sys_type = (req.get("system_type") or "SEB").upper()
+    os_name = "🍎 macOS (MacBook)" if sys_type in ["MAC", "MACOS"] else "🪟 Windows (.exe)"
+    size_str = "~11MB" if sys_type in ["MAC", "MACOS"] else "~205MB"
+
     text = (
-        "🔔 <b>YÊU CẦU TẢI PHẦN MỀM THI (~200MB)</b>\n\n"
+        f"🔔 <b>YÊU CẦU TẢI PHẦN MỀM THI ({size_str})</b>\n\n"
         f"👤 <b>Học sinh:</b> {req.get('full_name', 'N/A')}\n"
+        f"💻 <b>Hệ điều hành:</b> {os_name}\n"
         f"📧 <b>Email:</b> {req.get('email', 'Chưa cung cấp')}\n"
         f"📝 <b>Lời nhắn:</b> {req.get('note', 'Không có')}\n"
         f"🌐 <b>IP:</b> {req.get('ip_address', 'N/A')}\n"
