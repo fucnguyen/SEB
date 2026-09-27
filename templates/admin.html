@@ -196,6 +196,7 @@
                         <thead class="bg-slate-900/80 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
                             <tr>
                                 <th class="p-3">Học sinh</th>
+                                <th class="p-3">Hệ điều hành</th>
                                 <th class="p-3">Email / SĐT</th>
                                 <th class="p-3">IP Đăng Ký</th>
                                 <th class="p-3">Thời gian</th>
@@ -1099,7 +1100,7 @@
                 tbody.innerHTML = "";
 
                 if (list.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">Chưa có yêu cầu tải nào.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">Chưa có yêu cầu tải nào.</td></tr>`;
                     return;
                 }
 
@@ -1107,36 +1108,47 @@
                     const tr = document.createElement("tr");
                     tr.className = "hover:bg-slate-900/40 transition";
                     
-                    let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] bg-amber-500/20 text-amber-400 border border-amber-500/30">Chờ duyệt</span>`;
+                    let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold">Chờ duyệt</span>`;
                     if (item.status === "approved") {
-                        statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Đã duyệt</span>`;
+                        statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">Đã duyệt</span>`;
                     } else if (item.status === "rejected") {
-                        statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] bg-rose-500/20 text-rose-400 border border-rose-500/30">Từ chối</span>`;
+                        statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold">Từ chối</span>`;
                     }
+
+                    const st = (item.system_type || '').toUpperCase();
+                    let osBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30"><i class="fa-brands fa-windows mr-1"></i>Windows</span>';
+                    if (st.includes('MAC')) {
+                        osBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30"><i class="fa-brands fa-apple mr-1"></i>macOS</span>';
+                    } else if (st === 'EOS' || st === 'PEA') {
+                        osBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"><i class="fa-solid fa-graduation-cap mr-1"></i>EOS/PEA</span>';
+                    }
+
+                    const timeStr = item.created_at ? (item.created_at.includes(' ') ? item.created_at.split(' ')[1] : item.created_at) : '—';
 
                     tr.innerHTML = `
                         <td class="p-3">
                             <span class="font-bold text-white block">${escapeHtml(item.full_name)}</span>
                             <span class="text-[10px] text-slate-500 sm:hidden">${escapeHtml(item.email || '')}</span>
                         </td>
+                        <td class="p-3">${osBadge}</td>
                         <td class="p-3 text-slate-400">${escapeHtml(item.email || '—')}</td>
                         <td class="p-3 font-mono text-[11px] text-blue-300">${escapeHtml(item.ip_address || '—')}</td>
-                        <td class="p-3 text-slate-500 text-[11px]">${item.created_at.split(' ')[1]}</td>
+                        <td class="p-3 text-slate-500 text-[11px] font-mono">${timeStr}</td>
                         <td class="p-3">${statusBadge}</td>
-                        <td class="p-3 text-right space-x-1">
+                        <td class="p-3 text-right space-x-1 whitespace-nowrap">
                             ${item.status === 'pending' ? `
-                                <button onclick="approveDownload('${item.request_id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px]" title="Duyệt cho tải">
+                                <button onclick="approveDownload('${item.request_id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px] shadow transition" title="Duyệt cho tải">
                                     <i class="fa-solid fa-check"></i> Duyệt
                                 </button>
-                                <button onclick="rejectDownload('${item.request_id}')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-semibold text-[11px]" title="Từ chối">
+                                <button onclick="rejectDownload('${item.request_id}')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-semibold text-[11px] transition" title="Từ chối">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                             ` : item.status === 'rejected' ? `
-                                <button onclick="approveDownload('${item.request_id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px]" title="Mở khóa duyệt lại cho học sinh">
+                                <button onclick="approveDownload('${item.request_id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px] transition" title="Mở khóa duyệt lại cho học sinh">
                                     <i class="fa-solid fa-rotate-left"></i> Duyệt Lại
                                 </button>
                             ` : `
-                                <button onclick="rejectDownload('${item.request_id}')" class="px-2 py-1 bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-rose-300 rounded-lg text-[10px]" title="Khóa / Thu hồi quyền tải">
+                                <button onclick="rejectDownload('${item.request_id}')" class="px-2 py-1 bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-rose-300 rounded-lg text-[10px] transition" title="Khóa / Thu hồi quyền tải">
                                     <i class="fa-solid fa-lock"></i> Khóa lại
                                 </button>
                             `}

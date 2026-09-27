@@ -47,6 +47,7 @@ def init_db():
 
     try:
         cursor.execute("ALTER TABLE download_requests ADD COLUMN system_type TEXT DEFAULT 'SEB'")
+        conn.commit()
     except Exception:
         pass
 
@@ -251,7 +252,19 @@ def list_download_requests(limit: int = 50, system_type: Optional[str] = None) -
     conn = get_connection()
     c = conn.cursor()
     if system_type:
-        c.execute("SELECT * FROM download_requests WHERE (system_type = ? OR system_type IS NULL) ORDER BY id DESC LIMIT ?", (system_type.upper(), limit))
+        st = system_type.upper().strip()
+        if st == 'SEB':
+            # Hệ thống SEB bao gồm cả bản Windows, macOS, SEB và dữ liệu cũ (NULL)
+            c.execute("""
+                SELECT * FROM download_requests 
+                WHERE (UPPER(system_type) IN ('SEB', 'WINDOWS', 'MACOS', 'MAC', 'WIN', 'SEB_MAC') 
+                       OR system_type IS NULL) 
+                ORDER BY id DESC LIMIT ?
+            """, (limit,))
+        elif st in ('EOS', 'PEA'):
+            c.execute("SELECT * FROM download_requests WHERE UPPER(system_type) IN ('EOS', 'PEA') ORDER BY id DESC LIMIT ?", (limit,))
+        else:
+            c.execute("SELECT * FROM download_requests WHERE (UPPER(system_type) = ? OR system_type IS NULL) ORDER BY id DESC LIMIT ?", (st, limit))
     else:
         c.execute("SELECT * FROM download_requests ORDER BY id DESC LIMIT ?", (limit,))
     rows = [dict(r) for r in c.fetchall()]

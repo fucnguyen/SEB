@@ -517,20 +517,54 @@ async def api_admin_approve_download(payload: dict):
     token = str(uuid.uuid4())
     expires_at = (database.now_vn() + timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
     success = database.approve_download_request(req_id, token, expires_at)
+    if success:
+        try:
+            row = database.get_download_request(req_id)
+            if row:
+                st_name = row.get("full_name", "Học sinh")
+                sys_t = (row.get("system_type") or "SEB").upper()
+                os_lbl = "🍎 macOS" if sys_t in ["MAC", "MACOS", "SEB_MAC"] else "🪟 Windows"
+                tele_msg = (
+                    f"✅ <b>ĐÃ DUYỆT TẢI PHẦN MỀM THI (TỪ TRANG ADMIN)</b>\n\n"
+                    f"👤 <b>Học sinh:</b> {st_name}\n"
+                    f"💻 <b>Hệ điều hành:</b> {os_lbl}\n"
+                    f"⏳ <b>Hạn link tải:</b> 30 phút (đến {expires_at})\n"
+                    f"ℹ️ <i>Học sinh đã có thể bấm Tải xuống ngay trên web!</i>"
+                )
+                asyncio.create_task(telegram_bot.notify_admin_custom(tele_msg))
+        except Exception:
+            pass
     return {"success": success}
 
 @app.post("/api/admin/reject-download", dependencies=[Depends(require_admin)])
 async def api_admin_reject_download(payload: dict):
     req_id = payload.get("request_id")
     success = database.reject_download_request(req_id)
+    if success:
+        try:
+            row = database.get_download_request(req_id)
+            if row:
+                st_name = row.get("full_name", "Học sinh")
+                tele_msg = (
+                    f"❌ <b>ĐÃ TỪ CHỐI YÊU CẦU TẢI (TỪ TRANG ADMIN)</b>\n\n"
+                    f"👤 <b>Học sinh:</b> {st_name}"
+                )
+                asyncio.create_task(telegram_bot.notify_admin_custom(tele_msg))
+        except Exception:
+            pass
     return {"success": success}
 
 @app.get("/api/admin/licenses", dependencies=[Depends(require_admin)])
 async def api_admin_list_licenses(system_type: Optional[str] = None):
     licenses = database.list_licenses(200)
     if system_type:
-        target = system_type.upper()
-        licenses = [l for l in licenses if (l.get("system_type") or "SEB").upper() == target]
+        target = system_type.upper().strip()
+        if target == 'SEB':
+            licenses = [l for l in licenses if (l.get("system_type") or "SEB").upper() in ('SEB', 'WINDOWS', 'MACOS', 'MAC', 'WIN', 'SEB_MAC')]
+        elif target in ('EOS', 'PEA'):
+            licenses = [l for l in licenses if (l.get("system_type") or "").upper() in ('EOS', 'PEA')]
+        else:
+            licenses = [l for l in licenses if (l.get("system_type") or "SEB").upper() == target]
     return licenses
 
 @app.post("/api/admin/approve-activation", dependencies=[Depends(require_admin)])
@@ -779,11 +813,11 @@ async def api_admin_get_exam_sessions():
 
 @app.get("/api/admin/seb-sessions", dependencies=[Depends(require_admin)])
 async def api_admin_get_seb_sessions():
-    """Lấy danh sách các phiên thi chạy qua hệ thống SEB Browser"""
+    """Lấy danh sách các phiên thi chạy qua hệ thống SEB Browser (tất cả các đề Moodle / LMS / Thi trực tuyến)"""
     all_sessions = database.list_live_exam_sessions()
     seb_sessions = [
         s for s in all_sessions 
-        if "SEB" in (s.get("exam_title") or "").upper() or "SAFEEXAM" in (s.get("exam_title") or "").upper()
+        if not any(k in (s.get("exam_title") or "").upper() for k in ["EOS", "PEA"])
     ]
     return {"success": True, "system": "SEB", "count": len(seb_sessions), "sessions": seb_sessions}
 
