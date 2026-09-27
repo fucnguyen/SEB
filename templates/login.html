@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Đăng Nhập Quản Trị - SEB System</title>
+    <title>Đăng Nhập Hệ Thống - SEB & Support Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,62 +19,157 @@
         .glow-box {
             box-shadow: 0 0 35px -5px rgba(59, 130, 246, 0.3);
         }
+        .glow-box-purple {
+            box-shadow: 0 0 35px -5px rgba(168, 85, 247, 0.3);
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4 selection:bg-blue-600 selection:text-white relative overflow-hidden">
 
     <!-- Ambient glowing backgrounds -->
-    <div class="absolute -top-32 -left-32 w-80 h-80 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none"></div>
-    <div class="absolute -bottom-32 -right-32 w-80 h-80 bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none"></div>
+    <div id="glow-bg-1" class="absolute -top-32 -left-32 w-80 h-80 bg-blue-600/20 rounded-full blur-[100px] pointer-events-none transition-colors duration-500"></div>
+    <div id="glow-bg-2" class="absolute -bottom-32 -right-32 w-80 h-80 bg-indigo-600/20 rounded-full blur-[100px] pointer-events-none transition-colors duration-500"></div>
 
     <div class="w-full max-w-md space-y-6 relative z-10">
         
         <!-- Logo & Header -->
         <div class="text-center space-y-3">
-            <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-2xl shadow-xl shadow-blue-500/25 border border-white/10">
-                <i class="fa-solid fa-shield-halved"></i>
+            <div id="logo-icon-box" class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-2xl shadow-xl shadow-blue-500/25 border border-white/10 transition-all duration-300">
+                <i id="header-icon" class="fa-solid fa-shield-halved"></i>
             </div>
             <div>
-                <h1 class="text-2xl font-extrabold text-white tracking-tight">Cổng Quản Trị Hệ Thống</h1>
-                <p class="text-xs text-slate-400 mt-1">Phân Phối & Kích Hoạt Bản Quyền SEB Online</p>
+                <h1 id="portal-title" class="text-2xl font-extrabold text-white tracking-tight">Cổng Quản Trị Hệ Thống</h1>
+                <p id="portal-subtitle" class="text-xs text-slate-400 mt-1">Phân Phối Bản Quyền & Giám Sát Ca Thi Trực Tuyến</p>
             </div>
         </div>
 
+        <!-- Role Selector Tabs -->
+        <div class="flex bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+            <button id="tab-btn-admin" onclick="switchLoginMode('admin')" class="flex-1 py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2 bg-blue-600 text-white shadow-sm">
+                <i class="fa-solid fa-user-shield"></i> Quản Trị Viên
+            </button>
+            <button id="tab-btn-support" onclick="switchLoginMode('support')" class="flex-1 py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-headset"></i> Nhân Viên Support (CTV)
+            </button>
+        </div>
+
         <!-- Login Card -->
-        <div class="glass-card rounded-2xl p-6 sm:p-8 shadow-2xl glow-box space-y-5">
-            <div>
-                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Mật Khẩu Quản Trị Viên</label>
-                <div class="relative">
-                    <input type="password" id="input-password" placeholder="Nhập mật khẩu quản trị..."
-                        class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition placeholder-slate-500 pr-11"
-                        onkeypress="if(event.key==='Enter') doLogin()">
-                    <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition">
-                        <i id="eye-icon" class="fa-regular fa-eye"></i>
-                    </button>
+        <div id="login-card-container" class="glass-card rounded-2xl p-6 sm:p-8 shadow-2xl glow-box space-y-5 transition-all duration-300">
+            
+            <!-- ADMIN FORM -->
+            <div id="form-admin" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Mật Khẩu Quản Trị Viên</label>
+                    <div class="relative">
+                        <input type="password" id="input-password" placeholder="Nhập mật khẩu quản trị..."
+                            class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition placeholder-slate-500 pr-11 font-mono"
+                            onkeypress="if(event.key==='Enter') doAdminLogin()"
+                            oninput="checkAutoDetectKey(this.value)">
+                        <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition">
+                            <i id="eye-icon" class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
+
+                <button id="btn-admin-login" onclick="doAdminLogin()"
+                    class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] font-bold text-sm rounded-xl transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 text-white">
+                    <i class="fa-solid fa-lock-open text-xs"></i> Đăng Nhập Quản Trị
+                </button>
+            </div>
+
+            <!-- SUPPORT FORM -->
+            <div id="form-support" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span>Mã Key Support (Do Admin Cấp)</span>
+                        <span class="text-[10px] text-purple-400/80 normal-case">Có mã checksum tự kiểm tra</span>
+                    </label>
+                    <div class="relative">
+                        <input type="text" id="input-support-key" placeholder="SUP-XXXX-XXXX-XXXX-XXXX"
+                            class="w-full bg-slate-900/90 border border-purple-500/40 rounded-xl px-4 py-3.5 text-sm text-purple-200 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition placeholder-slate-500 font-mono uppercase tracking-wider text-center"
+                            onkeypress="if(event.key==='Enter') doSupportLogin()"
+                            autocomplete="off" spellcheck="false">
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                        <i class="fa-solid fa-circle-info text-purple-400 mr-1"></i>
+                        Đăng nhập bằng mã Key được cấp. Hệ thống sẽ tự động hiển thị các ca thi và thí sinh được phân công cho bạn trong ngày hôm nay.
+                    </p>
+                </div>
+
+                <button id="btn-support-login" onclick="doSupportLogin()"
+                    class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] font-bold text-sm rounded-xl transition shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 text-white">
+                    <i class="fa-solid fa-right-to-bracket text-xs"></i> Vào Bàn Làm Việc Support
+                </button>
             </div>
 
             <!-- Error message container -->
             <div id="error-msg" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
-                <i class="fa-solid fa-circle-exclamation text-rose-400"></i>
-                <span id="error-text">Mật khẩu không chính xác!</span>
+                <i class="fa-solid fa-circle-exclamation text-rose-400 shrink-0"></i>
+                <span id="error-text">Lỗi xác thực</span>
             </div>
 
-            <button id="btn-login" onclick="doLogin()"
-                class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] font-bold text-sm rounded-xl transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 text-white">
-                <i class="fa-solid fa-lock-open text-xs"></i> Đăng Nhập Hệ Thống
-            </button>
         </div>
 
         <!-- Back Link -->
         <div class="text-center">
             <a href="/" class="text-xs text-slate-500 hover:text-blue-400 transition inline-flex items-center gap-1.5">
-                <i class="fa-solid fa-arrow-left"></i> Quay lại trang học sinh
+                <i class="fa-solid fa-arrow-left"></i> Quay lại trang chủ học sinh
             </a>
         </div>
     </div>
 
     <script>
+        let currentMode = 'admin';
+
+        function switchLoginMode(mode) {
+            currentMode = mode;
+            const tabAdmin = document.getElementById("tab-btn-admin");
+            const tabSupport = document.getElementById("tab-btn-support");
+            const formAdmin = document.getElementById("form-admin");
+            const formSupport = document.getElementById("form-support");
+            const errBox = document.getElementById("error-msg");
+            const card = document.getElementById("login-card-container");
+            const logoBox = document.getElementById("logo-icon-box");
+            const headerIcon = document.getElementById("header-icon");
+            const title = document.getElementById("portal-title");
+            const subtitle = document.getElementById("portal-subtitle");
+
+            errBox.classList.add("hidden");
+
+            if (mode === 'support') {
+                tabAdmin.className = "flex-1 py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2 text-slate-400 hover:text-white";
+                tabSupport.className = "flex-1 py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2 bg-purple-600 text-white shadow-sm";
+                formAdmin.classList.add("hidden");
+                formSupport.classList.remove("hidden");
+                card.className = "glass-card rounded-2xl p-6 sm:p-8 shadow-2xl glow-box-purple space-y-5 transition-all duration-300";
+                logoBox.className = "w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-2xl shadow-xl shadow-purple-500/25 border border-white/10 transition-all duration-300";
+                headerIcon.className = "fa-solid fa-headset";
+                title.innerText = "Cổng Hỗ Trợ Ca Thi (CTV)";
+                subtitle.innerText = "Hỗ Trợ Giải Đề & Cập Nhật Đáp Án Thí Sinh";
+                setTimeout(() => document.getElementById("input-support-key").focus(), 100);
+            } else {
+                tabSupport.className = "flex-1 py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2 text-slate-400 hover:text-white";
+                tabAdmin.className = "flex-1 py-2 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2 bg-blue-600 text-white shadow-sm";
+                formSupport.classList.add("hidden");
+                formAdmin.classList.remove("hidden");
+                card.className = "glass-card rounded-2xl p-6 sm:p-8 shadow-2xl glow-box space-y-5 transition-all duration-300";
+                logoBox.className = "w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 mx-auto flex items-center justify-center text-white text-2xl shadow-xl shadow-blue-500/25 border border-white/10 transition-all duration-300";
+                headerIcon.className = "fa-solid fa-shield-halved";
+                title.innerText = "Cổng Quản Trị Hệ Thống";
+                subtitle.innerText = "Phân Phối Bản Quyền & Giám Sát Ca Thi Trực Tuyến";
+                setTimeout(() => document.getElementById("input-password").focus(), 100);
+            }
+        }
+
+        function checkAutoDetectKey(val) {
+            val = val.trim().toUpperCase();
+            if (val.startsWith("SUP-")) {
+                switchLoginMode('support');
+                document.getElementById("input-support-key").value = val;
+                document.getElementById("input-password").value = "";
+            }
+        }
+
         function togglePasswordVisibility() {
             const input = document.getElementById("input-password");
             const icon = document.getElementById("eye-icon");
@@ -87,10 +182,10 @@
             }
         }
 
-        async function doLogin() {
+        async function doAdminLogin() {
             const password = document.getElementById("input-password").value;
             const errBox = document.getElementById("error-msg");
-            const btn = document.getElementById("btn-login");
+            const btn = document.getElementById("btn-admin-login");
 
             errBox.classList.add("hidden");
             btn.disabled = true;
@@ -111,15 +206,63 @@
                     errBox.classList.remove("hidden");
                     document.getElementById("error-text").innerText = data.message || "Mật khẩu không đúng!";
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-lock-open text-xs"></i> Đăng Nhập Hệ Thống';
+                    btn.innerHTML = '<i class="fa-solid fa-lock-open text-xs"></i> Đăng Nhập Quản Trị';
                 }
             } catch (err) {
                 errBox.classList.remove("hidden");
                 document.getElementById("error-text").innerText = "Lỗi kết nối máy chủ!";
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-lock-open text-xs"></i> Đăng Nhập Hệ Thống';
+                btn.innerHTML = '<i class="fa-solid fa-lock-open text-xs"></i> Đăng Nhập Quản Trị';
             }
         }
+
+        async function doSupportLogin() {
+            const keyCode = document.getElementById("input-support-key").value.trim().toUpperCase();
+            const errBox = document.getElementById("error-msg");
+            const btn = document.getElementById("btn-support-login");
+
+            if (!keyCode) {
+                errBox.classList.remove("hidden");
+                document.getElementById("error-text").innerText = "Vui lòng nhập mã Key Support!";
+                return;
+            }
+
+            errBox.classList.add("hidden");
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Đang kiểm tra Key...';
+
+            try {
+                const res = await fetch("/api/support/login", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({key_code: keyCode})
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    btn.innerHTML = '<i class="fa-solid fa-check text-xs"></i> Key hợp lệ! Đang vào bàn làm việc...';
+                    window.location.href = data.redirect || "/support";
+                } else {
+                    errBox.classList.remove("hidden");
+                    document.getElementById("error-text").innerText = data.message || "Key không hợp lệ!";
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-right-to-bracket text-xs"></i> Vào Bàn Làm Việc Support';
+                }
+            } catch (err) {
+                errBox.classList.remove("hidden");
+                document.getElementById("error-text").innerText = "Lỗi kết nối máy chủ!";
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-right-to-bracket text-xs"></i> Vào Bàn Làm Việc Support';
+            }
+        }
+
+        // Check URL params on load
+        window.addEventListener("DOMContentLoaded", () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get("tab") === "support") {
+                switchLoginMode("support");
+            }
+        });
     </script>
 </body>
 </html>

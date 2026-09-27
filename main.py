@@ -84,7 +84,98 @@ def require_admin(request: Request):
         raise HTTPException(status_code=401, detail="Chưa đăng nhập quyền Quản trị viên!")
     return True
 
+# ────────────────── Support Authentication ──────────────────
+SUPPORT_COOKIE_NAME = "seb_support_token"
+SUPPORT_AUTH_SALT = "seb_support_auth_salt_super_secret_2026"
+
+def create_support_session_token(support_key: str) -> str:
+    key_clean = support_key.strip().upper()
+    sig = hashlib.sha256(f"{key_clean}:{SUPPORT_AUTH_SALT}".encode()).hexdigest()
+    return f"{key_clean}:{sig}"
+
+def verify_support_session_token(token: str) -> Optional[str]:
+    if not token or ":" not in token:
+        return None
+    parts = token.split(":", 1)
+    if len(parts) != 2:
+        return None
+    key_clean, sig = parts
+    expected_sig = hashlib.sha256(f"{key_clean}:{SUPPORT_AUTH_SALT}".encode()).hexdigest()
+    if sig != expected_sig:
+        return None
+    return key_clean
+
+def is_support_authenticated(request: Request) -> bool:
+    token = request.cookies.get(SUPPORT_COOKIE_NAME) or request.headers.get("x-support-token")
+    if not token:
+        return False
+    key_clean = verify_support_session_token(token)
+    if not key_clean:
+        return False
+    k = database.get_support_key(key_clean)
+    if not k or k.get("status") != "active":
+        return False
+    exp = k.get("expires_at")
+    if exp:
+        today_str = database.now_vn().strftime("%Y-%m-%d")
+        if today_str > exp:
+            return False
+    return True
+
+def get_current_support(request: Request) -> Dict[str, Any]:
+    token = request.cookies.get(SUPPORT_COOKIE_NAME) or request.headers.get("x-support-token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Chưa đăng nhập Support Key!")
+    key_clean = verify_support_session_token(token)
+    if not key_clean:
+        raise HTTPException(status_code=401, detail="Token Support không hợp lệ!")
+    k = database.get_support_key(key_clean)
+    if not k:
+        raise HTTPException(status_code=401, detail="Support Key không tồn tại trên hệ thống!")
+    if k.get("status") == "suspended":
+        raise HTTPException(status_code=403, detail="Key của bạn đang bị TẠM KHÓA bởi Quản trị viên!")
+    if k.get("status") == "locked":
+        raise HTTPException(status_code=403, detail="Key của bạn đã bị KHÓA vĩnh viễn!")
+    exp = k.get("expires_at")
+    if exp:
+        today_str = database.now_vn().strftime("%Y-%m-%d")
+        if today_str > exp:
+            raise HTTPException(status_code=403, detail=f"Key đã hết hạn sử dụng vào ngày {exp}!")
+    return k
+
 # ────────────────── Pydantic Request Models ──────────────────
+
+class SupportLoginModel(BaseModel):
+    key_code: str
+
+class SupportKeyCreateModel(BaseModel):
+    assigned_name: str
+    email: Optional[str] = ""
+    phone: Optional[str] = ""
+    note: Optional[str] = ""
+    expires_at: Optional[str] = ""
+
+class SupportKeyStatusModel(BaseModel):
+    key_code: str
+    status: str
+
+class SupportKeyExpiryModel(BaseModel):
+    key_code: str
+    expires_at: str
+
+class SupportAssignmentCreateModel(BaseModel):
+    support_key: str
+    hwid: str
+    student_name: Optional[str] = ""
+    exam_date: str
+    exam_shift: Optional[str] = ""
+    subject: Optional[str] = ""
+    notes: Optional[str] = ""
+
+class SupportSetAnswerModel(BaseModel):
+    hwid: str
+    question_index: int
+    answer: str
 
 class LoginModel(BaseModel):
     password: str
@@ -213,7 +304,16 @@ async def page_mock_exam(request: Request):
 async def page_login(request: Request):
     if is_admin_authenticated(request):
         return RedirectResponse(url="/admin", status_code=303)
+    if is_support_authenticated(request):
+        return RedirectResponse(url="/support", status_code=303)
     return templates.TemplateResponse(request=request, name="login.html")
+
+@app.get("/support", response_class=HTMLResponse)
+async def page_support(request: Request):
+    if not is_support_authenticated(request):
+        if not is_admin_authenticated(request):
+            return RedirectResponse(url="/login?tab=support", status_code=303)
+    return templates.TemplateResponse(request=request, name="support.html")
 
 @app.get("/admin", response_class=HTMLResponse)
 async def page_admin(request: Request):
@@ -225,6 +325,12 @@ async def page_admin(request: Request):
 async def admin_logout():
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie(AUTH_COOKIE_NAME)
+    return response
+
+@app.get("/api/support/logout")
+async def api_support_logout():
+    response = RedirectResponse(url="/login?tab=support", status_code=303)
+    response.delete_cookie(SUPPORT_COOKIE_NAME)
     return response
 
 # ────────────────── Admin Authentication API ──────────────────
@@ -1081,12 +1187,166 @@ async def api_admin_push_exam(payload: PushExamModel):
 async def api_admin_delete_exam_session(hwid: str):
     """Xoá sạch phiên thi của một học sinh"""
     try:
-        database.db.execute("DELETE FROM live_exam_questions WHERE hwid=?", (hwid,))
-        database.db.execute("DELETE FROM live_exam_sessions WHERE hwid=?", (hwid,))
-        database.db.commit()
+        conn = database.get_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM live_exam_questions WHERE hwid=?", (hwid,))
+        c.execute("DELETE FROM live_exam_sessions WHERE hwid=?", (hwid,))
+        conn.commit()
+        conn.close()
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+# ────────────────── Support API Endpoints ──────────────────
+
+@app.post("/api/support/login")
+async def api_support_login(payload: SupportLoginModel):
+    key = payload.key_code.strip().upper()
+    if not database.verify_support_key_checksum(key):
+        return JSONResponse(status_code=400, content={"success": False, "message": "Mã Key sai định dạng hoặc mã kiểm tra (checksum) không hợp lệ!"})
+    
+    k = database.get_support_key(key)
+    if not k:
+        return JSONResponse(status_code=404, content={"success": False, "message": "Mã Key Support không tồn tại trên hệ thống!"})
+    
+    if k.get("status") == "suspended":
+        return JSONResponse(status_code=403, content={"success": False, "message": "Key của bạn đang bị TẠM KHÓA bởi Quản trị viên!"})
+    if k.get("status") == "locked":
+        return JSONResponse(status_code=403, content={"success": False, "message": "Key của bạn đã bị KHÓA vĩnh viễn!"})
+    
+    exp = k.get("expires_at")
+    if exp:
+        today_str = database.now_vn().strftime("%Y-%m-%d")
+        if today_str > exp:
+            return JSONResponse(status_code=403, content={"success": False, "message": f"Mã Key đã hết hạn sử dụng vào ngày {exp}!"})
+            
+    database.update_support_key_last_login(key)
+    token = create_support_session_token(key)
+    
+    res = JSONResponse(content={
+        "success": True,
+        "message": f"Xin chào {k.get('assigned_name')}! Đăng nhập thành công.",
+        "assigned_name": k.get("assigned_name"),
+        "key_code": key,
+        "redirect": "/support"
+    })
+    res.set_cookie(
+        key=SUPPORT_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        max_age=86400 * 3,
+        samesite="lax"
+    )
+    return res
+
+@app.get("/api/support/me")
+async def api_support_me(current_support: Dict[str, Any] = Depends(get_current_support)):
+    return {
+        "success": True,
+        "key_code": current_support["key_code"],
+        "assigned_name": current_support["assigned_name"],
+        "status": current_support["status"],
+        "today": database.now_vn().strftime("%Y-%m-%d"),
+        "expires_at": current_support.get("expires_at") or "Vĩnh viễn"
+    }
+
+@app.get("/api/support/exams")
+async def api_support_get_exams(current_support: Dict[str, Any] = Depends(get_current_support)):
+    """Chỉ trả về các ca thi và máy được Admin phân công cho Support này trong ngày HÔM NAY"""
+    today_vn = database.now_vn().strftime("%Y-%m-%d")
+    result = database.get_support_assigned_exams_for_date(current_support["key_code"], today_vn)
+    return result
+
+@app.get("/api/support/exam-questions/{hwid}")
+async def api_support_get_questions(hwid: str, current_support: Dict[str, Any] = Depends(get_current_support)):
+    """Lấy danh sách câu hỏi của thí sinh. Kiểm tra nghiêm ngặt quyền gán máy trong ngày!"""
+    today_vn = database.now_vn().strftime("%Y-%m-%d")
+    if not database.is_hwid_assigned_to_support(current_support["key_code"], hwid, today_vn):
+        raise HTTPException(status_code=403, detail="Bạn không được phân công hỗ trợ máy này trong ngày hôm nay!")
+    return database.get_live_exam_questions(hwid)
+
+@app.post("/api/support/exam-set-answer")
+async def api_support_set_answer(payload: SupportSetAnswerModel, current_support: Dict[str, Any] = Depends(get_current_support)):
+    """Support chọn đáp án cho thí sinh được phân công"""
+    today_vn = database.now_vn().strftime("%Y-%m-%d")
+    if not database.is_hwid_assigned_to_support(current_support["key_code"], payload.hwid, today_vn):
+        raise HTTPException(status_code=403, detail="Bạn không được phân công hỗ trợ máy này trong ngày hôm nay!")
+    
+    success = database.set_question_support_answer(
+        hwid=payload.hwid,
+        question_index=payload.question_index,
+        support_answer=payload.answer
+    )
+    return {"success": success}
+
+# ────────────────── Admin Support & Assignment Management APIs ──────────────────
+
+@app.get("/api/admin/support-keys", dependencies=[Depends(require_admin)])
+async def api_admin_list_support_keys():
+    keys = database.list_support_keys()
+    return {"success": True, "keys": keys}
+
+@app.post("/api/admin/support-keys", dependencies=[Depends(require_admin)])
+async def api_admin_create_support_key(payload: SupportKeyCreateModel):
+    if not payload.assigned_name.strip():
+        return JSONResponse(status_code=400, content={"success": False, "message": "Tên người nhận key không được để trống!"})
+    
+    k = database.create_support_key(
+        assigned_name=payload.assigned_name,
+        email=payload.email or "",
+        phone=payload.phone or "",
+        note=payload.note or "",
+        expires_at=payload.expires_at or ""
+    )
+    return {"success": True, "key": k}
+
+@app.post("/api/admin/support-keys/status", dependencies=[Depends(require_admin)])
+async def api_admin_update_support_key_status(payload: SupportKeyStatusModel):
+    success = database.update_support_key_status(payload.key_code, payload.status)
+    if not success:
+        return JSONResponse(status_code=400, content={"success": False, "message": "Không tìm thấy key hoặc trạng thái không hợp lệ!"})
+    return {"success": True, "message": f"Đã chuyển trạng thái key sang {payload.status}"}
+
+@app.post("/api/admin/support-keys/expiry", dependencies=[Depends(require_admin)])
+async def api_admin_update_support_key_expiry(payload: SupportKeyExpiryModel):
+    success = database.update_support_key_expiry(payload.key_code, payload.expires_at)
+    return {"success": success}
+
+@app.delete("/api/admin/support-keys/{key_code}", dependencies=[Depends(require_admin)])
+async def api_admin_delete_support_key(key_code: str):
+    success = database.delete_support_key(key_code)
+    return {"success": success}
+
+@app.get("/api/admin/support-assignments", dependencies=[Depends(require_admin)])
+async def api_admin_list_assignments(support_key: Optional[str] = None, exam_date: Optional[str] = None):
+    assignments = database.list_support_assignments(support_key=support_key, exam_date=exam_date)
+    return {"success": True, "assignments": assignments}
+
+@app.post("/api/admin/support-assignments", dependencies=[Depends(require_admin)])
+async def api_admin_create_assignment(payload: SupportAssignmentCreateModel):
+    if not payload.support_key.strip():
+        return JSONResponse(status_code=400, content={"success": False, "message": "Chưa chọn mã Key Support!"})
+    if not payload.hwid.strip():
+        return JSONResponse(status_code=400, content={"success": False, "message": "Chưa nhập mã HWID của thí sinh!"})
+    if not payload.exam_date.strip():
+        return JSONResponse(status_code=400, content={"success": False, "message": "Chưa chọn ngày thi!"})
+    
+    assignment = database.create_support_assignment(
+        support_key=payload.support_key,
+        hwid=payload.hwid,
+        student_name=payload.student_name or "",
+        exam_date=payload.exam_date,
+        exam_shift=payload.exam_shift or "",
+        subject=payload.subject or "",
+        notes=payload.notes or ""
+    )
+    return {"success": True, "assignment": assignment}
+
+@app.delete("/api/admin/support-assignments/{assignment_id}", dependencies=[Depends(require_admin)])
+async def api_admin_delete_assignment(assignment_id: int):
+    success = database.delete_support_assignment(assignment_id)
+    return {"success": success}
+
 
 
 # ────────────────── Telegram Webhook ──────────────────

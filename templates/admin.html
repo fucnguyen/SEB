@@ -151,6 +151,9 @@
             <button onclick="switchTab('tab-settings')" id="btn-tab-settings" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-gears"></i> Cấu Hình Hệ Thống
             </button>
+            <button onclick="switchTab('tab-support-mgmt')" id="btn-tab-support-mgmt" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-purple-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-headset text-purple-400"></i> Quản Lý Support & Phân Ca (<span id="badge-support-keys-count">0</span>)
+            </button>
         </div>
 
         <!-- SUB-NAVIGATION BAR FOR EOS & PEA SYSTEM MODE -->
@@ -178,6 +181,9 @@
             </button>
             <button onclick="switchTab('tab-settings')" id="btn-tab-eos-settings" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-gears"></i> Cấu Hình EOS/PEA
+            </button>
+            <button onclick="switchTab('tab-support-mgmt')" id="btn-tab-eos-support-mgmt" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-purple-400 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-headset text-purple-400"></i> Quản Lý Support & Phân Ca
             </button>
         </div>
 
@@ -624,6 +630,164 @@
             </div>
         </div>
 
+        <!-- TAB: Quản Lý Support & Phân Ca -->
+        <div id="tab-support-mgmt" class="hidden space-y-6">
+            
+            <!-- Header bar & Quick Stats -->
+            <div class="glass-card rounded-2xl p-5 border border-slate-800 shadow-xl space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 pb-3 border-b border-slate-800/80">
+                    <div>
+                        <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-headset text-purple-400"></i> Quản Lý Mã Key Support & Phân Ca Thí Sinh
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Cấp key bảo mật cho CTV / Support, gắn máy theo ngày thi, khóa hoặc tạm khóa từ xa</p>
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button onclick="openCreateSupportKeyModal()" class="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-lg shadow-purple-600/25">
+                            <i class="fa-solid fa-key"></i> + Cấp Key Support Mới
+                        </button>
+                        <button onclick="openAssignSupportModal()" class="px-3.5 py-2 bg-purple-950/80 hover:bg-purple-900 border border-purple-700/60 text-purple-200 rounded-xl text-xs font-bold flex items-center gap-2 transition">
+                            <i class="fa-solid fa-calendar-plus"></i> + Phân Ca / Gắn Máy
+                        </button>
+                        <button onclick="loadSupportMgmtData()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition border border-slate-700" title="Làm mới">
+                            <i id="btn-sup-refresh" class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4 Quick Stats -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-semibold block uppercase">Tổng Key Đã Cấp</span>
+                            <span id="stat-sup-total" class="text-xl font-black text-purple-400 mt-0.5 block">0</span>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 text-sm">
+                            <i class="fa-solid fa-key"></i>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-semibold block uppercase">Đang Hoạt Động</span>
+                            <span id="stat-sup-active" class="text-xl font-black text-emerald-400 mt-0.5 block">0</span>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 text-sm">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-semibold block uppercase">Đang Tạm Khóa</span>
+                            <span id="stat-sup-suspended" class="text-xl font-black text-amber-400 mt-0.5 block">0</span>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 text-sm">
+                            <i class="fa-solid fa-pause"></i>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] text-slate-400 font-semibold block uppercase">Phân Ca Hôm Nay</span>
+                            <span id="stat-sup-today-assigned" class="text-xl font-black text-blue-400 mt-0.5 block">0</span>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 text-sm">
+                            <i class="fa-solid fa-calendar-day"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 1: DANH SÁCH MÃ KEY SUPPORT -->
+            <div class="glass-card rounded-2xl overflow-hidden shadow-xl border border-slate-800">
+                <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-slate-900/70">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-id-badge text-purple-400"></i>
+                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">Danh Sách Mã Key Support (CTV)</h3>
+                        <span id="sup-keys-table-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300">0</span>
+                    </div>
+                    <div class="w-full sm:w-64 relative">
+                        <input type="text" id="filter-sup-key-input" oninput="filterSupportKeysTable()" placeholder="Tìm tên CTV / Mã key..."
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500 pr-8">
+                        <i class="fa-solid fa-magnifying-glass absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800 text-[11px]">
+                                <th class="p-3">Mã Key Support</th>
+                                <th class="p-3">Người Nhận / CTV</th>
+                                <th class="p-3">Trạng Thái</th>
+                                <th class="p-3">Hạn Dùng</th>
+                                <th class="p-3">Đăng Nhập Gần Nhất</th>
+                                <th class="p-3">Ghi Chú</th>
+                                <th class="p-3 text-right">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sup-keys-table-body" class="divide-y divide-slate-800/60">
+                            <tr>
+                                <td colspan="7" class="p-6 text-center text-slate-500">
+                                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải danh sách key support...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECTION 2: BẢNG PHÂN CA THI & GẮN MÁY THI SINH -->
+            <div class="glass-card rounded-2xl overflow-hidden shadow-xl border border-slate-800">
+                <div class="p-4 border-b border-slate-800 flex flex-col md:flex-row justify-between md:items-center gap-3 bg-slate-900/70">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-check text-indigo-400"></i>
+                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">Lịch Thi & Phân Công Máy Theo Ngày</h3>
+                        <span id="sup-assignments-table-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300">0</span>
+                    </div>
+
+                    <!-- Filters for Assignments -->
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <select id="filter-assign-date" onchange="filterAssignmentsTable()" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                            <option value="">Tất cả các ngày</option>
+                            <option value="today" selected>Hôm nay</option>
+                            <option value="tomorrow">Ngày mai</option>
+                        </select>
+                        <select id="filter-assign-support" onchange="filterAssignmentsTable()" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                            <option value="">Tất cả Support</option>
+                        </select>
+                        <div class="relative w-44">
+                            <input type="text" id="filter-assign-search" oninput="filterAssignmentsTable()" placeholder="Tìm thí sinh / HWID..."
+                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500 pr-7">
+                            <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800 text-[11px]">
+                                <th class="p-3">Ngày Thi</th>
+                                <th class="p-3">Ca / Giờ Thi</th>
+                                <th class="p-3">Môn Thi</th>
+                                <th class="p-3">Thí Sinh & HWID</th>
+                                <th class="p-3">Support Phụ Trách</th>
+                                <th class="p-3">Ghi Chú</th>
+                                <th class="p-3 text-right">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sup-assignments-table-body" class="divide-y divide-slate-800/60">
+                            <tr>
+                                <td colspan="7" class="p-6 text-center text-slate-500">
+                                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải dữ liệu phân ca...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
     </main>
 
     <!-- Modal: Tạo Key Thủ Công -->
@@ -873,6 +1037,165 @@
         </div>
     </div>
 
+    <!-- Modal: Cấp Key Support Mới -->
+    <div id="modal-create-support-key" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="glass-card max-w-lg w-full rounded-2xl p-6 border border-slate-700 space-y-4 shadow-2xl overflow-y-auto max-h-[92vh]">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-key text-purple-400"></i> Cấp Mã Key Support Mới
+                </h3>
+                <button onclick="closeCreateSupportKeyModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div id="create-key-form" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Tên Người Nhận / CTV <span class="text-rose-400">*</span></label>
+                    <input type="text" id="sup-input-name" placeholder="Ví dụ: Hoàng Minh - CTV Giải Đề"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Email (tùy chọn)</label>
+                        <input type="email" id="sup-input-email" placeholder="email@gmail.com"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Số Điện Thoại (tùy chọn)</label>
+                        <input type="text" id="sup-input-phone" placeholder="09xxxxxxxx"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Thời Hạn Sử Dụng</label>
+                    <select id="sup-input-duration" onchange="toggleCustomKeyExpiry(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                        <option value="lifetime" selected>Vĩnh viễn (Không hết hạn)</option>
+                        <option value="1d">1 Ngày (24 Giờ)</option>
+                        <option value="3d">3 Ngày</option>
+                        <option value="7d">7 Ngày (1 Tuần)</option>
+                        <option value="30d">30 Ngày (1 Tháng)</option>
+                        <option value="custom">Tùy chọn ngày hết hạn cụ thể...</option>
+                    </select>
+                </div>
+
+                <div id="sup-custom-date-box" class="hidden">
+                    <label class="block text-xs font-semibold text-purple-300 mb-1">Chọn Ngày Hết Hạn (YYYY-MM-DD)</label>
+                    <input type="date" id="sup-input-custom-date" class="w-full bg-slate-900 border border-purple-500/50 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Ghi Chú Của Admin</label>
+                    <textarea id="sup-input-note" rows="2" placeholder="Ghi chú môn thi phụ trách, ca làm việc..."
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"></textarea>
+                </div>
+
+                <div class="pt-2">
+                    <button id="btn-submit-create-key" onclick="submitCreateSupportKey()" class="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl transition shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-key"></i> Tạo Mã Key Support
+                    </button>
+                </div>
+            </div>
+
+            <!-- Result Box after created -->
+            <div id="create-key-result" class="hidden space-y-4 pt-2">
+                <div class="p-4 rounded-xl bg-purple-950/40 border border-purple-500/40 text-center space-y-2">
+                    <span class="text-xs text-purple-300 font-semibold uppercase tracking-wider block">Mã Key Support Đã Tạo Thành Công</span>
+                    <div id="result-key-code" class="text-lg sm:text-xl font-mono font-black text-white bg-slate-900 py-2.5 px-3 rounded-xl border border-purple-500/50 select-all tracking-wider text-center">
+                        SUP-XXXX-XXXX-XXXX-XXXX
+                    </div>
+                    <p class="text-[11px] text-slate-400">Key có mã kiểm tra tính hợp lệ SHA-256. Gửi mã này cho Support để họ đăng nhập vào <code>/support</code> hoặc tab Support trên trang đăng nhập.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="copyGeneratedSupportKey()" class="flex-1 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+                        <i class="fa-regular fa-copy"></i> Sao Chép Mã Key
+                    </button>
+                    <button onclick="resetAndCreateAnotherKey()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition">
+                        Tạo Tiếp
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal: Phân Ca / Gắn Máy Cho Support -->
+    <div id="modal-assign-support-machine" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="glass-card max-w-lg w-full rounded-2xl p-6 border border-slate-700 space-y-4 shadow-2xl overflow-y-auto max-h-[92vh]">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-plus text-indigo-400"></i> Phân Ca & Gắn Máy Cho Support
+                </h3>
+                <button onclick="closeAssignSupportModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Chọn Support Nhận Ca <span class="text-rose-400">*</span></label>
+                    <select id="assign-input-support-key" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                        <option value="">-- Chọn Support Key --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Chọn Máy / Thí Sinh <span class="text-rose-400">*</span></label>
+                    <select id="assign-input-hwid-select" onchange="onAssignCandidateSelected(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+                        <option value="">-- Chọn thí sinh từ danh sách hệ thống --</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Mã HWID Máy</label>
+                        <input type="text" id="assign-input-hwid" placeholder="Nhập hoặc tự điền HWID"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-purple-300 font-mono focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Tên Thí Sinh</label>
+                        <input type="text" id="assign-input-name" placeholder="Tên học sinh"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Ngày Thi (YYYY-MM-DD) <span class="text-rose-400">*</span></label>
+                        <input type="date" id="assign-input-date"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Ca / Giờ Thi</label>
+                        <input type="text" id="assign-input-shift" placeholder="Ví dụ: Ca 1 (07:30 - 09:00)"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Môn Thi / Tiêu Đề Bài Thi</label>
+                    <input type="text" id="assign-input-subject" placeholder="Ví dụ: PRF192 - Lập Trình C, CS101..."
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Ghi Chú Phân Công</label>
+                    <input type="text" id="assign-input-notes" placeholder="Ví dụ: Đề thi khó, ưu tiên làm nhanh câu tự luận..."
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+                </div>
+
+                <div class="p-2.5 rounded-xl bg-purple-950/20 border border-purple-800/40 text-[11px] text-purple-300 leading-relaxed">
+                    <i class="fa-solid fa-shield-halved mr-1 text-purple-400"></i>
+                    <strong>Cơ chế bảo mật nghiêm ngặt:</strong> Vào đúng ngày thi đã chọn, máy thí sinh này mới xuất hiện trong bàn làm việc của Support được chỉ định. Support không thể xem máy này vào ngày khác hoặc xem máy của người khác!
+                </div>
+
+                <div class="pt-2">
+                    <button id="btn-submit-assign" onclick="submitCreateSupportAssignment()" class="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm rounded-xl transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check"></i> Xác Nhận Phân Công
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Admin JS Scripts -->
     <script>
         let allLicenses = [];
@@ -884,11 +1207,12 @@
             loadLicenses();
             loadAccessLogs();
             loadSettings();
+            loadSupportMgmtData();
             setInterval(loadDashboardStats, 5000);
         });
 
         function switchTab(tabId) {
-            const tabs = ["tab-downloads", "tab-licenses", "tab-logs", "tab-chats", "tab-settings", "tab-exam-support", "tab-fpt-main", "tab-seb-main", "tab-exam-builder"];
+            const tabs = ["tab-downloads", "tab-licenses", "tab-logs", "tab-chats", "tab-settings", "tab-exam-support", "tab-fpt-main", "tab-seb-main", "tab-exam-builder", "tab-support-mgmt"];
             tabs.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.add("hidden");
@@ -920,6 +1244,7 @@
             if (tabId === "tab-exam-support") loadExamSessions();
             if (tabId === "tab-fpt-main") loadFPTSectionData();
             if (tabId === "tab-seb-main") loadSEBSectionData();
+            if (tabId === "tab-support-mgmt") loadSupportMgmtData();
         }
 
         let cachedFPTSessions = [];
@@ -2912,6 +3237,564 @@
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape") closeImageLightbox();
         });
+
+        // ────────────────── Support Keys & Scheduling Management ──────────────────
+        let cachedSupportKeys = [];
+        let cachedSupportAssignments = [];
+
+        async function loadSupportMgmtData() {
+            const btnRefresh = document.getElementById("btn-sup-refresh");
+            if (btnRefresh) btnRefresh.classList.add("fa-spin");
+
+            try {
+                // 1. Load Support Keys
+                const keysRes = await fetch("/api/admin/support-keys");
+                if (keysRes.ok) {
+                    const keysData = await keysRes.json();
+                    cachedSupportKeys = keysData.keys || [];
+                    renderSupportKeysTable(cachedSupportKeys);
+                    updateSupportKeyStats(cachedSupportKeys);
+                    populateSupportKeyDropdowns(cachedSupportKeys);
+                }
+
+                // 2. Load Support Assignments
+                const assignRes = await fetch("/api/admin/support-assignments");
+                if (assignRes.ok) {
+                    const assignData = await assignRes.json();
+                    cachedSupportAssignments = assignData.assignments || [];
+                    renderSupportAssignmentsTable(cachedSupportAssignments);
+                    updateAssignmentStats(cachedSupportAssignments);
+                }
+
+                // Update HWID candidate list for assignment modal
+                populateCandidateDropdown();
+
+            } catch (err) {
+                console.error("loadSupportMgmtData error:", err);
+            } finally {
+                if (btnRefresh) {
+                    setTimeout(() => btnRefresh.classList.remove("fa-spin"), 400);
+                }
+            }
+        }
+
+        function updateSupportKeyStats(keys) {
+            const totalEl = document.getElementById("stat-sup-total");
+            const activeEl = document.getElementById("stat-sup-active");
+            const suspendedEl = document.getElementById("stat-sup-suspended");
+            const countBadge = document.getElementById("badge-support-keys-count");
+            const tableBadge = document.getElementById("sup-keys-table-count");
+
+            const total = keys.length;
+            const active = keys.filter(k => k.status === 'active').length;
+            const suspended = keys.filter(k => k.status === 'suspended').length;
+
+            if (totalEl) totalEl.innerText = total;
+            if (activeEl) activeEl.innerText = active;
+            if (suspendedEl) suspendedEl.innerText = suspended;
+            if (countBadge) countBadge.innerText = total;
+            if (tableBadge) tableBadge.innerText = total;
+        }
+
+        function updateAssignmentStats(assignments) {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const todayCount = assignments.filter(a => a.exam_date === todayStr).length;
+            const todayStatEl = document.getElementById("stat-sup-today-assigned");
+            const assignBadge = document.getElementById("sup-assignments-table-count");
+
+            if (todayStatEl) todayStatEl.innerText = todayCount;
+            if (assignBadge) assignBadge.innerText = assignments.length;
+        }
+
+        function renderSupportKeysTable(keys) {
+            const tbody = document.getElementById("sup-keys-table-body");
+            if (!tbody) return;
+
+            if (keys.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="p-8 text-center text-slate-500">
+                            <i class="fa-solid fa-key text-3xl text-slate-600 mb-2 block"></i>
+                            Chưa có mã Key Support nào được cấp. Bấm nút <strong>"+ Cấp Key Support Mới"</strong> để tạo key đầu tiên!
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = "";
+            const todayStr = new Date().toISOString().slice(0, 10);
+
+            keys.forEach(k => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-900/40 transition border-b border-slate-800/40";
+
+                // Status Badge
+                let statusBadge = '';
+                let toggleActionBtn = '';
+
+                if (k.expires_at && todayStr > k.expires_at) {
+                    statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-700 text-slate-300">Đã Hết Hạn</span>`;
+                    toggleActionBtn = `<button onclick="updateSupportKeyStatus('${k.key_code}', 'active')" class="px-2 py-1 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/50 text-emerald-300 rounded-lg text-[10px] font-semibold transition" title="Gia hạn / Kích hoạt lại">Mở lại</button>`;
+                } else if (k.status === 'active') {
+                    statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 w-max"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Hoạt Động</span>`;
+                    toggleActionBtn = `<button onclick="updateSupportKeyStatus('${k.key_code}', 'suspended')" class="px-2 py-1 bg-amber-950/60 hover:bg-amber-900 border border-amber-700/50 text-amber-300 rounded-lg text-[10px] font-semibold transition" title="Tạm dừng quyền đăng nhập">Tạm Khóa</button>`;
+                } else if (k.status === 'suspended') {
+                    statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">Tạm Khóa</span>`;
+                    toggleActionBtn = `<button onclick="updateSupportKeyStatus('${k.key_code}', 'active')" class="px-2 py-1 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/50 text-emerald-300 rounded-lg text-[10px] font-semibold transition" title="Mở khóa để CTV tiếp tục hỗ trợ">Mở Khóa</button>`;
+                } else {
+                    statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">Khóa Vĩnh Viễn</span>`;
+                    toggleActionBtn = `<button onclick="updateSupportKeyStatus('${k.key_code}', 'active')" class="px-2 py-1 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-700/50 text-emerald-300 rounded-lg text-[10px] font-semibold transition">Mở Khóa</button>`;
+                }
+
+                // Expiry text
+                const expiryText = k.expires_at ? escapeHtml(k.expires_at) : '<span class="text-slate-500 font-normal">Vĩnh viễn</span>';
+
+                tr.innerHTML = `
+                    <td class="p-3 whitespace-nowrap">
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-mono text-xs font-bold text-purple-300 bg-purple-950/40 px-2.5 py-1 rounded-lg border border-purple-800/40 select-all tracking-wider">${escapeHtml(k.key_code)}</span>
+                            <button onclick="copyTextToClipboard('${k.key_code}', 'Đã sao chép mã Key Support!')" class="p-1 text-slate-400 hover:text-purple-300 transition" title="Sao chép key">
+                                <i class="fa-regular fa-copy text-xs"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td class="p-3 whitespace-nowrap">
+                        <div class="font-bold text-white">${escapeHtml(k.assigned_name)}</div>
+                        <div class="text-[10px] text-slate-400 flex items-center gap-2">
+                            ${k.phone ? `<span><i class="fa-solid fa-phone text-[9px] mr-0.5"></i>${escapeHtml(k.phone)}</span>` : ''}
+                            ${k.email ? `<span><i class="fa-solid fa-envelope text-[9px] mr-0.5"></i>${escapeHtml(k.email)}</span>` : ''}
+                        </div>
+                    </td>
+                    <td class="p-3 whitespace-nowrap">${statusBadge}</td>
+                    <td class="p-3 whitespace-nowrap font-mono text-[11px] text-slate-300">${expiryText}</td>
+                    <td class="p-3 whitespace-nowrap font-mono text-[11px] text-slate-400">${k.last_login ? escapeHtml(k.last_login) : '<span class="text-slate-600">Chưa đăng nhập</span>'}</td>
+                    <td class="p-3 text-slate-400 text-[11px] max-w-xs truncate">${escapeHtml(k.note || '—')}</td>
+                    <td class="p-3 whitespace-nowrap text-right">
+                        <div class="flex items-center justify-end gap-1.5">
+                            <button onclick="openAssignSupportModal('${k.key_code}')" class="px-2 py-1 bg-purple-950/60 hover:bg-purple-900 border border-purple-700/50 text-purple-300 rounded-lg text-[10px] font-semibold transition" title="Gắn máy / phân ca cho người này">
+                                <i class="fa-solid fa-plus mr-0.5"></i> Gắn Máy
+                            </button>
+                            ${toggleActionBtn}
+                            ${k.status !== 'locked' ? `
+                                <button onclick="updateSupportKeyStatus('${k.key_code}', 'locked')" class="px-2 py-1 bg-slate-800 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-800 text-slate-400 hover:text-rose-300 rounded-lg text-[10px] font-semibold transition" title="Khóa vĩnh viễn key này">
+                                    Khóa
+                                </button>
+                            ` : ''}
+                            <button onclick="deleteSupportKey('${k.key_code}')" class="p-1 text-slate-500 hover:text-rose-400 transition" title="Xóa vĩnh viễn">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterSupportKeysTable() {
+            const q = (document.getElementById("filter-sup-key-input")?.value || "").toLowerCase().trim();
+            if (!q) {
+                renderSupportKeysTable(cachedSupportKeys);
+                return;
+            }
+            const filtered = cachedSupportKeys.filter(k => 
+                (k.assigned_name && k.assigned_name.toLowerCase().includes(q)) ||
+                (k.key_code && k.key_code.toLowerCase().includes(q)) ||
+                (k.note && k.note.toLowerCase().includes(q)) ||
+                (k.email && k.email.toLowerCase().includes(q))
+            );
+            renderSupportKeysTable(filtered);
+        }
+
+        function populateSupportKeyDropdowns(keys) {
+            const assignSel = document.getElementById("assign-input-support-key");
+            const filterSel = document.getElementById("filter-assign-support");
+
+            if (assignSel) {
+                assignSel.innerHTML = '<option value="">-- Chọn Support Key --</option>';
+                keys.filter(k => k.status === 'active').forEach(k => {
+                    const opt = document.createElement("option");
+                    opt.value = k.key_code;
+                    opt.innerText = `${k.assigned_name} (${k.key_code})`;
+                    assignSel.appendChild(opt);
+                });
+            }
+
+            if (filterSel) {
+                const currentVal = filterSel.value;
+                filterSel.innerHTML = '<option value="">Tất cả Support</option>';
+                keys.forEach(k => {
+                    const opt = document.createElement("option");
+                    opt.value = k.key_code;
+                    opt.innerText = `${k.assigned_name} (${k.key_code})`;
+                    if (k.key_code === currentVal) opt.selected = true;
+                    filterSel.appendChild(opt);
+                });
+            }
+        }
+
+        function populateCandidateDropdown() {
+            const sel = document.getElementById("assign-input-hwid-select");
+            if (!sel) return;
+            sel.innerHTML = '<option value="">-- Chọn thí sinh từ danh sách hệ thống --</option>';
+
+            if (typeof allLicenses !== 'undefined' && allLicenses && allLicenses.length > 0) {
+                allLicenses.forEach(lic => {
+                    const opt = document.createElement("option");
+                    opt.value = lic.hwid;
+                    opt.setAttribute("data-name", lic.student_name || '');
+                    opt.innerText = `${lic.student_name || 'Học sinh'} [${lic.hwid.substring(0, 10)}...] - ${lic.machine_name || lic.ip_address || ''}`;
+                    sel.appendChild(opt);
+                });
+            }
+        }
+
+        function onAssignCandidateSelected(hwid) {
+            const hwidInput = document.getElementById("assign-input-hwid");
+            const nameInput = document.getElementById("assign-input-name");
+            const sel = document.getElementById("assign-input-hwid-select");
+
+            if (!hwid) return;
+            hwidInput.value = hwid;
+
+            const selectedOpt = sel.options[sel.selectedIndex];
+            if (selectedOpt) {
+                const name = selectedOpt.getAttribute("data-name");
+                if (name && (!nameInput.value || nameInput.value === 'Học sinh')) {
+                    nameInput.value = name;
+                }
+            }
+        }
+
+        function renderSupportAssignmentsTable(assignments) {
+            const tbody = document.getElementById("sup-assignments-table-body");
+            if (!tbody) return;
+
+            if (assignments.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="p-8 text-center text-slate-500">
+                            <i class="fa-solid fa-calendar-xmark text-3xl text-slate-600 mb-2 block"></i>
+                            Chưa có phân ca nào phù hợp với bộ lọc hiện tại. Bấm nút <strong>"+ Phân Ca / Gắn Máy"</strong> để tạo phân công mới!
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = "";
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const tomorrowDt = new Date();
+            tomorrowDt.setDate(tomorrowDt.getDate() + 1);
+            const tomorrowStr = tomorrowDt.toISOString().slice(0, 10);
+
+            assignments.forEach(a => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-900/40 transition border-b border-slate-800/40";
+
+                let dateBadge = `<span class="font-mono text-xs text-slate-300">${escapeHtml(a.exam_date)}</span>`;
+                if (a.exam_date === todayStr) {
+                    dateBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 font-mono">Hôm Nay (${escapeHtml(a.exam_date)})</span>`;
+                } else if (a.exam_date === tomorrowStr) {
+                    dateBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 font-mono">Ngày Mai (${escapeHtml(a.exam_date)})</span>`;
+                } else if (a.exam_date < todayStr) {
+                    dateBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-500 font-mono">${escapeHtml(a.exam_date)}</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="p-3 whitespace-nowrap">${dateBadge}</td>
+                    <td class="p-3 whitespace-nowrap font-semibold text-slate-200">${escapeHtml(a.exam_shift || 'Tự do')}</td>
+                    <td class="p-3 whitespace-nowrap text-purple-300 font-semibold">${escapeHtml(a.subject || 'Bài thi')}</td>
+                    <td class="p-3 whitespace-nowrap">
+                        <div class="font-bold text-white">${escapeHtml(a.student_name || 'Thí sinh')}</div>
+                        <div class="font-mono text-[10px] text-slate-500">${escapeHtml(a.hwid)}</div>
+                    </td>
+                    <td class="p-3 whitespace-nowrap">
+                        <div class="font-semibold text-purple-300">${escapeHtml(a.assigned_name || 'Support')}</div>
+                        <div class="font-mono text-[10px] text-slate-500">${escapeHtml(a.support_key)}</div>
+                    </td>
+                    <td class="p-3 text-slate-400 text-[11px] max-w-xs truncate">${escapeHtml(a.notes || '—')}</td>
+                    <td class="p-3 whitespace-nowrap text-right">
+                        <button onclick="deleteSupportAssignment(${a.id})" class="px-2 py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/50 text-rose-300 rounded-lg text-[10px] font-semibold transition" title="Xóa phân công ca này">
+                            <i class="fa-solid fa-trash-can mr-1"></i> Xóa
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterAssignmentsTable() {
+            const dateFilter = document.getElementById("filter-assign-date")?.value || "";
+            const supFilter = document.getElementById("filter-assign-support")?.value || "";
+            const q = (document.getElementById("filter-assign-search")?.value || "").toLowerCase().trim();
+
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const tomorrowDt = new Date();
+            tomorrowDt.setDate(tomorrowDt.getDate() + 1);
+            const tomorrowStr = tomorrowDt.toISOString().slice(0, 10);
+
+            const filtered = cachedSupportAssignments.filter(a => {
+                if (dateFilter === 'today' && a.exam_date !== todayStr) return false;
+                if (dateFilter === 'tomorrow' && a.exam_date !== tomorrowStr) return false;
+                if (supFilter && a.support_key.toUpperCase() !== supFilter.toUpperCase()) return false;
+                if (q) {
+                    const matchName = (a.student_name || '').toLowerCase().includes(q);
+                    const matchHWID = (a.hwid || '').toLowerCase().includes(q);
+                    const matchSubj = (a.subject || '').toLowerCase().includes(q);
+                    const matchSup = (a.assigned_name || '').toLowerCase().includes(q);
+                    if (!matchName && !matchHWID && !matchSubj && !matchSup) return false;
+                }
+                return true;
+            });
+
+            renderSupportAssignmentsTable(filtered);
+        }
+
+        // Modal: Create Support Key
+        function openCreateSupportKeyModal() {
+            document.getElementById("create-key-form").classList.remove("hidden");
+            document.getElementById("create-key-result").classList.add("hidden");
+            document.getElementById("sup-input-name").value = "";
+            document.getElementById("sup-input-email").value = "";
+            document.getElementById("sup-input-phone").value = "";
+            document.getElementById("sup-input-note").value = "";
+            document.getElementById("sup-input-duration").value = "lifetime";
+            document.getElementById("sup-custom-date-box").classList.add("hidden");
+            document.getElementById("modal-create-support-key").classList.remove("hidden");
+        }
+
+        function closeCreateSupportKeyModal() {
+            document.getElementById("modal-create-support-key").classList.add("hidden");
+        }
+
+        function toggleCustomKeyExpiry(val) {
+            const box = document.getElementById("sup-custom-date-box");
+            if (val === 'custom') {
+                box.classList.remove("hidden");
+                const dt = new Date();
+                dt.setDate(dt.getDate() + 7);
+                document.getElementById("sup-input-custom-date").value = dt.toISOString().slice(0, 10);
+            } else {
+                box.classList.add("hidden");
+            }
+        }
+
+        async function submitCreateSupportKey() {
+            const name = document.getElementById("sup-input-name").value.trim();
+            const email = document.getElementById("sup-input-email").value.trim();
+            const phone = document.getElementById("sup-input-phone").value.trim();
+            const note = document.getElementById("sup-input-note").value.trim();
+            const duration = document.getElementById("sup-input-duration").value;
+            let expiresAt = "";
+
+            if (!name) {
+                alert("Vui lòng nhập tên người nhận key!");
+                return;
+            }
+
+            const dt = new Date();
+            if (duration === "1d") {
+                dt.setDate(dt.getDate() + 1);
+                expiresAt = dt.toISOString().slice(0, 10);
+            } else if (duration === "3d") {
+                dt.setDate(dt.getDate() + 3);
+                expiresAt = dt.toISOString().slice(0, 10);
+            } else if (duration === "7d") {
+                dt.setDate(dt.getDate() + 7);
+                expiresAt = dt.toISOString().slice(0, 10);
+            } else if (duration === "30d") {
+                dt.setDate(dt.getDate() + 30);
+                expiresAt = dt.toISOString().slice(0, 10);
+            } else if (duration === "custom") {
+                expiresAt = document.getElementById("sup-input-custom-date").value;
+            }
+
+            const btn = document.getElementById("btn-submit-create-key");
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo key...';
+
+            try {
+                const res = await fetch("/api/admin/support-keys", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        assigned_name: name,
+                        email: email,
+                        phone: phone,
+                        note: note,
+                        expires_at: expiresAt
+                    })
+                });
+                const data = await res.json();
+                if (data.success && data.key) {
+                    document.getElementById("create-key-form").classList.add("hidden");
+                    document.getElementById("create-key-result").classList.remove("hidden");
+                    document.getElementById("result-key-code").innerText = data.key.key_code;
+                    loadSupportMgmtData();
+                } else {
+                    alert(data.message || "Không thể tạo key!");
+                }
+            } catch (err) {
+                alert("Lỗi kết nối máy chủ: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-key"></i> Tạo Mã Key Support';
+            }
+        }
+
+        function copyGeneratedSupportKey() {
+            const keyCode = document.getElementById("result-key-code").innerText.trim();
+            copyTextToClipboard(keyCode, "Đã sao chép mã Key Support vào bộ nhớ đệm!");
+        }
+
+        function resetAndCreateAnotherKey() {
+            openCreateSupportKeyModal();
+        }
+
+        async function updateSupportKeyStatus(keyCode, newStatus) {
+            const promptMsg = newStatus === 'suspended' ? 'Tạm khóa key này? CTV sẽ không thể vào bàn làm việc.'
+                            : newStatus === 'locked' ? 'Khóa vĩnh viễn key này? Hành động này sẽ chặn truy cập triệt để.'
+                            : 'Kích hoạt lại key này?';
+            if (!confirm(promptMsg)) return;
+
+            try {
+                const res = await fetch("/api/admin/support-keys/status", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({key_code: keyCode, status: newStatus})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    loadSupportMgmtData();
+                } else {
+                    alert(data.message || "Thao tác thất bại!");
+                }
+            } catch (err) {
+                alert("Lỗi: " + err.message);
+            }
+        }
+
+        async function deleteSupportKey(keyCode) {
+            if (!confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn key ${keyCode}?\nTất cả lịch phân ca gắn với key này cũng sẽ bị xóa.`)) return;
+            try {
+                const res = await fetch(`/api/admin/support-keys/${encodeURIComponent(keyCode)}`, { method: "DELETE" });
+                const data = await res.json();
+                if (data.success) {
+                    loadSupportMgmtData();
+                }
+            } catch (err) {
+                alert("Lỗi: " + err.message);
+            }
+        }
+
+        // Modal: Assign Support Machine
+        function openAssignSupportModal(presetKey = '') {
+            populateSupportKeyDropdowns(cachedSupportKeys);
+            populateCandidateDropdown();
+
+            if (presetKey) {
+                const sel = document.getElementById("assign-input-support-key");
+                if (sel) sel.value = presetKey;
+            }
+
+            const todayStr = new Date().toISOString().slice(0, 10);
+            document.getElementById("assign-input-date").value = todayStr;
+            document.getElementById("assign-input-hwid").value = "";
+            document.getElementById("assign-input-name").value = "";
+            document.getElementById("assign-input-shift").value = "Ca 1 (07:30 - 09:00)";
+            document.getElementById("assign-input-subject").value = "";
+            document.getElementById("assign-input-notes").value = "";
+
+            document.getElementById("modal-assign-support-machine").classList.remove("hidden");
+        }
+
+        function closeAssignSupportModal() {
+            document.getElementById("modal-assign-support-machine").classList.add("hidden");
+        }
+
+        async function submitCreateSupportAssignment() {
+            const key = document.getElementById("assign-input-support-key").value;
+            const hwid = document.getElementById("assign-input-hwid").value.trim();
+            const name = document.getElementById("assign-input-name").value.trim();
+            const date = document.getElementById("assign-input-date").value;
+            const shift = document.getElementById("assign-input-shift").value.trim();
+            const subject = document.getElementById("assign-input-subject").value.trim();
+            const notes = document.getElementById("assign-input-notes").value.trim();
+
+            if (!key) {
+                alert("Vui lòng chọn Support Key nhận ca!");
+                return;
+            }
+            if (!hwid) {
+                alert("Vui lòng nhập hoặc chọn mã HWID máy!");
+                return;
+            }
+            if (!date) {
+                alert("Vui lòng chọn ngày thi!");
+                return;
+            }
+
+            const btn = document.getElementById("btn-submit-assign");
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gán ca thi...';
+
+            try {
+                const res = await fetch("/api/admin/support-assignments", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        support_key: key,
+                        hwid: hwid,
+                        student_name: name,
+                        exam_date: date,
+                        exam_shift: shift,
+                        subject: subject,
+                        notes: notes
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeAssignSupportModal();
+                    loadSupportMgmtData();
+                    alert(`Đã phân ca thành công!\n- Máy: ${name || hwid}\n- Ngày thi: ${date}\n- Support: ${key}`);
+                } else {
+                    alert(data.message || "Phân ca thất bại!");
+                }
+            } catch (err) {
+                alert("Lỗi: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Xác Nhận Phân Công';
+            }
+        }
+
+        async function deleteSupportAssignment(id) {
+            if (!confirm("Hủy phân công ca thi này?")) return;
+            try {
+                const res = await fetch(`/api/admin/support-assignments/${id}`, { method: "DELETE" });
+                const data = await res.json();
+                if (data.success) {
+                    loadSupportMgmtData();
+                }
+            } catch (err) {
+                alert("Lỗi: " + err.message);
+            }
+        }
+
+        function copyTextToClipboard(text, successMsg = "Đã sao chép!") {
+            navigator.clipboard.writeText(text).then(() => {
+                alert(successMsg);
+            }).catch(() => {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                alert(successMsg);
+            });
+        }
 
     </script>
 </body>

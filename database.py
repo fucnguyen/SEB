@@ -1,5 +1,8 @@
 import sqlite3
 import os
+import hashlib
+import secrets
+import json
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
@@ -169,6 +172,44 @@ def init_db():
             cursor.execute(f"ALTER TABLE live_exam_questions ADD COLUMN {_col} {_def}")
         except Exception:
             pass  # Column already exists
+
+    # 8. Bảng quản lý mã Key Support dành cho CTV / Người hỗ trợ
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS support_keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key_code TEXT UNIQUE NOT NULL,
+        assigned_name TEXT NOT NULL,
+        email TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
+        note TEXT DEFAULT '',
+        status TEXT DEFAULT 'active', -- active, suspended, locked
+        created_at TEXT NOT NULL,
+        expires_at TEXT DEFAULT '',
+        last_login TEXT DEFAULT ''
+    )
+    """)
+
+    # 9. Bảng phân ca thi / gắn máy (HWID) theo ngày cho từng Support Key
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS support_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        support_key TEXT NOT NULL,
+        hwid TEXT NOT NULL,
+        student_name TEXT DEFAULT '',
+        exam_date TEXT NOT NULL,      -- YYYY-MM-DD
+        exam_shift TEXT DEFAULT '',   -- Ca thi
+        subject TEXT DEFAULT '',      -- Môn thi
+        notes TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        status TEXT DEFAULT 'active', -- active, completed, cancelled
+        UNIQUE(support_key, hwid, exam_date)
+    )
+    """)
+    try:
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_sup_assign_date ON support_assignments(support_key, exam_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_sup_assign_hwid ON support_assignments(hwid, exam_date)")
+    except Exception:
+        pass
 
     # Các giá trị mặc định cho settings
     default_settings = {
@@ -922,3 +963,291 @@ def get_live_exam_questions(hwid: str) -> List[Dict[str, Any]]:
         rows.append(d)
     conn.close()
     return rows
+
+
+# ────────────────── Support Keys & Exam Scheduling ──────────────────
+
+SUPPORT_KEY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+SUPPORT_KEY_SALT = "SEB_SUPPORT_SECRET_SALT_2026"
+
+def _calc_support_checksum(prefix: str) -> str:
+    h = hashlib.sha256(f"{SUPPORT_KEY_SALT}:{prefix}".encode()).hexdigest().upper()
+    res = []
+    for i in range(4):
+        val = int(h[i * 2 : i * 2 + 2], 16) % len(SUPPORT_KEY_ALPHABET)
+        res.append(SUPPORT_KEY_ALPHABET[val])
+    return "".join(res)
+
+def generate_support_key() -> str:
+    """Sinh key bảo mật dài: SUP-XXXX-XXXX-XXXX-YYYY với checksum SHA-256 chống gõ nhầm"""
+    p1 = "".join(secrets.choice(SUPPORT_KEY_ALPHABET) for _ in range(4))
+    p2 = "".join(secrets.choice(SUPPORT_KEY_ALPHABET) for _ in range(4))
+    p3 = "".join(secrets.choice(SUPPORT_KEY_ALPHABET) for _ in range(4))
+    prefix = f"SUP-{p1}-{p2}-{p3}"
+    checksum = _calc_support_checksum(prefix)
+    return f"{prefix}-{checksum}"
+
+def verify_support_key_checksum(key: str) -> bool:
+    """Kiểm tra cấu trúc và checksum mã key Support"""
+    key = (key or "").strip().upper()
+    parts = key.split("-")
+    if len(parts) != 5 or parts[0] != "SUP":
+        return False
+    if any(len(p) != 4 for p in parts[1:]):
+        return False
+    prefix = "-".join(parts[:4])
+    expected = _calc_support_checksum(prefix)
+    return parts[4] == expected
+
+def create_support_key(assigned_name: str, email: str = "", phone: str = "", note: str = "", expires_at: str = "") -> Dict[str, Any]:
+    key_code = generate_support_key()
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO support_keys (key_code, assigned_name, email, phone, note, status, created_at, expires_at, last_login)
+        VALUES (?, ?, ?, ?, ?, 'active', ?, ?, '')
+    """, (key_code, assigned_name.strip(), email.strip(), phone.strip(), note.strip(), now, expires_at.strip()))
+    conn.commit()
+    conn.close()
+    return get_support_key(key_code)
+
+def get_support_key(key_code: str) -> Optional[Dict[str, Any]]:
+    key_code = (key_code or "").strip().upper()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM support_keys WHERE UPPER(key_code) = ?", (key_code,))
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def list_support_keys() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM support_keys ORDER BY id DESC")
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def update_support_key_status(key_code: str, status: str) -> bool:
+    """Cập nhật trạng thái: active (kích hoạt), suspended (tạm khóa), locked (khóa vĩnh viễn)"""
+    key_code = (key_code or "").strip().upper()
+    status = status.lower().strip()
+    if status not in ("active", "suspended", "locked"):
+        return False
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE support_keys SET status = ? WHERE UPPER(key_code) = ?", (status, key_code))
+    affected = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
+
+def update_support_key_expiry(key_code: str, expires_at: str) -> bool:
+    key_code = (key_code or "").strip().upper()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE support_keys SET expires_at = ? WHERE UPPER(key_code) = ?", (expires_at.strip(), key_code))
+    affected = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
+
+def update_support_key_last_login(key_code: str) -> bool:
+    key_code = (key_code or "").strip().upper()
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE support_keys SET last_login = ? WHERE UPPER(key_code) = ?", (now, key_code))
+    affected = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
+
+def delete_support_key(key_code: str) -> bool:
+    key_code = (key_code or "").strip().upper()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM support_keys WHERE UPPER(key_code) = ?", (key_code,))
+    c.execute("DELETE FROM support_assignments WHERE UPPER(support_key) = ?", (key_code,))
+    conn.commit()
+    conn.close()
+    return True
+
+def create_support_assignment(support_key: str, hwid: str, student_name: str = "", exam_date: str = "", exam_shift: str = "", subject: str = "", notes: str = "") -> Dict[str, Any]:
+    support_key = (support_key or "").strip().upper()
+    hwid = (hwid or "").strip()
+    now = now_vn().strftime("%Y-%m-%d %H:%M:%S")
+    if not exam_date:
+        exam_date = now_vn().strftime("%Y-%m-%d")
+    else:
+        exam_date = exam_date.strip()
+
+    if not student_name:
+        lic = get_license_by_hwid(hwid)
+        if lic:
+            student_name = lic.get("student_name") or ""
+
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO support_assignments (support_key, hwid, student_name, exam_date, exam_shift, subject, notes, created_at, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
+        ON CONFLICT(support_key, hwid, exam_date) DO UPDATE SET
+            student_name = excluded.student_name,
+            exam_shift = excluded.exam_shift,
+            subject = excluded.subject,
+            notes = excluded.notes,
+            status = 'active'
+    """, (support_key, hwid, student_name, exam_date, exam_shift.strip(), subject.strip(), notes.strip(), now))
+    conn.commit()
+    last_id = c.lastrowid
+    conn.close()
+    return {"id": last_id, "support_key": support_key, "hwid": hwid, "student_name": student_name, "exam_date": exam_date, "exam_shift": exam_shift, "subject": subject, "notes": notes}
+
+def list_support_assignments(support_key: Optional[str] = None, exam_date: Optional[str] = None) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    c = conn.cursor()
+    query = """
+        SELECT a.*, k.assigned_name, k.status as key_status
+        FROM support_assignments a
+        LEFT JOIN support_keys k ON UPPER(a.support_key) = UPPER(k.key_code)
+        WHERE 1=1
+    """
+    params = []
+    if support_key:
+        query += " AND UPPER(a.support_key) = ?"
+        params.append(support_key.strip().upper())
+    if exam_date:
+        query += " AND a.exam_date = ?"
+        params.append(exam_date.strip())
+    query += " ORDER BY a.exam_date DESC, a.id DESC"
+    c.execute(query, params)
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def delete_support_assignment(assignment_id: int) -> bool:
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM support_assignments WHERE id = ?", (assignment_id,))
+    affected = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
+
+def is_hwid_assigned_to_support(support_key: str, hwid: str, target_date: Optional[str] = None) -> bool:
+    """Kiểm tra bảo mật RBAC: HWID này có được phân công cho Support Key này vào ngày target_date không?"""
+    support_key = (support_key or "").strip().upper()
+    hwid = (hwid or "").strip()
+    if not support_key or not hwid:
+        return False
+    
+    k = get_support_key(support_key)
+    if not k or k.get("status") != "active":
+        return False
+    
+    exp = k.get("expires_at")
+    if exp:
+        try:
+            today_str = now_vn().strftime("%Y-%m-%d")
+            if today_str > exp:
+                return False
+        except Exception:
+            pass
+
+    if not target_date:
+        target_date = now_vn().strftime("%Y-%m-%d")
+
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT 1 FROM support_assignments 
+        WHERE UPPER(support_key) = ? AND hwid = ? AND exam_date = ? AND status = 'active'
+        LIMIT 1
+    """, (support_key, hwid, target_date))
+    row = c.fetchone()
+    conn.close()
+    return row is not None
+
+def get_support_assigned_exams_for_date(support_key: str, target_date: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Lấy danh sách các ca thi và máy được phân công cho Support Key này trong ngày target_date (mặc định hôm nay).
+    Chỉ trả về máy được phân công, kết hợp với trạng thái thi trực tiếp từ live_exam_sessions.
+    """
+    support_key = (support_key or "").strip().upper()
+    k = get_support_key(support_key)
+    if not k:
+        return {"success": False, "message": "Mã Key Support không tồn tại!", "sessions": []}
+    
+    if k.get("status") == "suspended":
+        return {"success": False, "message": "Key của bạn đang bị TẠM KHÓA bởi Quản trị viên!", "status": "suspended", "sessions": []}
+    if k.get("status") == "locked":
+        return {"success": False, "message": "Key của bạn đã bị KHÓA vĩnh viễn!", "status": "locked", "sessions": []}
+
+    exp = k.get("expires_at")
+    if exp:
+        today_str = now_vn().strftime("%Y-%m-%d")
+        if today_str > exp:
+            return {"success": False, "message": f"Key đã hết hạn sử dụng vào ngày {exp}!", "status": "expired", "sessions": []}
+
+    if not target_date:
+        target_date = now_vn().strftime("%Y-%m-%d")
+
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT a.*, 
+               s.exam_title, s.total_questions, s.status as session_status, s.last_sync,
+               l.student_name as lic_student_name, l.machine_name, l.ip_address, l.status as lic_status
+        FROM support_assignments a
+        LEFT JOIN live_exam_sessions s ON a.hwid = s.hwid
+        LEFT JOIN licenses l ON a.hwid = l.hwid
+        WHERE UPPER(a.support_key) = ? AND a.exam_date = ? AND a.status = 'active'
+        ORDER BY a.id ASC
+    """, (support_key, target_date))
+    rows = c.fetchall()
+    conn.close()
+
+    now_dt = now_vn()
+    results = []
+    for r in rows:
+        d = dict(r)
+        last_sync_str = d.get("last_sync") or ""
+        is_online = False
+        if last_sync_str:
+            try:
+                sync_dt = datetime.strptime(last_sync_str, "%Y-%m-%d %H:%M:%S")
+                if (now_dt - sync_dt).total_seconds() <= 120:
+                    is_online = True
+            except Exception:
+                pass
+        
+        student_display = d.get("student_name") or d.get("lic_student_name") or "Thí sinh"
+        exam_title_display = d.get("subject") or d.get("exam_title") or "Bài thi trực tuyến"
+        
+        results.append({
+            "assignment_id": d["id"],
+            "hwid": d["hwid"],
+            "student_name": student_display,
+            "machine_name": d.get("machine_name") or "",
+            "ip_address": d.get("ip_address") or "",
+            "exam_date": d["exam_date"],
+            "exam_shift": d.get("exam_shift") or "Tự do",
+            "subject": exam_title_display,
+            "notes": d.get("notes") or "",
+            "total_questions": d.get("total_questions") or 0,
+            "session_status": d.get("session_status") or ("active" if is_online else "pending"),
+            "last_sync": last_sync_str,
+            "is_online": is_online
+        })
+
+    return {
+        "success": True,
+        "support_key": support_key,
+        "assigned_name": k.get("assigned_name"),
+        "exam_date": target_date,
+        "total_assigned": len(results),
+        "sessions": results
+    }
+
