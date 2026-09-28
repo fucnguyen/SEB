@@ -845,13 +845,16 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
 
     # 1. Upsert session
     try:
-        c.execute("SELECT id FROM live_exam_sessions WHERE hwid = ?", (hwid,))
-        if c.fetchone():
+        c.execute("SELECT id, status, created_at FROM live_exam_sessions WHERE hwid = ?", (hwid,))
+        existing = c.fetchone()
+        if existing:
+            # If session was archived or created > 2 hours ago, reset created_at to now so cleanup task won't wipe it
             c.execute("""
                 UPDATE live_exam_sessions
-                SET student_name = ?, exam_title = ?, page_url = ?, total_questions = ?, last_sync = ?, status = 'active'
+                SET student_name = ?, exam_title = ?, page_url = ?, total_questions = ?, last_sync = ?, status = 'active',
+                    created_at = CASE WHEN status = 'archived' THEN ? ELSE created_at END
                 WHERE hwid = ?
-            """, (student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions), now, hwid))
+            """, (student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions), now, now, hwid))
         else:
             c.execute("""
                 INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
@@ -1173,9 +1176,10 @@ def auto_archive_expired_sessions(max_age_hours: float = 2.0) -> int:
     conn = get_connection()
     c = conn.cursor()
     cutoff_time = (now_vn() - timedelta(hours=max_age_hours)).strftime("%Y-%m-%d %H:%M:%S")
+    # Only archive sessions that are truly abandoned: both last_sync AND created_at must be older than cutoff_time
     c.execute("""
         SELECT hwid FROM live_exam_sessions
-        WHERE status != 'archived' AND (last_sync < ? OR created_at < ?)
+        WHERE status != 'archived' AND last_sync < ? AND created_at < ?
     """, (cutoff_time, cutoff_time))
     rows = c.fetchall()
     conn.close()
