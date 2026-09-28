@@ -308,6 +308,9 @@ class SettingsModel(BaseModel):
     r2_bucket_name: Optional[str] = ""
     r2_access_key: Optional[str] = ""
     r2_secret_key: Optional[str] = ""
+    github_token: Optional[str] = ""
+    github_repo: Optional[str] = ""
+    github_release_tag: Optional[str] = ""
 
 # ────────────────── Web Pages ──────────────────
 
@@ -445,9 +448,11 @@ async def api_check_download_status(request_id: str):
 @app.get("/api/download/stream")
 async def api_stream_local_file(token: str, request: Request):
     """
-    Stream file cài đặt ~205MB cục bộ với BẢO MẬT KHÓA THEO ĐỊA CHỈ IP (IP-BINDING):
-    - Chỉ DUY NHẤT IP của máy tính lúc xin phép mới được tải.
-    - Mang link sang máy khác hoặc chia sẻ cho người khác sẽ bị chặn 403 Forbidden ngay lập tức!
+    Stream file cài đặt ~205MB (Windows) hoặc ~11MB (macOS):
+    - Kiểm tra token tải đã được Admin/Telegram duyệt.
+    - Hỗ trợ đổi mạng IP (ghi nhận log, không chặn 403 gây lỗi học sinh).
+    - Tự động chuyển hướng (Redirect 302) đến máy chủ AWS S3 / Cloudflare R2 tốc độ cao.
+    - Fallback về file cục bộ nếu có.
     """
     row = database.get_request_by_download_token(token)
     if not row:
@@ -456,39 +461,40 @@ async def api_stream_local_file(token: str, request: Request):
     # 1. Kiểm tra thời hạn 24 giờ của link
     exp_str = row.get("token_expires_at")
     if exp_str:
-        exp_time = datetime.strptime(exp_str, "%Y-%m-%d %H:%M:%S")
-        if database.now_vn() > exp_time:
-            raise HTTPException(status_code=403, detail="Đường link tải này đã hết hạn (24 giờ). Vui lòng gửi yêu cầu xin duyệt lại!")
+        try:
+            exp_time = datetime.strptime(exp_str, "%Y-%m-%d %H:%M:%S")
+            if database.now_vn() > exp_time:
+                raise HTTPException(status_code=403, detail="Đường link tải này đã hết hạn. Vui lòng gửi yêu cầu xin duyệt lại!")
+        except Exception:
+            pass
 
-    # 2. KIỂM TRA ĐỊA CHỈ IP (IP-Binding)
+    # 2. GHI NHẬN ĐỊA CHỈ IP (Audit log, không chặn 403 để học sinh đổi mạng 4G/Wi-Fi vẫn tải được bình thường)
     current_ip = get_client_ip(request)
     registered_ip = row.get("ip_address")
+    if registered_ip and current_ip != registered_ip:
+        print(f"[Download Audit] Token {token[:8]}... tải từ IP {current_ip} (IP đăng ký ban đầu: {registered_ip})")
 
-    if registered_ip and registered_ip not in ("127.0.0.1", "localhost"):
-        if current_ip != registered_ip:
-            raise HTTPException(
-                status_code=403,
-                detail=f"CẢNH BÁO BẢO MẬT: Đường link tải này chỉ cấp riêng cho địa chỉ IP ({registered_ip}) của học sinh đã xin duyệt ban đầu. "
-                       f"IP của máy hiện tại là ({current_ip}). Bạn tuyệt đối KHÔNG ĐƯỢC chia sẻ link tải cho máy khác!"
-            )
-
-    # 3. Nếu cấu hình Cloudflare R2 hoặc external URL, redirect sang presigned/external URL bảo mật
+    # 3. Lấy link CDN đám mây (GitHub S3 Pre-signed hoặc Cloudflare R2)
     sys_type = row.get("system_type", "SEB") or "SEB"
     cloud_url, is_cloud = storage.generate_download_url(token, system_type=sys_type)
-    if is_cloud:
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=cloud_url)
+    if is_cloud and cloud_url:
+        return RedirectResponse(url=cloud_url, status_code=302)
 
-    # 4. Stream file từ máy chủ
+    # 4. Stream file từ máy chủ nếu file có trên ổ cứng cục bộ
     file_path, filename = storage.get_local_setup_file(sys_type)
-    if not file_path or not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File cài đặt chưa được tải lên máy chủ!")
+    if file_path and os.path.exists(file_path):
+        return FileResponse(
+            path=file_path,
+            filename=filename,
+            media_type="application/octet-stream"
+        )
 
-    return FileResponse(
-        path=file_path,
-        filename=filename,
-        media_type="application/octet-stream"
-    )
+    # 5. Fallback cuối cùng: thử cấp lại pre-signed URL từ GitHub Release trực tiếp
+    fallback_s3 = storage.get_github_signed_asset_url(sys_type)
+    if fallback_s3:
+        return RedirectResponse(url=fallback_s3, status_code=302)
+
+    raise HTTPException(status_code=404, detail="File cài đặt đang được hệ thống chuẩn bị. Vui lòng thử lại sau 1 phút hoặc liên hệ Admin!")
 
 # ────────────────── SEB Launcher Online License API ──────────────────
 

@@ -227,7 +227,11 @@ def init_db():
         "telegram_notifications_enabled": "true",
         "external_download_url": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_v2.exe",
         "external_download_url_seb": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_v2.exe",
+        "external_download_url_mac": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_macOS.zip",
         "external_download_url_eos": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_EOS_v2.exe",
+        "github_token": "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",
+        "github_repo": "fucnguyen/SEB",
+        "github_release_tag": "v2.0",
         "r2_endpoint_url": "",
         "r2_access_key": "",
         "r2_secret_key": "",
@@ -240,10 +244,14 @@ def init_db():
     for k, v in default_settings.items():
         cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
 
-    # Cập nhật nếu trước đó là mật khẩu mặc định "admin"
+    # Cập nhật nếu trước đó là mật khẩu mặc định "admin" hoặc các giá trị quan trọng bị trống
     cursor.execute("UPDATE settings SET value = 'Nguyenphuc1234@' WHERE key = 'admin_password' AND value = 'admin'")
     cursor.execute("UPDATE settings SET value = '8902883418:AAF1rAAcEVx4gyI9gcJW5GrBjqB-PphSuf8' WHERE key = 'telegram_bot_token' AND (value = '' OR value IS NULL)")
     cursor.execute("UPDATE settings SET value = '6396371761' WHERE key = 'telegram_chat_id' AND (value = '' OR value IS NULL)")
+    cursor.execute("UPDATE settings SET value = 'https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_macOS.zip' WHERE key = 'external_download_url_mac' AND (value = '' OR value IS NULL)")
+    cursor.execute("UPDATE settings SET value = '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' WHERE key = 'github_token' AND (value = '' OR value IS NULL)")
+    cursor.execute("UPDATE settings SET value = 'fucnguyen/SEB' WHERE key = 'github_repo' AND (value = '' OR value IS NULL)")
+    cursor.execute("UPDATE settings SET value = 'v2.0' WHERE key = 'github_release_tag' AND (value = '' OR value IS NULL)")
 
     # 6. Tự động nạp danh sách mã máy lịch sử và bản quyền từ seed_data.json
     seed_initial_data(cursor)
