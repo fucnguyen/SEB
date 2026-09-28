@@ -810,10 +810,24 @@
     function getCurrentStudentAnswer(block, qtype, options) {
         if (qtype === "radio") {
             var checked = block.querySelector("input[type='radio']:checked, input.form-check-input:checked");
-            if (!checked) return "";
-            var radios = block.querySelectorAll("input[type='radio'], input.form-check-input");
-            for (var i = 0; i < radios.length; i++) {
-                if (radios[i] === checked) return options[i] ? options[i].label : String(i);
+            if (checked) {
+                var radios = block.querySelectorAll("input[type='radio'], input.form-check-input");
+                for (var i = 0; i < radios.length; i++) {
+                    if (radios[i] === checked) return options[i] ? options[i].label : String(i);
+                }
+            }
+            // Support custom radio selections without native inputs (e.g. .selected, .active, .checked, aria-checked="true")
+            var customChoices = block.querySelectorAll(
+                ".form-check, .answer > div, .answer > li, .option, .choice, [class*='choice-item'], [class*='option-item'], [role='radio'], .ant-radio-wrapper"
+            );
+            for (var c = 0; c < customChoices.length; c++) {
+                var el = customChoices[c];
+                var isSel = el.classList.contains("selected") || el.classList.contains("active") || el.classList.contains("checked") ||
+                            el.classList.contains("ant-radio-wrapper-checked") || el.getAttribute("aria-checked") === "true" ||
+                            el.querySelector(".ant-radio-checked, [aria-checked='true'], .checked, .selected");
+                if (isSel) {
+                    return options[c] ? options[c].label : String(c);
+                }
             }
             return "";
         }
@@ -821,9 +835,20 @@
         if (qtype === "checkbox") {
             var labels = [];
             var checks = block.querySelectorAll("input[type='checkbox'], input.form-check-input");
-            checks.forEach(function (c, i) {
-                if (c.checked && options[i]) labels.push(options[i].label);
-            });
+            if (checks.length > 0) {
+                checks.forEach(function (c, i) {
+                    if (c.checked && options[i]) labels.push(options[i].label);
+                });
+            } else {
+                var customChecks = block.querySelectorAll(
+                    ".form-check, [role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper, .choice, .option, [class*='choice-item']"
+                );
+                customChecks.forEach(function (c, i) {
+                    var isSel = c.classList.contains("selected") || c.classList.contains("active") || c.classList.contains("checked") ||
+                                c.classList.contains("ant-checkbox-checked") || c.getAttribute("aria-checked") === "true";
+                    if (isSel && options[i]) labels.push(options[i].label);
+                });
+            }
             return labels.join(",");
         }
 
@@ -833,8 +858,17 @@
         }
 
         if (qtype === "essay") {
-            var ta = block.querySelector("textarea");
-            return ta ? (ta.value || "").trim() : "";
+            var ta = block.querySelector("textarea, [contenteditable='true']");
+            if (!ta) {
+                var ifr = block.querySelector("iframe");
+                if (ifr) {
+                    try {
+                        var idoc = ifr.contentDocument || ifr.contentWindow.document;
+                        return idoc && idoc.body ? idoc.body.innerText.trim() : "";
+                    } catch(e) {}
+                }
+            }
+            return ta ? (ta.value || ta.innerText || "").trim() : "";
         }
 
         return "";
@@ -896,7 +930,7 @@
                 inp.dispatchEvent(new Event("change", { bubbles: true }));
             }
         } else {
-            var isChecked = chk.classList.contains("ant-checkbox-checked") || chk.getAttribute("aria-checked") === "true";
+            var isChecked = chk.classList.contains("ant-checkbox-checked") || chk.classList.contains("selected") || chk.getAttribute("aria-checked") === "true";
             if (isChecked !== shouldCheck) {
                 chk.click();
             }
@@ -907,7 +941,7 @@
         if (!block || answer === undefined || answer === null || String(answer).trim() === "") return;
         var ansStr = String(answer).trim();
 
-        // 1. Radio (Single Choice / True-False)
+        // 1. Radio (Single Choice / True-False) - Any number of choices: A, B, C, D, E, F, G, H...
         if (qtype === "radio") {
             var targetIdx = -1;
             var targetLetter = "";
@@ -915,10 +949,13 @@
 
             if (/^\d+$/.test(ansStr)) {
                 targetIdx = parseInt(ansStr, 10);
-                targetLetter = String.fromCharCode(65 + targetIdx); // 0->A, 1->B, 2->C, 3->D
-            } else if (ansStr.length === 1 && /[A-Z]/i.test(ansStr)) {
-                targetLetter = ansStr.toUpperCase();
-                targetIdx = targetLetter.charCodeAt(0) - 65;
+                targetLetter = targetIdx < 26 ? String.fromCharCode(65 + targetIdx) : "";
+            } else {
+                var mLetter = ansStr.match(/^\s*(?:option|lựa chọn|đáp án)?\s*[\(\[]?([A-Za-z])[\)\]\.\:\s]*$/i);
+                if (mLetter) {
+                    targetLetter = mLetter[1].toUpperCase();
+                    targetIdx = targetLetter.charCodeAt(0) - 65;
+                }
             }
 
             var allChoices = block.querySelectorAll(
@@ -928,11 +965,11 @@
 
             var clicked = false;
 
-            // 1.1 Match by letter label in choice text (A., B., C., D.)
+            // 1.1 Match by letter label in choice text: A., B., C., D., E., F., (E), [E], E -, E:, etc.
             if (targetLetter) {
                 for (var i = 0; i < allChoices.length; i++) {
                     var cText = getText(allChoices[i]);
-                    var letterMatch = cText.match(/^\s*\(?([A-Z])\)?[\.\:\s]/i);
+                    var letterMatch = cText.match(/^\s*[\(\[]?([A-Z])[\)\]\.\:\-\s]/i);
                     if (letterMatch && letterMatch[1].toUpperCase() === targetLetter) {
                         triggerElementClick(allChoices[i]);
                         clicked = true;
@@ -966,14 +1003,19 @@
                 }
             }
 
-            // 1.3 Fallback to index matching
+            // 1.3 Fallback to index matching (Guarantees choice 4 [E], 5 [F], 6 [G], 7 [H] etc. are selected)
             if (!clicked && targetIdx >= 0) {
                 var radios = block.querySelectorAll("input[type='radio'], input.form-check-input");
                 if (radios.length > targetIdx && radios[targetIdx]) {
                     triggerElementClick(radios[targetIdx]);
                     clicked = true;
+                } else if (allChoices.length > targetIdx && allChoices[targetIdx]) {
+                    triggerElementClick(allChoices[targetIdx]);
+                    clicked = true;
                 } else {
-                    var radioContainers = block.querySelectorAll(".form-check, [role='radio'], .ant-radio, .ant-radio-wrapper, label");
+                    var radioContainers = block.querySelectorAll(
+                        ".form-check, [role='radio'], .ant-radio, .ant-radio-wrapper, .choice, .option, label"
+                    );
                     if (radioContainers.length > targetIdx && radioContainers[targetIdx]) {
                         triggerElementClick(radioContainers[targetIdx]);
                         clicked = true;
@@ -983,19 +1025,25 @@
             return;
         }
 
-        // 2. Checkbox (Multiple Choice)
+        // 2. Checkbox (Multiple Choice) - Supports 5, 6, 7, 8+ choices: "A, C, E", "0, 2, 4", "B, D, F"
         if (qtype === "checkbox") {
-            var parts = ansStr.split(/[,;\n]/).map(function (s) { return s.trim(); });
+            var rawParts = ansStr.split(/[,;\n]/).map(function (s) { return s.trim(); }).filter(Boolean);
             var targetIdxs = [];
+            var targetLetters = [];
             var targetTexts = [];
 
-            parts.forEach(function (p) {
-                if (/^\d+$/.test(p)) {
-                    targetIdxs.push(parseInt(p, 10));
-                } else if (p.length === 1 && /[A-Z]/i.test(p)) {
-                    targetIdxs.push(p.toUpperCase().charCodeAt(0) - 65);
-                } else if (p) {
-                    targetTexts.push(p.toLowerCase());
+            rawParts.forEach(function (p) {
+                var cleanP = p.replace(/^[\(\[\s]+|[\)\]\.\:\s]+$/g, "").trim();
+                if (/^\d+$/.test(cleanP)) {
+                    var numIdx = parseInt(cleanP, 10);
+                    targetIdxs.push(numIdx);
+                    if (numIdx < 26) targetLetters.push(String.fromCharCode(65 + numIdx));
+                } else if (/^[A-Za-z]$/.test(cleanP)) {
+                    var ltr = cleanP.toUpperCase();
+                    targetLetters.push(ltr);
+                    targetIdxs.push(ltr.charCodeAt(0) - 65);
+                } else if (cleanP) {
+                    targetTexts.push(cleanP.toLowerCase());
                 }
             });
 
@@ -1004,14 +1052,26 @@
                 checks.forEach(function (chk, i) {
                     var parent = chk.closest("label, .form-check, [class*='choice'], tr, li") || chk.parentElement;
                     var cText = parent ? getText(parent).toLowerCase() : "";
-                    var shouldCheck = targetIdxs.indexOf(i) !== -1 || targetTexts.some(function(t) { return cText.includes(t); });
+                    var letterMatch = cText.match(/^\s*[\(\[]?([A-Z])[\)\]\.\:\-\s]/i);
+                    var chkLetter = letterMatch ? letterMatch[1].toUpperCase() : "";
+
+                    var shouldCheck = targetIdxs.indexOf(i) !== -1 ||
+                                      (chkLetter && targetLetters.indexOf(chkLetter) !== -1) ||
+                                      targetTexts.some(function(t) { return cText.includes(t); });
                     setCheckboxState(chk, shouldCheck);
                 });
             } else {
-                var checkContainers = block.querySelectorAll(".form-check, [role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper");
+                var checkContainers = block.querySelectorAll(
+                    ".form-check, [role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper, .choice, .option, [class*='choice-item'], [class*='option-item'], [class*='checkbox-wrapper']"
+                );
                 checkContainers.forEach(function (cBox, i) {
                     var cText = getText(cBox).toLowerCase();
-                    var shouldCheck = targetIdxs.indexOf(i) !== -1 || targetTexts.some(function(t) { return cText.includes(t); });
+                    var letterMatch = cText.match(/^\s*[\(\[]?([A-Z])[\)\]\.\:\-\s]/i);
+                    var chkLetter = letterMatch ? letterMatch[1].toUpperCase() : "";
+
+                    var shouldCheck = targetIdxs.indexOf(i) !== -1 ||
+                                      (chkLetter && targetLetters.indexOf(chkLetter) !== -1) ||
+                                      targetTexts.some(function(t) { return cText.includes(t); });
                     setCheckboxState(cBox, shouldCheck);
                 });
             }
@@ -1271,7 +1331,7 @@
         try {
             if (typeof answers === "string") answers = JSON.parse(answers);
             if (answers && Object.keys(answers).length > 0) {
-                supportAnswers = answers;
+                Object.assign(supportAnswers, answers);
                 setupGlobalClickToAnswer();
                 autoApplyCurrentQuestionAnswer();
             }
@@ -1294,7 +1354,7 @@
                 .then(function (res) { return res.json(); })
                 .then(function (data) {
                     if (data && data.support_answers) {
-                        supportAnswers = data.support_answers;
+                        Object.assign(supportAnswers, data.support_answers);
                         setupGlobalClickToAnswer();
                         autoApplyCurrentQuestionAnswer();
                     }
@@ -1308,7 +1368,7 @@
             .then(function (res) { return res.json(); })
             .then(function (data) {
                 if (data && data.support_answers) {
-                    supportAnswers = data.support_answers;
+                    Object.assign(supportAnswers, data.support_answers);
                     setupGlobalClickToAnswer();
                     autoApplyCurrentQuestionAnswer();
                 }

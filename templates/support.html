@@ -475,31 +475,35 @@
 
                 if (opts.length > 0) {
                     optionsHtml = '<div class="space-y-2 pt-2">';
+                    const isCheckbox = q.question_type === 'checkbox';
+                    const chosenSet = new Set((q.support_answer || "").split(",").map(s => s.trim()).filter(Boolean));
+
                     opts.forEach((opt, optIdx) => {
                         const optLabel = opt.label || String.fromCharCode(65 + optIdx);
-                        const isSelectedBySupport = q.support_answer === optLabel || q.support_answer === String(optIdx);
+                        const isSelectedBySupport = chosenSet.has(optLabel) || chosenSet.has(String(optIdx));
+                        const clickAction = isCheckbox ? `toggleSupportCheckbox(${idx}, '${optLabel}')` : `setSupportAnswer(${idx}, '${optLabel}')`;
                         
                         optionsHtml += `
                             <div class="flex items-center justify-between p-2.5 rounded-xl border transition ${
                                 isSelectedBySupport 
-                                    ? 'bg-purple-900/40 border-purple-500 text-white font-semibold' 
+                                    ? (isCheckbox ? 'bg-purple-900/50 border-purple-400 text-white font-semibold' : 'bg-emerald-950/40 border-emerald-500 text-white font-semibold')
                                     : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700'
                             }">
                                 <div class="flex items-center gap-3 pr-2 flex-1">
                                     <span class="w-6 h-6 rounded-lg text-xs font-bold font-mono flex items-center justify-center shrink-0 ${
-                                        isSelectedBySupport ? 'bg-purple-500 text-white' : 'bg-slate-800 text-purple-400'
+                                        isSelectedBySupport ? (isCheckbox ? 'bg-purple-500 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-800 text-purple-400'
                                     }">
                                         ${optLabel}
                                     </span>
                                     <span class="text-xs leading-normal">${escapeHtml(opt.text || '')}</span>
                                 </div>
-                                <button onclick="setSupportAnswer(${idx}, '${optLabel}')" 
+                                <button onclick="${clickAction}" 
                                     class="px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
                                         isSelectedBySupport 
                                             ? 'bg-emerald-600 text-white hover:bg-emerald-500' 
                                             : 'bg-purple-600/20 text-purple-300 hover:bg-purple-600 hover:text-white border border-purple-500/30'
                                     }">
-                                    ${isSelectedBySupport ? '<i class="fa-solid fa-check mr-1"></i> Đã Chọn' : 'Chọn Đáp Án Này'}
+                                    ${isSelectedBySupport ? '<i class="fa-solid fa-check mr-1"></i> ' + (isCheckbox ? 'Đang Chọn' : 'Đã Chọn') : (isCheckbox ? '+ Chọn' : 'Chọn Đáp Án Này')}
                                 </button>
                             </div>
                         `;
@@ -527,6 +531,21 @@
             });
         }
 
+        async function toggleSupportCheckbox(questionIndex, optLabel) {
+            if (!currentSelectedHWID) return;
+            const q = cachedQuestions[questionIndex];
+            if (!q) return;
+            const current = q.support_answer || "";
+            const chosen = new Set(current ? current.split(",").map(s => s.trim()).filter(Boolean) : []);
+            if (chosen.has(optLabel)) {
+                chosen.delete(optLabel);
+            } else {
+                chosen.add(optLabel);
+            }
+            const newAns = Array.from(chosen).sort().join(",");
+            await setSupportAnswer(questionIndex, newAns);
+        }
+
         async function setSupportAnswer(questionIndex, answerLabel) {
             if (!currentSelectedHWID) return;
             try {
@@ -541,7 +560,7 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`Đã chọn đáp án ${answerLabel} cho Câu ${questionIndex + 1}`);
+                    showToast(`Đã chọn đáp án ${answerLabel || 'rỗng'} cho Câu ${questionIndex + 1}`);
                     // Optimistic update
                     if (cachedQuestions[questionIndex]) {
                         cachedQuestions[questionIndex].support_answer = answerLabel;
