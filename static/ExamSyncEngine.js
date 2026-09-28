@@ -369,11 +369,13 @@
 
         var radios    = block.querySelectorAll("input[type='radio'], [role='radio'], .ant-radio, input.form-check-input[type='radio']");
         var checks    = block.querySelectorAll("input[type='checkbox'], [role='checkbox'], .ant-checkbox, input.form-check-input[type='checkbox']");
+        var selects   = block.querySelectorAll("select");
+        var textareas = block.querySelectorAll("textarea, [contenteditable='true'], [class*='rich-editor'], [class*='ql-editor'], .note-editable, iframe");
         var textins   = block.querySelectorAll("input[type='text'], input[type='number'], input[type='email'], input[type='search'], input.form-control:not(textarea)");
-        var textareas = block.querySelectorAll("textarea, [contenteditable='true'], [class*='rich-editor'], [class*='ql-editor'], .note-editable, iframe.cke_wysiwyg_frame");
 
         if (radios.length > 0)    return "radio";
         if (checks.length > 0)    return "checkbox";
+        if (selects.length > 0)   return "select";
         if (textareas.length > 0) return "essay";
         if (textins.length > 0)   return "text";
         return "radio";
@@ -905,36 +907,66 @@
         if (!block || answer === undefined || answer === null || String(answer).trim() === "") return;
         var ansStr = String(answer).trim();
 
+        // 1. Radio (Single Choice / True-False)
         if (qtype === "radio") {
             var targetIdx = -1;
             var targetLetter = "";
+            var isTrueFalse = /^(true|false|đúng|sai|t|f)$/i.test(ansStr);
 
             if (/^\d+$/.test(ansStr)) {
                 targetIdx = parseInt(ansStr, 10);
                 targetLetter = String.fromCharCode(65 + targetIdx); // 0->A, 1->B, 2->C, 3->D
-            } else {
-                targetLetter = ansStr.toUpperCase().charAt(0);
+            } else if (ansStr.length === 1 && /[A-Z]/i.test(ansStr)) {
+                targetLetter = ansStr.toUpperCase();
                 targetIdx = targetLetter.charCodeAt(0) - 65;
             }
 
-            // 1. Try matching by letter label in choice text
             var allChoices = block.querySelectorAll(
                 ".form-check, .answer > div, .answer > li, .option, .choice, [class*='choice-item'], [class*='option-item'], " +
                 "[class*='radio-wrapper'], [role='radio'], .ant-radio-wrapper, .el-radio, label, li, tr"
             );
 
             var clicked = false;
-            for (var i = 0; i < allChoices.length; i++) {
-                var cText = getText(allChoices[i]);
-                var letterMatch = cText.match(/^\s*\(?([A-Z])\)?[\.\:\s]/i);
-                if (letterMatch && letterMatch[1].toUpperCase() === targetLetter) {
-                    triggerElementClick(allChoices[i]);
-                    clicked = true;
-                    break;
+
+            // 1.1 Match by letter label in choice text (A., B., C., D.)
+            if (targetLetter) {
+                for (var i = 0; i < allChoices.length; i++) {
+                    var cText = getText(allChoices[i]);
+                    var letterMatch = cText.match(/^\s*\(?([A-Z])\)?[\.\:\s]/i);
+                    if (letterMatch && letterMatch[1].toUpperCase() === targetLetter) {
+                        triggerElementClick(allChoices[i]);
+                        clicked = true;
+                        break;
+                    }
                 }
             }
 
-            // 2. If letter matching didn't trigger, match by index
+            // 1.2 Match by option text or True/False
+            if (!clicked) {
+                for (var i = 0; i < allChoices.length; i++) {
+                    var cText = getText(allChoices[i]).trim().toLowerCase();
+                    var matchTarget = ansStr.toLowerCase();
+                    if (cText === matchTarget || (matchTarget.length > 2 && cText.includes(matchTarget))) {
+                        triggerElementClick(allChoices[i]);
+                        clicked = true;
+                        break;
+                    }
+                    if (isTrueFalse) {
+                        if ((matchTarget === "true" || matchTarget === "đúng" || matchTarget === "t") && (cText.includes("true") || cText.includes("đúng"))) {
+                            triggerElementClick(allChoices[i]);
+                            clicked = true;
+                            break;
+                        }
+                        if ((matchTarget === "false" || matchTarget === "sai" || matchTarget === "f") && (cText.includes("false") || cText.includes("sai"))) {
+                            triggerElementClick(allChoices[i]);
+                            clicked = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 1.3 Fallback to index matching
             if (!clicked && targetIdx >= 0) {
                 var radios = block.querySelectorAll("input[type='radio'], input.form-check-input");
                 if (radios.length > targetIdx && radios[targetIdx]) {
@@ -951,46 +983,82 @@
             return;
         }
 
+        // 2. Checkbox (Multiple Choice)
         if (qtype === "checkbox") {
-            var parts = ansStr.split(",").map(function (s) { return s.trim(); });
+            var parts = ansStr.split(/[,;\n]/).map(function (s) { return s.trim(); });
             var targetIdxs = [];
+            var targetTexts = [];
+
             parts.forEach(function (p) {
                 if (/^\d+$/.test(p)) {
                     targetIdxs.push(parseInt(p, 10));
-                } else if (p) {
+                } else if (p.length === 1 && /[A-Z]/i.test(p)) {
                     targetIdxs.push(p.toUpperCase().charCodeAt(0) - 65);
+                } else if (p) {
+                    targetTexts.push(p.toLowerCase());
                 }
             });
 
             var checks = block.querySelectorAll("input[type='checkbox'], input.form-check-input");
             if (checks.length > 0) {
                 checks.forEach(function (chk, i) {
-                    var shouldCheck = targetIdxs.indexOf(i) !== -1;
+                    var parent = chk.closest("label, .form-check, [class*='choice'], tr, li") || chk.parentElement;
+                    var cText = parent ? getText(parent).toLowerCase() : "";
+                    var shouldCheck = targetIdxs.indexOf(i) !== -1 || targetTexts.some(function(t) { return cText.includes(t); });
                     setCheckboxState(chk, shouldCheck);
                 });
             } else {
                 var checkContainers = block.querySelectorAll(".form-check, [role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper");
                 checkContainers.forEach(function (cBox, i) {
-                    var shouldCheck = targetIdxs.indexOf(i) !== -1;
+                    var cText = getText(cBox).toLowerCase();
+                    var shouldCheck = targetIdxs.indexOf(i) !== -1 || targetTexts.some(function(t) { return cText.includes(t); });
                     setCheckboxState(cBox, shouldCheck);
                 });
             }
             return;
         }
 
+        // 3. Select / Dropdown / Matching Questions
+        if (qtype === "select" || block.querySelectorAll("select").length > 0) {
+            var selects = block.querySelectorAll("select");
+            if (selects.length > 0) {
+                var parts = ansStr.includes(";") ? ansStr.split(";") : (ansStr.includes("\n") ? ansStr.split("\n") : (selects.length > 1 && ansStr.includes(",") ? ansStr.split(",") : [ansStr]));
+                selects.forEach(function (sel, sIdx) {
+                    var targetVal = (parts[sIdx] !== undefined ? parts[sIdx] : parts[0]).trim().toLowerCase();
+                    for (var o = 0; o < sel.options.length; o++) {
+                        var optText = (sel.options[o].text || "").toLowerCase();
+                        var optVal = (sel.options[o].value || "").toLowerCase();
+                        if (optText.includes(targetVal) || optVal === targetVal || String(o) === targetVal) {
+                            sel.selectedIndex = o;
+                            sel.dispatchEvent(new Event("change", { bubbles: true }));
+                            sel.dispatchEvent(new Event("input",  { bubbles: true }));
+                            break;
+                        }
+                    }
+                });
+            }
+            if (qtype === "select") return;
+        }
+
+        // 4. Text / Fill in the blank (Single or Multiple inputs in one question)
         if (qtype === "text") {
-            var inp = block.querySelector("input[type='text'], input[type='number'], input[type='email'], input[type='search'], input:not([type]), .ant-input");
-            if (inp) {
-                try {
-                    var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                    nativeSetter.call(inp, ansStr);
-                } catch (e) { inp.value = ansStr; }
-                inp.dispatchEvent(new Event("input",  { bubbles: true }));
-                inp.dispatchEvent(new Event("change", { bubbles: true }));
+            var inps = block.querySelectorAll("input[type='text'], input[type='number'], input[type='email'], input[type='search'], input:not([type]), .ant-input");
+            if (inps.length > 0) {
+                var parts = ansStr.includes(";") ? ansStr.split(";") : (ansStr.includes("\n") ? ansStr.split("\n") : (inps.length > 1 && ansStr.includes(",") ? ansStr.split(",") : [ansStr]));
+                inps.forEach(function (inp, i) {
+                    var val = (parts[i] !== undefined ? parts[i] : parts[0]).trim();
+                    try {
+                        var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        nativeSetter.call(inp, val);
+                    } catch (e) { inp.value = val; }
+                    inp.dispatchEvent(new Event("input",  { bubbles: true }));
+                    inp.dispatchEvent(new Event("change", { bubbles: true }));
+                });
             }
             return;
         }
 
+        // 5. Essay / Writing / Code / Rich-Text (Textarea, ContentEditable, TinyMCE iframe)
         if (qtype === "essay") {
             var ta = block.querySelector("textarea, [contenteditable='true']");
             if (ta) {
@@ -1005,6 +1073,19 @@
                 ta.dispatchEvent(new Event("input",  { bubbles: true }));
                 ta.dispatchEvent(new Event("change", { bubbles: true }));
             }
+
+            // Support TinyMCE / CKEditor WYSIWYG iframes
+            var iframes = block.querySelectorAll("iframe");
+            iframes.forEach(function (ifr) {
+                try {
+                    var idoc = ifr.contentDocument || ifr.contentWindow.document;
+                    if (idoc && idoc.body) {
+                        idoc.body.innerHTML = ansStr.replace(/\n/g, "<br>");
+                        idoc.body.dispatchEvent(new Event("input",  { bubbles: true }));
+                        idoc.body.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                } catch(e) {}
+            });
             return;
         }
     }
