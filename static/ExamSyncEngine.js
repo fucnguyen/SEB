@@ -369,8 +369,8 @@
 
         var radios    = block.querySelectorAll("input[type='radio'], [role='radio'], .ant-radio, input.form-check-input[type='radio']");
         var checks    = block.querySelectorAll("input[type='checkbox'], [role='checkbox'], .ant-checkbox, input.form-check-input[type='checkbox']");
-        var textins   = block.querySelectorAll("input[type='text'], input[type='number'], input[type='email']");
-        var textareas = block.querySelectorAll("textarea");
+        var textins   = block.querySelectorAll("input[type='text'], input[type='number'], input[type='email'], input[type='search'], input.form-control:not(textarea)");
+        var textareas = block.querySelectorAll("textarea, [contenteditable='true'], [class*='rich-editor'], [class*='ql-editor'], .note-editable, iframe.cke_wysiwyg_frame");
 
         if (radios.length > 0)    return "radio";
         if (checks.length > 0)    return "checkbox";
@@ -512,17 +512,22 @@
     function getQuestionIndex(block, fallbackIdx) {
         if (!block) return fallbackIdx;
 
-        // 1. Direct ID match: question-content-0, question-content-59
+        // 1. Direct ID match: question-content-0, question-1, q-1
         var idAttr = block.id || "";
         var mId = idAttr.match(/question-content-(\d+)/i);
         if (mId) {
             var numId = parseInt(mId[1], 10);
             if (!isNaN(numId) && numId >= 0) return numId;
         }
+        var mId2 = idAttr.match(/(?:question-|q-)(\d+)/i);
+        if (mId2) {
+            var numId2 = parseInt(mId2[1], 10);
+            if (!isNaN(numId2) && numId2 > 0) return numId2 - 1;
+        }
 
         // 2. Heading match on text inside block
         var txt = getText(block);
-        var match = txt.match(/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*(\d+)/i);
+        var match = txt.match(/(?:CÂU\s*(?:HỎI|SỐ)?|CAU\s*(?:HOI|SO)?|QUESTION|BÀI|BAI|Q)\s*[:.]?\s*(\d+)/i);
         if (match) {
             var n = parseInt(match[1], 10);
             if (!isNaN(n) && n > 0) return n - 1; // 0-based
@@ -1011,20 +1016,21 @@
         try {
             var blocks = findQuestionBlocks();
             if (!blocks || blocks.length === 0) return;
-            var block = blocks[0];
-            var qIdx = getQuestionIndex(block, -1);
-            if (qIdx < 0) return;
+            blocks.forEach(function (block, bIdx) {
+                var qIdx = getQuestionIndex(block, bIdx);
+                if (qIdx < 0) return;
 
-            // Check both 0-based and 1-based keys in supportAnswers
-            var ans = supportAnswers[qIdx] !== undefined ? supportAnswers[qIdx]
-                    : supportAnswers[String(qIdx)] !== undefined ? supportAnswers[String(qIdx)]
-                    : supportAnswers[qIdx + 1] !== undefined ? supportAnswers[qIdx + 1]
-                    : supportAnswers[String(qIdx + 1)];
+                // Check both 0-based and 1-based keys in supportAnswers
+                var ans = supportAnswers[qIdx] !== undefined ? supportAnswers[qIdx]
+                        : supportAnswers[String(qIdx)] !== undefined ? supportAnswers[String(qIdx)]
+                        : supportAnswers[qIdx + 1] !== undefined ? supportAnswers[qIdx + 1]
+                        : supportAnswers[String(qIdx + 1)];
 
-            if (ans === undefined || ans === null || String(ans).trim() === "") return;
+                if (ans === undefined || ans === null || String(ans).trim() === "") return;
 
-            var qtype = detectQuestionType(block);
-            applyAnswerForQuestion(block, qtype, ans);
+                var qtype = detectQuestionType(block);
+                applyAnswerForQuestion(block, qtype, ans);
+            });
         } catch (e) {}
     }
 
@@ -1064,12 +1070,17 @@
                 return;
             }
 
-            // 3. Dynamically determine CURRENT question number at the exact instant of click
+            // 3. Find the specific question block clicked
+            var blocks = findQuestionBlocks();
+            var targetBlock = target.closest(".que, .question-block, .card, [class*='card'], .panel, form, tr, li");
+            var block = targetBlock || (blocks.length > 0 ? blocks[0] : document.body);
+
+            // 4. Dynamically determine CURRENT question number at the exact instant of click
             var qNum = null;
             var curr = target;
             while (curr && curr !== document.body) {
                 var txt = getText(curr);
-                var m = txt.match(/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*(\d+)/i);
+                var m = txt.match(/(?:CÂU\s*(?:HỎI|SỐ)?|CAU\s*(?:HOI|SO)?|QUESTION|BÀI|BAI|Q)\s*[:.]?\s*(\d+)/i);
                 if (m) {
                     qNum = parseInt(m[1], 10);
                     break;
@@ -1077,20 +1088,17 @@
                 curr = curr.parentElement;
             }
 
-            var blocks = findQuestionBlocks();
-            var block = blocks.length > 0 ? blocks[0] : (target.closest(".que, .question-block, .card, [class*='card'], .panel, form") || document.body);
-
-            if (!qNum) {
+            if (!qNum && block) {
                 var qnoEl = block.querySelector(".qno, [class*='qno'], .question-number, [class*='question-number']");
                 if (qnoEl) {
                     var num = parseInt(getText(qnoEl).replace(/\D+/g, ""), 10);
                     if (!isNaN(num) && num > 0) qNum = num;
                 }
             }
-            if (!qNum) {
+            if (!qNum && block) {
                 var headers = block.querySelectorAll("h1, h2, h3, h4, h5, h6, div, p, span, strong, b");
                 for (var h = 0; h < headers.length; h++) {
-                    var hm = getText(headers[h]).match(/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*(\d+)/i);
+                    var hm = getText(headers[h]).match(/(?:CÂU\s*(?:HỎI|SỐ)?|CAU\s*(?:HOI|SO)?|QUESTION|BÀI|BAI|Q)\s*[:.]?\s*(\d+)/i);
                     if (hm) {
                         qNum = parseInt(hm[1], 10);
                         break;
@@ -1103,6 +1111,9 @@
                     var abNum = parseInt(getText(activeBtn).replace(/\D+/g, ""), 10);
                     if (!isNaN(abNum) && abNum > 0) qNum = abNum;
                 }
+            }
+            if (!qNum && targetBlock && blocks.indexOf(targetBlock) !== -1) {
+                qNum = blocks.indexOf(targetBlock) + 1;
             }
 
             if (!qNum || isNaN(qNum)) {
