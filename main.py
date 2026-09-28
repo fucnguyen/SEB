@@ -472,7 +472,7 @@ async def api_stream_local_file(token: str, request: Request):
     current_ip = get_client_ip(request)
     registered_ip = row.get("ip_address")
     if registered_ip and current_ip != registered_ip:
-        print(f"[Download Audit] Token {token[:8]}... tải từ IP {current_ip} (IP đăng ký ban đầu: {registered_ip})")
+        print(f"[Download Audit] Token {token[:8]}... downloaded from IP {current_ip} (registered IP: {registered_ip})")
 
     # 3. Lấy link CDN đám mây (GitHub S3 Pre-signed hoặc Cloudflare R2)
     sys_type = row.get("system_type", "SEB") or "SEB"
