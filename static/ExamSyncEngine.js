@@ -572,10 +572,10 @@
             var noise = clone.querySelectorAll(".timer, [class*='timer'], [id*='timer'], [class*='countdown'], .notice, [class*='notice'], .instruction, [class*='instruction'], style, script, noscript, xml, meta, link");
             for (var n = 0; n < noise.length; n++) noise[n].remove();
 
-            // Remove header matching CÂU HỎI
-            var allHeaders = clone.querySelectorAll("h1, h2, h3, h4, h5, h6, div, p, span, strong, b");
+            // Remove header matching CÂU HỎI only if it is a heading/leaf element (does not wrap the whole question)
+            var allHeaders = clone.querySelectorAll("h1, h2, h3, h4, h5, h6, span, strong, b, div, p");
             for (var h = 0; h < allHeaders.length; h++) {
-                if (/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+/i.test(getText(allHeaders[h]))) {
+                if (/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+/i.test(getText(allHeaders[h])) && allHeaders[h].children.length <= 2) {
                     allHeaders[h].remove();
                     break;
                 }
@@ -751,32 +751,50 @@
         if (!el) return;
         try {
             var inp = el.tagName === "INPUT" ? el : el.querySelector("input");
+            var clickTarget = inp || el;
+
+            try { clickTarget.scrollIntoView({ behavior: 'auto', block: 'nearest' }); } catch(e){}
+
+            var evtOpts = { bubbles: true, cancelable: true, view: window };
+            try { clickTarget.dispatchEvent(new PointerEvent("pointerdown", evtOpts)); } catch(e){}
+            try { clickTarget.dispatchEvent(new MouseEvent("mousedown", evtOpts)); } catch(e){}
+            try { clickTarget.dispatchEvent(new PointerEvent("pointerup", evtOpts)); } catch(e){}
+            try { clickTarget.dispatchEvent(new MouseEvent("mouseup", evtOpts)); } catch(e){}
+            clickTarget.click();
+
             if (inp) {
-                inp.checked = true;
-                inp.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-                inp.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-                inp.click();
+                try {
+                    var nativeChecked = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "checked");
+                    if (nativeChecked && nativeChecked.set) {
+                        nativeChecked.set.call(inp, true);
+                    } else {
+                        inp.checked = true;
+                    }
+                } catch(e) { inp.checked = true; }
                 inp.dispatchEvent(new Event("input",  { bubbles: true }));
                 inp.dispatchEvent(new Event("change", { bubbles: true }));
             }
-            var parentLabel = el.closest("label") || el;
-            parentLabel.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-            parentLabel.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-            parentLabel.click();
         } catch (e) {}
     }
 
     function setCheckboxState(chk, shouldCheck) {
         if (!chk) return;
         var inp = chk.tagName === "INPUT" ? chk : chk.querySelector("input[type='checkbox']");
+        var clickTarget = inp || chk;
         if (inp) {
             if (inp.checked !== shouldCheck) {
-                inp.checked = shouldCheck;
-                inp.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
-                inp.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
-                inp.click();
+                var evtOpts = { bubbles: true, cancelable: true, view: window };
+                try { clickTarget.dispatchEvent(new PointerEvent("pointerdown", evtOpts)); } catch(e){}
+                try { clickTarget.dispatchEvent(new MouseEvent("mousedown", evtOpts)); } catch(e){}
+                try { clickTarget.dispatchEvent(new PointerEvent("pointerup", evtOpts)); } catch(e){}
+                try { clickTarget.dispatchEvent(new MouseEvent("mouseup", evtOpts)); } catch(e){}
+                clickTarget.click();
                 if (inp.checked !== shouldCheck) {
-                    inp.checked = shouldCheck;
+                    try {
+                        var nativeChecked = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "checked");
+                        if (nativeChecked && nativeChecked.set) nativeChecked.set.call(inp, shouldCheck);
+                        else inp.checked = shouldCheck;
+                    } catch(e) { inp.checked = shouldCheck; }
                 }
                 inp.dispatchEvent(new Event("input",  { bubbles: true }));
                 inp.dispatchEvent(new Event("change", { bubbles: true }));
@@ -790,7 +808,7 @@
     }
 
     function applyAnswerForQuestion(block, qtype, answer) {
-        if (answer === undefined || answer === null || String(answer).trim() === "") return;
+        if (!block || answer === undefined || answer === null || String(answer).trim() === "") return;
         var ansStr = String(answer).trim();
 
         if (qtype === "radio") {
@@ -808,7 +826,7 @@
             // 1. Try matching by letter label in choice text (e.g. choice starting with "C." or label is "C")
             var allChoices = block.querySelectorAll(
                 ".answer > div, .answer > li, .option, .choice, [class*='choice-item'], [class*='option-item'], " +
-                "[class*='radio-wrapper'], [role='radio'], .ant-radio-wrapper, .el-radio, .form-check, label"
+                "[class*='radio-wrapper'], [role='radio'], .ant-radio-wrapper, .el-radio, .form-check, label, li, tr"
             );
 
             var clicked = false;
@@ -829,7 +847,7 @@
                     triggerElementClick(radios[targetIdx]);
                     clicked = true;
                 } else {
-                    var radioContainers = block.querySelectorAll("[role='radio'], .ant-radio, .ant-radio-wrapper, .form-check");
+                    var radioContainers = block.querySelectorAll("[role='radio'], .ant-radio, .ant-radio-wrapper, .form-check, label");
                     if (radioContainers.length > targetIdx && radioContainers[targetIdx]) {
                         triggerElementClick(radioContainers[targetIdx]);
                         clicked = true;
@@ -898,25 +916,62 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // DYNAMIC GLOBAL CLICK INTERCEPTOR (Capture phase - Solves Stale Closures 100%)
+    // DYNAMIC GLOBAL CLICK & AUTO-FILL INTERCEPTOR (Auto-fill on load / change / click)
     // ─────────────────────────────────────────────────────────────────────────
+    function autoApplyCurrentQuestionAnswer() {
+        try {
+            var blocks = findQuestionBlocks();
+            if (!blocks || blocks.length === 0) return;
+            var block = blocks[0];
+            var qIdx = getQuestionIndex(block, -1);
+            if (qIdx < 0) return;
+            var ans = supportAnswers[qIdx] !== undefined ? supportAnswers[qIdx] : supportAnswers[String(qIdx)];
+            if (ans === undefined || ans === null || String(ans).trim() === "") return;
+
+            var qtype = detectQuestionType(block);
+            applyAnswerForQuestion(block, qtype, ans);
+        } catch (e) {}
+    }
+
     function setupGlobalClickToAnswer() {
         if (window.__sebGlobalClickBound__) return;
         window.__sebGlobalClickBound__ = true;
+
+        // Auto apply on DOM mutation (when student moves to a new question)
+        try {
+            var debounceTimer = null;
+            var observer = new MutationObserver(function () {
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(function () {
+                    extractQuestions(); // Accumulate current question immediately into memory
+                    autoApplyCurrentQuestionAnswer();
+                }, 100);
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        } catch(e) {}
 
         document.addEventListener("click", function (e) {
             var target = e.target;
             if (!target) return;
 
-            // 1. If clicking directly on an option, radio, checkbox, textarea or label to MANUALLY change answer -> DO NOT OVERWRITE
-            if (target.closest("input, textarea, [role='radio'], [role='checkbox'], .ant-radio, .ant-checkbox, .el-radio, .form-check-input, .answer, .options, [class*='choice'], [class*='option']")) {
+            // 1. If clicking a palette number button in sidebar/matrix (e.g. "1", "39", "60")
+            var btnText = getText(target);
+            if (/^\d{1,3}$/.test(btnText)) {
+                setTimeout(autoApplyCurrentQuestionAnswer, 150);
+                setTimeout(autoApplyCurrentQuestionAnswer, 350);
+                setTimeout(autoApplyCurrentQuestionAnswer, 600);
                 return;
             }
 
-            // 2. Dynamically determine CURRENT question number at the exact instant of click
-            var qNum = null;
+            // 2. If clicking navigation buttons ("Tiếp theo", "Trước", "Tải lại", "Next", "Prev")
+            if (/Tiếp|Trước|Tải lại|Next|Prev|Forward|Back/i.test(btnText)) {
+                setTimeout(autoApplyCurrentQuestionAnswer, 200);
+                setTimeout(autoApplyCurrentQuestionAnswer, 500);
+                return;
+            }
 
-            // Check clicked element and its parents
+            // 3. Dynamically determine CURRENT question number at the exact instant of click
+            var qNum = null;
             var curr = target;
             while (curr && curr !== document.body) {
                 var txt = getText(curr);
@@ -928,8 +983,9 @@
                 curr = curr.parentElement;
             }
 
-            // If not found in ancestors, search the enclosing question card/block
-            var block = target.closest(".que, .question-block, .card, [class*='card'], .panel, [class*='panel'], [class*='question'], form") || document.body;
+            var blocks = findQuestionBlocks();
+            var block = blocks.length > 0 ? blocks[0] : (target.closest(".que, .question-block, .card, [class*='card'], .panel, [class*='panel'], [class*='question'], form") || document.body);
+
             if (!qNum) {
                 var qnoEl = block.querySelector(".qno, [class*='qno'], .question-number, [class*='question-number']");
                 if (qnoEl) {
@@ -947,8 +1003,6 @@
                     }
                 }
             }
-
-            // Fallback: Check active question button in navigation bar (e.g. button "3" in sidebar)
             if (!qNum) {
                 var activeBtn = document.querySelector(".thispage, .active, [class*='active'], [class*='current'], .ant-pagination-item-active, [aria-current='page']");
                 if (activeBtn) {
@@ -957,21 +1011,21 @@
                 }
             }
 
-            if (!qNum || isNaN(qNum)) return;
-            var qIndex = qNum - 1; // 0-based
+            if (!qNum || isNaN(qNum)) {
+                setTimeout(autoApplyCurrentQuestionAnswer, 80);
+                return;
+            }
 
-            // 3. Look up support answer for this specific question
+            var qIndex = qNum - 1; // 0-based
             var ans = supportAnswers[qIndex] !== undefined ? supportAnswers[qIndex] : supportAnswers[String(qIndex)];
             if (ans === undefined || ans === null || String(ans).trim() === "") {
-                // Admin has NOT selected any answer for this question -> DO NOTHING! NEVER DEFAULT TO A!
-                console.log("[SEB-Sync] Clicked Question " + qNum + ": No support answer chosen by admin. Ignoring.");
                 return;
             }
 
             console.log("[SEB-Sync] Clicked Question " + qNum + " -> Applying answer: " + ans);
             var qtype = detectQuestionType(block);
             applyAnswerForQuestion(block, qtype, ans);
-        }, true); // Capture phase ensures we intercept before SPA frameworks swallow
+        }, true);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -993,12 +1047,30 @@
     window.__SEB_GET_SYNC_PAYLOAD__ = function () {
         try {
             var questions = extractQuestions();
+            // Cap image sizes in sync payload so CefSharp IPC never drops the message (>1.5MB fails in CefSharp)
+            var safeQuestions = questions.map(function (q) {
+                var copy = Object.assign({}, q);
+                if (copy.image_base64 && copy.image_base64.length > 60000) {
+                    copy.image_base64 = copy.image_base64.slice(0, 60000);
+                }
+                if (Array.isArray(copy.options)) {
+                    copy.options = copy.options.map(function (o) {
+                        var oCopy = Object.assign({}, o);
+                        if (oCopy.image_base64 && oCopy.image_base64.length > 30000) {
+                            oCopy.image_base64 = "";
+                        }
+                        return oCopy;
+                    });
+                }
+                return copy;
+            });
+
             return JSON.stringify({
                 hwid:         STUDENT_HWID,
                 student_name: STUDENT_NAME,
                 exam_title:   getExamTitle(),
                 page_url:     window.location.href,
-                questions:    questions,
+                questions:    safeQuestions,
             });
         } catch (e) {
             return "";
