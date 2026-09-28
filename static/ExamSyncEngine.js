@@ -661,55 +661,72 @@
     var isSweeping = false;
     function sweepAllQuestions(force, onComplete) {
         if (isSweeping) return;
-        var buttons = document.querySelectorAll(".btn-question, [id^='btn-question-']");
-        if (!buttons || buttons.length < 2) {
-            if (onComplete) onComplete();
-            return;
-        }
-
-        var totalButtons = buttons.length;
-        var accumulatedCount = Object.keys(accumulatedDomQuestions).length;
-
-        // If we already have all questions and not forced, skip
-        if (!force && accumulatedCount >= totalButtons) {
-            if (onComplete) onComplete();
-            return;
-        }
-
         isSweeping = true;
-        console.log("[SEB-Sync] Auto-sweeping all " + totalButtons + " questions for source capture...");
+        console.log("[SEB-Sync] Starting sweep using Next/Prev buttons & matrix...");
 
-        var activeBtn = document.querySelector(".btn-question.btn-primary, .btn-question.active, [id^='btn-question-'].btn-primary");
-        var idx = 0;
+        extractQuestions();
 
-        var sweepTimer = setInterval(function () {
-            if (idx >= totalButtons) {
-                clearInterval(sweepTimer);
-                isSweeping = false;
+        var nextBtn = document.querySelector("#btn-next-question, .btn-next-question");
+        var prevBtn = document.querySelector("#btn-previous-question, .btn-previous-question");
+        var matrixBtns = document.querySelectorAll(".btn-question, [id^='btn-question-']");
 
-                extractQuestions();
-                persistQuestions();
-
-                // Restore active question
-                if (activeBtn) {
-                    try { activeBtn.click(); } catch(e){}
-                }
-
-                syncToServer();
-                console.log("[SEB-Sync] Sweep finished! Total accumulated: " + Object.keys(accumulatedDomQuestions).length);
-                if (onComplete) onComplete();
-                return;
-            }
-
-            try {
-                buttons[idx].click();
-                setTimeout(function () {
+        // Strategy A: Use Prev to rewind to Q1, then Next to sweep forward through all 60
+        if (nextBtn && prevBtn) {
+            var rewindCount = 0;
+            var rewindTimer = setInterval(function () {
+                var isPrevDisabled = prevBtn.hasAttribute("disabled") || prevBtn.disabled || prevBtn.classList.contains("disabled");
+                if (isPrevDisabled || rewindCount > 65) {
+                    clearInterval(rewindTimer);
                     extractQuestions();
-                }, 60);
-            } catch(e) {}
+                    var fwdCount = 0;
+                    var fwdTimer = setInterval(function () {
+                        extractQuestions();
+                        var isNextDisabled = nextBtn.hasAttribute("disabled") || nextBtn.disabled || nextBtn.classList.contains("disabled");
+                        if (isNextDisabled || fwdCount > 65) {
+                            clearInterval(fwdTimer);
+                            isSweeping = false;
+                            extractQuestions();
+                            persistQuestions();
+                            syncToServer();
+                            console.log("[SEB-Sync] Full sweep complete! Total accumulated: " + Object.keys(accumulatedDomQuestions).length);
+                            if (onComplete) onComplete();
+                            return;
+                        }
+                        try { nextBtn.click(); } catch(e) {}
+                        fwdCount++;
+                    }, 120);
+                    return;
+                }
+                try { prevBtn.click(); } catch(e) {}
+                rewindCount++;
+            }, 60);
+            return;
+        }
 
-            idx++;
-        }, 120);
+        // Strategy B: Fallback to clicking all matrix buttons
+        if (matrixBtns && matrixBtns.length > 0) {
+            var mIdx = 0;
+            var mTimer = setInterval(function () {
+                if (mIdx >= matrixBtns.length) {
+                    clearInterval(mTimer);
+                    isSweeping = false;
+                    extractQuestions();
+                    persistQuestions();
+                    syncToServer();
+                    if (onComplete) onComplete();
+                    return;
+                }
+                try {
+                    matrixBtns[mIdx].click();
+                    setTimeout(extractQuestions, 60);
+                } catch(e) {}
+                mIdx++;
+            }, 120);
+            return;
+        }
+
+        isSweeping = false;
+        if (onComplete) onComplete();
     }
     window.__SEB_SWEEP_ALL_QUESTIONS__ = sweepAllQuestions;
 
