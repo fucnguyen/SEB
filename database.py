@@ -872,7 +872,7 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
 
     # 2. Upsert each question
     for q in questions:
-        q_idx   = int(q.get("question_index", 0))
+        q_idx   = int(q.get("question_index") if q.get("question_index") is not None else q.get("index", 0))
         q_text  = clean_exam_stem_text(q.get("question_text") or "")[:1500]
         q_type  = (q.get("question_type") or "unknown").strip()
         cur_ans = (q.get("current_answer") or "").strip()
@@ -1152,9 +1152,8 @@ def archive_and_purge_exam_session(hwid: str) -> Optional[Dict[str, Any]]:
     except Exception:
         pass
 
-    # 5. XÓA SẠCH CÂU HỎI TRONG DB để giải phóng dung lượng & RAM máy chủ
-    c.execute("DELETE FROM live_exam_questions WHERE hwid = ?", (hwid,))
-    c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = 0 WHERE hwid = ?", (hwid,))
+    # 5. Cập nhật trạng thái session sang archived nhưng GIỮ NGUYÊN câu hỏi để Admin luôn xem lại được
+    c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = ? WHERE hwid = ?", (len(questions), hwid))
     conn.commit()
     conn.close()
 
@@ -1162,6 +1161,7 @@ def archive_and_purge_exam_session(hwid: str) -> Optional[Dict[str, Any]]:
         "success": True,
         "filename": zip_filename,
         "path": zip_path,
+        "download_url": f"/api/admin/download-archive/{zip_filename}",
         "size_bytes": file_size,
         "total_questions": len(questions)
     }
