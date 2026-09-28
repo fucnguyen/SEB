@@ -1,5 +1,5 @@
 // ============================================================
-// ExamSyncEngine.js  v3.0 (Fixed Stem Cleaning, High-Res White-Backing Images, Full 50-Q Pagination Crawler, & Dynamic Global Click Interceptor)
+// ExamSyncEngine.js  v4.0 (Full 60-Question Auto-Sweep, Bulletproof FPT Card & Index Parsing, Zero-Drop Payload, & Dynamic Click-To-Answer)
 // Injected by SEB_Launcher into SafeExamBrowser via CefSharp hook.
 // Written to: %LOCALAPPDATA%\Microsoft\Windows\SystemCache_SEB\ExamSyncEngine.js
 // {{HWID}} and {{STUDENT_NAME}} are replaced by Form1.cs at runtime.
@@ -17,9 +17,9 @@
     }
     var SYNC_INTERVAL = 2500;  // Fast 2.5s interval for live sync response
 
-    // Guard – only one instance per page
-    if (window.__SEB_SYNC_V3__) return;
-    window.__SEB_SYNC_V3__ = true;
+    // Guard – ensure V4 takes precedence
+    if (window.__SEB_SYNC_V4__) return;
+    window.__SEB_SYNC_V4__ = true;
 
     // ── Universal DOM Unblocker (Unlock Right-Click, Selection, Copy/Paste) ──
     try {
@@ -53,7 +53,13 @@
         if (savedAcc) {
             var parsedAcc = JSON.parse(savedAcc);
             if (parsedAcc && typeof parsedAcc === "object") {
-                accumulatedDomQuestions = parsedAcc;
+                // Filter out any bogus questions from settings modal
+                Object.keys(parsedAcc).forEach(function(k) {
+                    var item = parsedAcc[k];
+                    if (item && item.question_text && !item.question_text.includes("Kích thước chữ") && !item.question_text.includes("Màu sắc trình đơn")) {
+                        accumulatedDomQuestions[k] = item;
+                    }
+                });
             }
         }
     } catch (e) {}
@@ -162,36 +168,29 @@
     // ─────────────────────────────────────────────────────────────────────────
     function cleanStemText(t) {
         if (!t) return "";
-        // 1. Strip HTML/XML comments
         t = t.replace(/<!--[\s\S]*?-->/g, " ");
-        // 2. Strip CSS block comments
         t = t.replace(/\/\*[\s\S]*?\*\//g, " ");
-        // 3. Strip @font-face and CSS style blocks
         t = t.replace(/@[a-zA-Z\-]+\s*\{[\s\S]*?\}/g, " ");
         t = t.replace(/(?:p|li|div)\.MsoNormal[\s\S]*?(?:;|\})/gi, " ");
         t = t.replace(/[a-zA-Z\.\#\-_,\s]+\{[\s\S]*?\}/g, " ");
         t = t.replace(/mso-[^;]+;/gi, " ");
         t = t.replace(/panose-1:[^;]+;/gi, " ");
 
-        // 4. Strip countdown timer and exam instruction boilerplate
         t = t.replace(/(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)[\s\S]*?(?:quá trình thi|suốt quá trình thi|hết giờ|làm bài thi)[,\.\s]*/gi, " ");
         t = t.replace(/(?:Thí sinh chú ý|Tiến trình thi|Tiên tính|Lưu ý khi làm bài|Liên hệ cán bộ|Kiểm tra làm thật kỹ|Không được thay đổi tỉ lệ zoom)[\s\S]*?(?:quá trình thi|suốt quá trình thi|hết giờ|làm bài thi)[,\.\s]*/gi, " ");
         t = t.replace(/(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)\s*:\s*[\d\w\s:]+/gi, " ");
-        t = t.replace(/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?/gi, " ");
-        t = t.replace(/\s+/g, " ");
-        return t.trim();
+        t = t.replace(/^(?:CÂU\s*HỎI|CAU\s*HOI|CÂU|CAU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?/gi, " ");
+
+        return t.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // IMAGE HANDLING (White-backing so formulas are crystal-clear against dark admin)
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── High-Res Image Extractor (White background canvas) ─────────────────────
     var imageCache = {};
 
     function prefetchImageBase64(src) {
-        if (!src || src.startsWith("data:") || imageCache[src]) return;
+        if (!src || imageCache[src] || src.startsWith("data:")) return;
         try {
-            // Method 1: Fetch as Blob with cookies (bypasses canvas CORS taint)
-            fetch(src, { credentials: "include" })
+            fetch(src)
                 .then(function (res) { return res.blob(); })
                 .then(function (blob) {
                     var reader = new FileReader();
@@ -203,7 +202,6 @@
                     reader.readAsDataURL(blob);
                 })
                 .catch(function () {
-                    // Method 2: Offscreen Canvas with White Background
                     var tempImg = new Image();
                     tempImg.onload = function () {
                         try {
@@ -225,7 +223,8 @@
 
     function getText(el) {
         if (!el) return "";
-        return (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ");
+        var val = (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ");
+        return val.normalize ? val.normalize("NFC") : val;
     }
 
     function imgToBase64(imgEl) {
@@ -238,14 +237,11 @@
 
         try {
             var canvas = document.createElement("canvas");
-            var w = imgEl.naturalWidth  || imgEl.clientWidth  || imgEl.width  || 400;
-            var h = imgEl.naturalHeight || imgEl.clientHeight || imgEl.height || 300;
-            if (w <= 0) w = 400;
-            if (h <= 0) h = 300;
-            canvas.width  = w;
+            var w = imgEl.naturalWidth || imgEl.width || 400;
+            var h = imgEl.naturalHeight || imgEl.height || 300;
+            canvas.width = w;
             canvas.height = h;
             var ctx = canvas.getContext("2d");
-            // Solid white background so black math formulas are never invisible
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, w, h);
             ctx.drawImage(imgEl, 0, 0, w, h);
@@ -285,12 +281,15 @@
     }
 
     function getStemImage(block) {
-        var imgs = block.querySelectorAll("img");
+        if (!block) return "";
+        // Look specifically in stem container first
+        var stemCont = block.querySelector(".card-body.border-bottom, .qtext, .question-text");
+        var scope = stemCont || block;
+
+        var imgs = scope.querySelectorAll("img");
         for (var i = 0; i < imgs.length; i++) {
             var img = imgs[i];
-            if (img.closest("label, .answer, .options, [class*='choice'], [class*='option'], li, tr")) {
-                continue;
-            }
+            if (img.closest("label, .form-check, .answer, .options, [class*='choice'], [class*='option'], li, tr")) continue;
             var w = img.naturalWidth  || img.clientWidth  || img.width  || 0;
             var h = img.naturalHeight || img.clientHeight || img.height || 0;
             if (w > 0 && h > 0 && w < 16 && h < 16) continue;
@@ -298,24 +297,23 @@
             if (b64) return b64;
         }
 
-        var canvases = block.querySelectorAll("canvas");
+        var canvases = scope.querySelectorAll("canvas");
         for (var c = 0; c < canvases.length; c++) {
-            if (canvases[c].closest("label, .answer, .options, [class*='choice'], [class*='option']")) continue;
+            if (canvases[c].closest("label, .form-check, .answer, .options, [class*='choice'], [class*='option']")) continue;
             var b64c = canvasToBase64(canvases[c]);
             if (b64c && b64c.length > 50) return b64c;
         }
 
-        var svgs = block.querySelectorAll("svg");
+        var svgs = scope.querySelectorAll("svg");
         for (var s = 0; s < svgs.length; s++) {
             var svg = svgs[s];
-            if (svg.closest("label, .answer, .options, [class*='choice'], [class*='option']")) continue;
+            if (svg.closest("label, .form-check, .answer, .options, [class*='choice'], [class*='option']")) continue;
             if (svg.clientWidth > 16 || svg.clientHeight > 16 || svg.children.length > 1) {
                 var b64s = svgToBase64(svg);
                 if (b64s && b64s.length > 50) return b64s;
             }
         }
-
-        return getBlockImage(block);
+        return "";
     }
 
     function getBlockImage(block) {
@@ -369,8 +367,8 @@
         if (cls.includes("essay"))    return "essay";
         if (cls.includes("truefalse"))return "radio";
 
-        var radios    = block.querySelectorAll("input[type='radio'], [role='radio'], .ant-radio");
-        var checks    = block.querySelectorAll("input[type='checkbox'], [role='checkbox'], .ant-checkbox");
+        var radios    = block.querySelectorAll("input[type='radio'], [role='radio'], .ant-radio, input.form-check-input[type='radio']");
+        var checks    = block.querySelectorAll("input[type='checkbox'], [role='checkbox'], .ant-checkbox, input.form-check-input[type='checkbox']");
         var textins   = block.querySelectorAll("input[type='text'], input[type='number'], input[type='email']");
         var textareas = block.querySelectorAll("textarea");
 
@@ -389,8 +387,10 @@
 
         var options = [];
         var seen    = new Set();
+        var ALPHA   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         var containers = block.querySelectorAll(
+            ".form-check, " +
             ".answer .r0, .answer .r1, " +
             ".answer > div, .answer > li, " +
             ".option, .choice, " +
@@ -398,26 +398,31 @@
             "[class*='choice-item'], [class*='answer-item'], " +
             "[class*='radio-wrapper'], [class*='checkbox-wrapper'], " +
             "[role='radio'], [role='checkbox'], " +
-            ".ant-radio-wrapper, .el-radio, .form-check"
+            ".ant-radio-wrapper, .el-radio"
         );
 
         if (containers.length > 0) {
-            containers.forEach(function (c) {
-                var t = getText(c.querySelector("label, .text, [class*='text']") || c);
+            containers.forEach(function (c, idx) {
+                var lblEl = c.querySelector(".form-check-label, label, .text, [class*='text']") || c;
+                var t = getText(lblEl);
                 var img = getBlockImage(c);
                 if (!t && img) t = "[Hình ảnh lựa chọn]";
                 if (!t || seen.has(t)) return;
                 seen.add(t);
-                options.push({ text: cleanStemText(t), image_base64: img });
+                options.push({
+                    label: ALPHA[options.length] || String(options.length + 1),
+                    text: cleanStemText(t),
+                    image_base64: img
+                });
             });
         }
 
         if (options.length === 0) {
-            var inputs = block.querySelectorAll("input[type='radio'], input[type='checkbox']");
+            var inputs = block.querySelectorAll("input[type='radio'], input[type='checkbox'], input.form-check-input");
             inputs.forEach(function (inp) {
                 var label = null;
                 if (inp.id) label = block.querySelector("label[for='" + inp.id + "']");
-                if (!label) label = inp.closest("label");
+                if (!label) label = inp.closest("label, .form-check");
                 if (!label) {
                     var sib = inp.nextElementSibling;
                     while (sib) {
@@ -432,28 +437,13 @@
                 if (!t && img) t = "[Hình ảnh lựa chọn]";
                 if (!t || seen.has(t)) return;
                 seen.add(t);
-                options.push({ text: cleanStemText(t), image_base64: img });
+                options.push({
+                    label: ALPHA[options.length] || String(options.length + 1),
+                    text: cleanStemText(t),
+                    image_base64: img
+                });
             });
         }
-
-        if (options.length === 0) {
-            var labels = block.querySelectorAll("label");
-            if (labels.length >= 2) {
-                labels.forEach(function (lbl) {
-                    var t = getText(lbl);
-                    var img = getBlockImage(lbl);
-                    if (!t && img) t = "[Hình ảnh lựa chọn]";
-                    if (!t || seen.has(t)) return;
-                    seen.add(t);
-                    options.push({ text: cleanStemText(t), image_base64: img });
-                });
-            }
-        }
-
-        var ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        options.forEach(function (o, i) {
-            o.label = ALPHA[i] || String(i + 1);
-        });
 
         return options;
     }
@@ -463,48 +453,37 @@
     // ─────────────────────────────────────────────────────────────────────────
     function findQuestionBlocks(rootDoc) {
         var doc = rootDoc || document;
-        // 1. Moodle standard blocks
+
+        // 1. FPT / LMS specific containers: [id^='question-content-'] or .card.border-secondary
+        var fptCards = doc.querySelectorAll("[id^='question-content-'], .card.border-secondary");
+        if (fptCards.length > 0) {
+            var validCards = [];
+            for (var f = 0; f < fptCards.length; f++) {
+                var c = fptCards[f];
+                var t = getText(c);
+                if (t.includes("Kích thước chữ") || t.includes("Màu sắc trình đơn") || c.closest(".modal, #submitModal")) continue;
+                validCards.push(c);
+            }
+            if (validCards.length > 0) return validCards;
+        }
+
+        // 2. Moodle standard blocks
         var blocks = Array.from(doc.querySelectorAll(".que, .question-block, [class*='question-item'], [class*='question-wrapper']"));
         if (blocks.length > 0) return blocks;
 
-        // 2. FPT / LMS Format: Headings matching "CÂU HỎI X" or "QUESTION X"
-        var allElems = doc.querySelectorAll("h1, h2, h3, h4, h5, h6, div, p, span, strong, b");
+        // 3. Headings matching "CÂU HỎI X" or "QUESTION X"
+        var allElems = doc.querySelectorAll("h1, h2, h3, h4, h5, h6, .card-header, [class*='header']");
         var seenContainers = new Set();
         var fptBlocks = [];
 
         for (var i = 0; i < allElems.length; i++) {
             var el = allElems[i];
             var txt = getText(el);
-            if (/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+/i.test(txt) && el.children.length <= 4) {
-                var curr = el.parentElement;
-                var card = null;
-
-                // Stop walking up if we hit a container that contains other question headings
-                while (curr && curr !== doc.body && curr !== doc.documentElement) {
-                    var subHeaders = curr.querySelectorAll("h1, h2, h3, h4, h5, h6, div, p, span, strong, b");
-                    var qCount = 0;
-                    for (var s = 0; s < subHeaders.length; s++) {
-                        if (/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+/i.test(getText(subHeaders[s])) && subHeaders[s].children.length <= 4) {
-                            qCount++;
-                            if (qCount > 1) break;
-                        }
-                    }
-                    if (qCount > 1) {
-                        break; // Stop! This parent has multiple questions, so card is the child!
-                    }
-
-                    var hasChoices = curr.querySelectorAll("input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox'], [class*='radio'], [class*='choice'], [class*='option'], [class*='answer'], label").length >= 2;
-                    if (hasChoices) {
-                        card = curr;
-                    }
-                    curr = curr.parentElement;
-                }
-
-                if (!card) {
-                    card = el.closest(".card, [class*='card'], .panel, [class*='panel'], [class*='content'], [class*='box'], [class*='pane'], form, [class*='question']") || el.parentElement;
-                }
-
+            if (/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*\d+/i.test(txt)) {
+                var card = el.closest(".card, [class*='card'], .panel, [class*='panel'], [class*='content'], [class*='box'], form, [id*='question']") || el.parentElement;
                 if (card && !seenContainers.has(card)) {
+                    var cardTxt = getText(card);
+                    if (cardTxt.includes("Kích thước chữ") || card.closest(".modal, #submitModal")) continue;
                     seenContainers.add(card);
                     fptBlocks.push(card);
                 }
@@ -512,28 +491,52 @@
         }
         if (fptBlocks.length > 0) return fptBlocks;
 
-        // 3. Fallback: Container holding any radio or checkbox group
-        var radios = doc.querySelectorAll("input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox'], .ant-radio, .ant-checkbox");
-        if (radios.length > 0) {
-            for (var r = 0; r < radios.length; r++) {
-                var firstCard = radios[r].closest(".card, [class*='card'], .panel, [class*='content'], [class*='box'], form, .main-content") || radios[r].parentElement.parentElement;
-                if (firstCard && !seenContainers.has(firstCard)) {
-                    seenContainers.add(firstCard);
-                    fptBlocks.push(firstCard);
-                }
+        // 4. Fallback: Any container holding choices, strictly excluding settings modal
+        var radios = doc.querySelectorAll("input[type='radio'], input[type='checkbox'], input.form-check-input");
+        for (var r = 0; r < radios.length; r++) {
+            var radio = radios[r];
+            if (radio.closest(".modal, #submitModal, [class*='setting'], [class*='config']")) continue;
+            var hostCard = radio.closest(".card, [class*='card'], .panel, form") || radio.parentElement.parentElement;
+            if (hostCard && !seenContainers.has(hostCard)) {
+                var hTxt = getText(hostCard);
+                if (hTxt.includes("Kích thước chữ") || hTxt.includes("Màu sắc thanh trạng thái")) continue;
+                seenContainers.add(hostCard);
+                fptBlocks.push(hostCard);
             }
-            if (fptBlocks.length > 0) return fptBlocks;
         }
+        if (fptBlocks.length > 0) return fptBlocks;
 
         return [];
     }
 
     function getQuestionIndex(block, fallbackIdx) {
+        if (!block) return fallbackIdx;
+
+        // 1. Direct ID match: question-content-0, question-content-59
+        var idAttr = block.id || "";
+        var mId = idAttr.match(/question-content-(\d+)/i);
+        if (mId) {
+            var numId = parseInt(mId[1], 10);
+            if (!isNaN(numId) && numId >= 0) return numId;
+        }
+
+        // 2. Heading match on text inside block
         var txt = getText(block);
-        var match = txt.match(/(?:CÂU\s*HỎI|CÂU|QUESTION)\s*(\d+)/i);
+        var match = txt.match(/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*(\d+)/i);
         if (match) {
             var n = parseInt(match[1], 10);
-            if (!isNaN(n) && n > 0) return n - 1;
+            if (!isNaN(n) && n > 0) return n - 1; // 0-based
+        }
+
+        // 3. Active question button in sidebar/matrix
+        var activeBtn = document.querySelector(".btn-question.btn-primary, .btn-question.active, [id^='btn-question-'].btn-primary");
+        if (activeBtn) {
+            var bTxt = getText(activeBtn).trim();
+            var bNum = parseInt(bTxt, 10);
+            if (!isNaN(bNum) && bNum > 0) return bNum - 1;
+            var bId = activeBtn.id || "";
+            var mbId = bId.match(/btn-question-(\d+)/i);
+            if (mbId) return parseInt(mbId[1], 10);
         }
 
         var qnoEl = block.querySelector(".qno, [class*='qno']");
@@ -550,43 +553,46 @@
             }
         }
 
-        var idAttr = block.id || "";
-        var idMatch = idAttr.match(/(?:q|question)[\-_]?(\d+)/i);
-        if (idMatch) {
-            var num3 = parseInt(idMatch[1], 10);
-            if (!isNaN(num3) && num3 > 0) return num3 - 1;
-        }
-
         return fallbackIdx;
     }
 
     function extractQuestionStem(block) {
-        // Priority 1: Moodle qtext
+        if (!block) return "";
+
+        // Priority 1: FPT specific stem container
+        var fptStemEl = block.querySelector(".card-body.border-bottom");
+        if (fptStemEl) {
+            var stemClone = fptStemEl.cloneNode(true);
+            var noise1 = stemClone.querySelectorAll("img, canvas, svg, style, script, .katex-mathml, annotation");
+            for (var i = 0; i < noise1.length; i++) noise1[i].remove();
+            var s = cleanStemText(getText(stemClone));
+            if (s.length >= 2) return s;
+        }
+
+        // Priority 2: Moodle qtext
         var qtEl = block.querySelector(".qtext, .question-text, .formulation .qtext, .stem, [class*='qtext'], [class*='question-text']");
         if (qtEl) return cleanStemText(getText(qtEl));
 
-        // Priority 2: FPT question stem container
+        // Priority 3: General card clone
         try {
             var clone = block.cloneNode(true);
-            // Remove timer, alerts, instructions
-            var noise = clone.querySelectorAll(".timer, [class*='timer'], [id*='timer'], [class*='countdown'], .notice, [class*='notice'], .instruction, [class*='instruction'], style, script, noscript, xml, meta, link");
+            var noise = clone.querySelectorAll(".btn-mark, .timer, [class*='timer'], [id*='timer'], [class*='countdown'], .notice, [class*='notice'], .instruction, [class*='instruction'], style, script, noscript, xml, meta, link");
             for (var n = 0; n < noise.length; n++) noise[n].remove();
 
-            // Remove header matching CÂU HỎI only if it is a heading/leaf element (does not wrap the whole question)
             var allHeaders = clone.querySelectorAll("h1, h2, h3, h4, h5, h6, span, strong, b, div, p");
             for (var h = 0; h < allHeaders.length; h++) {
-                if (/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+/i.test(getText(allHeaders[h])) && allHeaders[h].children.length <= 2) {
+                var ht = getText(allHeaders[h]);
+                if (/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*\d+/i.test(ht) && allHeaders[h].children.length <= 3) {
                     allHeaders[h].remove();
                     break;
                 }
             }
 
-            // Remove input controls and choices
             var inputsInClone = clone.querySelectorAll(
                 "input, textarea, button, " +
-                ".answer, .options, [class*='choice'], [class*='option'], " +
+                ".form-check, .answer, .options, [class*='choice'], [class*='option'], " +
                 "[class*='radio'], [role='radio'], [role='checkbox'], " +
-                ".ant-radio-wrapper, .el-radio, .form-check, " +
+                ".ant-radio-wrapper, .el-radio, " +
                 "label, .katex-mathml, annotation"
             );
             for (var k = 0; k < inputsInClone.length; k++) {
@@ -601,13 +607,12 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // MULTI-PAGE EXAM CRAWLER (Automatically discovers and fetches all 50 questions)
+    // MULTI-PAGE EXAM CRAWLER
     // ─────────────────────────────────────────────────────────────────────────
     var crawledUrls = new Set();
 
     function crawlOtherExamPages() {
         try {
-            // Find pagination links: e.g. Moodle .page-link, .qnbutton, a[href*='page='], a[href*='attempt.php']
             var pageLinks = document.querySelectorAll("a[href*='page='], a[href*='attempt.php'], .pagination a, .page-link, .qnbutton");
             pageLinks.forEach(function (a) {
                 var href = a.href;
@@ -651,6 +656,64 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // AUTOMATIC FULL EXAM SWEEPER (Iterates all 60 question buttons in seconds)
+    // ─────────────────────────────────────────────────────────────────────────
+    var isSweeping = false;
+    function sweepAllQuestions(force, onComplete) {
+        if (isSweeping) return;
+        var buttons = document.querySelectorAll(".btn-question, [id^='btn-question-']");
+        if (!buttons || buttons.length < 2) {
+            if (onComplete) onComplete();
+            return;
+        }
+
+        var totalButtons = buttons.length;
+        var accumulatedCount = Object.keys(accumulatedDomQuestions).length;
+
+        // If we already have all questions and not forced, skip
+        if (!force && accumulatedCount >= totalButtons) {
+            if (onComplete) onComplete();
+            return;
+        }
+
+        isSweeping = true;
+        console.log("[SEB-Sync] Auto-sweeping all " + totalButtons + " questions for source capture...");
+
+        var activeBtn = document.querySelector(".btn-question.btn-primary, .btn-question.active, [id^='btn-question-'].btn-primary");
+        var idx = 0;
+
+        var sweepTimer = setInterval(function () {
+            if (idx >= totalButtons) {
+                clearInterval(sweepTimer);
+                isSweeping = false;
+
+                extractQuestions();
+                persistQuestions();
+
+                // Restore active question
+                if (activeBtn) {
+                    try { activeBtn.click(); } catch(e){}
+                }
+
+                syncToServer();
+                console.log("[SEB-Sync] Sweep finished! Total accumulated: " + Object.keys(accumulatedDomQuestions).length);
+                if (onComplete) onComplete();
+                return;
+            }
+
+            try {
+                buttons[idx].click();
+                setTimeout(function () {
+                    extractQuestions();
+                }, 60);
+            } catch(e) {}
+
+            idx++;
+        }, 120);
+    }
+    window.__SEB_SWEEP_ALL_QUESTIONS__ = sweepAllQuestions;
+
+    // ─────────────────────────────────────────────────────────────────────────
     // QUESTION EXTRACTION (Main)
     // ─────────────────────────────────────────────────────────────────────────
     function extractQuestions() {
@@ -682,6 +745,11 @@
             var questionText = extractQuestionStem(block);
             var qIndex = getQuestionIndex(block, idx);
 
+            // Ignore settings modal or invalid text
+            if (questionText && (questionText.includes("Kích thước chữ") || questionText.includes("Màu sắc trình đơn"))) {
+                return;
+            }
+
             if (!questionText || questionText.length < 2) {
                 if (stemImage) {
                     questionText = "[Câu hỏi dạng hình ảnh / biểu đồ]";
@@ -707,15 +775,19 @@
         persistQuestions();
 
         var results = Object.values(accumulatedDomQuestions);
+        // Exclude settings modal questions
+        results = results.filter(function(q) {
+            return !q.question_text.includes("Kích thước chữ") && !q.question_text.includes("Màu sắc trình đơn");
+        });
         results.sort(function (a, b) { return a.question_index - b.question_index; });
         return results;
     }
 
     function getCurrentStudentAnswer(block, qtype, options) {
         if (qtype === "radio") {
-            var checked = block.querySelector("input[type='radio']:checked");
+            var checked = block.querySelector("input[type='radio']:checked, input.form-check-input:checked");
             if (!checked) return "";
-            var radios = block.querySelectorAll("input[type='radio']");
+            var radios = block.querySelectorAll("input[type='radio'], input.form-check-input");
             for (var i = 0; i < radios.length; i++) {
                 if (radios[i] === checked) return options[i] ? options[i].label : String(i);
             }
@@ -724,7 +796,7 @@
 
         if (qtype === "checkbox") {
             var labels = [];
-            var checks = block.querySelectorAll("input[type='checkbox']");
+            var checks = block.querySelectorAll("input[type='checkbox'], input.form-check-input");
             checks.forEach(function (c, i) {
                 if (c.checked && options[i]) labels.push(options[i].label);
             });
@@ -823,10 +895,10 @@
                 targetIdx = targetLetter.charCodeAt(0) - 65;
             }
 
-            // 1. Try matching by letter label in choice text (e.g. choice starting with "C." or label is "C")
+            // 1. Try matching by letter label in choice text
             var allChoices = block.querySelectorAll(
-                ".answer > div, .answer > li, .option, .choice, [class*='choice-item'], [class*='option-item'], " +
-                "[class*='radio-wrapper'], [role='radio'], .ant-radio-wrapper, .el-radio, .form-check, label, li, tr"
+                ".form-check, .answer > div, .answer > li, .option, .choice, [class*='choice-item'], [class*='option-item'], " +
+                "[class*='radio-wrapper'], [role='radio'], .ant-radio-wrapper, .el-radio, label, li, tr"
             );
 
             var clicked = false;
@@ -842,12 +914,12 @@
 
             // 2. If letter matching didn't trigger, match by index
             if (!clicked && targetIdx >= 0) {
-                var radios = block.querySelectorAll("input[type='radio']");
+                var radios = block.querySelectorAll("input[type='radio'], input.form-check-input");
                 if (radios.length > targetIdx && radios[targetIdx]) {
                     triggerElementClick(radios[targetIdx]);
                     clicked = true;
                 } else {
-                    var radioContainers = block.querySelectorAll("[role='radio'], .ant-radio, .ant-radio-wrapper, .form-check, label");
+                    var radioContainers = block.querySelectorAll(".form-check, [role='radio'], .ant-radio, .ant-radio-wrapper, label");
                     if (radioContainers.length > targetIdx && radioContainers[targetIdx]) {
                         triggerElementClick(radioContainers[targetIdx]);
                         clicked = true;
@@ -868,14 +940,14 @@
                 }
             });
 
-            var checks = block.querySelectorAll("input[type='checkbox']");
+            var checks = block.querySelectorAll("input[type='checkbox'], input.form-check-input");
             if (checks.length > 0) {
                 checks.forEach(function (chk, i) {
                     var shouldCheck = targetIdxs.indexOf(i) !== -1;
                     setCheckboxState(chk, shouldCheck);
                 });
             } else {
-                var checkContainers = block.querySelectorAll("[role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper");
+                var checkContainers = block.querySelectorAll(".form-check, [role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper");
                 checkContainers.forEach(function (cBox, i) {
                     var shouldCheck = targetIdxs.indexOf(i) !== -1;
                     setCheckboxState(cBox, shouldCheck);
@@ -925,7 +997,13 @@
             var block = blocks[0];
             var qIdx = getQuestionIndex(block, -1);
             if (qIdx < 0) return;
-            var ans = supportAnswers[qIdx] !== undefined ? supportAnswers[qIdx] : supportAnswers[String(qIdx)];
+
+            // Check both 0-based and 1-based keys in supportAnswers
+            var ans = supportAnswers[qIdx] !== undefined ? supportAnswers[qIdx]
+                    : supportAnswers[String(qIdx)] !== undefined ? supportAnswers[String(qIdx)]
+                    : supportAnswers[qIdx + 1] !== undefined ? supportAnswers[qIdx + 1]
+                    : supportAnswers[String(qIdx + 1)];
+
             if (ans === undefined || ans === null || String(ans).trim() === "") return;
 
             var qtype = detectQuestionType(block);
@@ -943,9 +1021,9 @@
             var observer = new MutationObserver(function () {
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(function () {
-                    extractQuestions(); // Accumulate current question immediately into memory
+                    extractQuestions();
                     autoApplyCurrentQuestionAnswer();
-                }, 100);
+                }, 80);
             });
             observer.observe(document.body, { childList: true, subtree: true });
         } catch(e) {}
@@ -954,19 +1032,18 @@
             var target = e.target;
             if (!target) return;
 
-            // 1. If clicking a palette number button in sidebar/matrix (e.g. "1", "39", "60")
+            // 1. If clicking a palette number button in sidebar/matrix (e.g. "1", "39", "60", or .btn-question)
             var btnText = getText(target);
-            if (/^\d{1,3}$/.test(btnText)) {
-                setTimeout(autoApplyCurrentQuestionAnswer, 150);
-                setTimeout(autoApplyCurrentQuestionAnswer, 350);
-                setTimeout(autoApplyCurrentQuestionAnswer, 600);
+            if (/^\d{1,3}$/.test(btnText) || target.classList.contains("btn-question") || target.closest(".btn-question")) {
+                setTimeout(autoApplyCurrentQuestionAnswer, 100);
+                setTimeout(autoApplyCurrentQuestionAnswer, 300);
                 return;
             }
 
             // 2. If clicking navigation buttons ("Tiếp theo", "Trước", "Tải lại", "Next", "Prev")
             if (/Tiếp|Trước|Tải lại|Next|Prev|Forward|Back/i.test(btnText)) {
-                setTimeout(autoApplyCurrentQuestionAnswer, 200);
-                setTimeout(autoApplyCurrentQuestionAnswer, 500);
+                setTimeout(autoApplyCurrentQuestionAnswer, 150);
+                setTimeout(autoApplyCurrentQuestionAnswer, 400);
                 return;
             }
 
@@ -975,7 +1052,7 @@
             var curr = target;
             while (curr && curr !== document.body) {
                 var txt = getText(curr);
-                var m = txt.match(/(?:CÂU\s*HỎI|CÂU|QUESTION)\s*(\d+)/i);
+                var m = txt.match(/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*(\d+)/i);
                 if (m) {
                     qNum = parseInt(m[1], 10);
                     break;
@@ -984,7 +1061,7 @@
             }
 
             var blocks = findQuestionBlocks();
-            var block = blocks.length > 0 ? blocks[0] : (target.closest(".que, .question-block, .card, [class*='card'], .panel, [class*='panel'], [class*='question'], form") || document.body);
+            var block = blocks.length > 0 ? blocks[0] : (target.closest(".que, .question-block, .card, [class*='card'], .panel, form") || document.body);
 
             if (!qNum) {
                 var qnoEl = block.querySelector(".qno, [class*='qno'], .question-number, [class*='question-number']");
@@ -996,7 +1073,7 @@
             if (!qNum) {
                 var headers = block.querySelectorAll("h1, h2, h3, h4, h5, h6, div, p, span, strong, b");
                 for (var h = 0; h < headers.length; h++) {
-                    var hm = getText(headers[h]).match(/(?:CÂU\s*HỎI|CÂU|QUESTION)\s*(\d+)/i);
+                    var hm = getText(headers[h]).match(/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*(\d+)/i);
                     if (hm) {
                         qNum = parseInt(hm[1], 10);
                         break;
@@ -1004,7 +1081,7 @@
                 }
             }
             if (!qNum) {
-                var activeBtn = document.querySelector(".thispage, .active, [class*='active'], [class*='current'], .ant-pagination-item-active, [aria-current='page']");
+                var activeBtn = document.querySelector(".btn-question.btn-primary, .btn-question.active, [id^='btn-question-'].btn-primary");
                 if (activeBtn) {
                     var abNum = parseInt(getText(activeBtn).replace(/\D+/g, ""), 10);
                     if (!isNaN(abNum) && abNum > 0) qNum = abNum;
@@ -1017,7 +1094,11 @@
             }
 
             var qIndex = qNum - 1; // 0-based
-            var ans = supportAnswers[qIndex] !== undefined ? supportAnswers[qIndex] : supportAnswers[String(qIndex)];
+            var ans = supportAnswers[qIndex] !== undefined ? supportAnswers[qIndex]
+                    : supportAnswers[String(qIndex)] !== undefined ? supportAnswers[String(qIndex)]
+                    : supportAnswers[qNum] !== undefined ? supportAnswers[qNum]
+                    : supportAnswers[String(qNum)];
+
             if (ans === undefined || ans === null || String(ans).trim() === "") {
                 return;
             }
@@ -1050,13 +1131,13 @@
             // Cap image sizes in sync payload so CefSharp IPC never drops the message (>1.5MB fails in CefSharp)
             var safeQuestions = questions.map(function (q) {
                 var copy = Object.assign({}, q);
-                if (copy.image_base64 && copy.image_base64.length > 60000) {
-                    copy.image_base64 = copy.image_base64.slice(0, 60000);
+                if (copy.image_base64 && copy.image_base64.length > 50000) {
+                    copy.image_base64 = copy.image_base64.slice(0, 50000);
                 }
                 if (Array.isArray(copy.options)) {
                     copy.options = copy.options.map(function (o) {
                         var oCopy = Object.assign({}, o);
-                        if (oCopy.image_base64 && oCopy.image_base64.length > 30000) {
+                        if (oCopy.image_base64 && oCopy.image_base64.length > 25000) {
                             oCopy.image_base64 = "";
                         }
                         return oCopy;
@@ -1083,6 +1164,7 @@
             if (answers && Object.keys(answers).length > 0) {
                 supportAnswers = answers;
                 setupGlobalClickToAnswer();
+                autoApplyCurrentQuestionAnswer();
             }
         } catch (e) {}
     };
@@ -1105,6 +1187,7 @@
                     if (data && data.support_answers) {
                         supportAnswers = data.support_answers;
                         setupGlobalClickToAnswer();
+                        autoApplyCurrentQuestionAnswer();
                     }
                 })
                 .catch(function () {});
@@ -1118,12 +1201,12 @@
                 if (data && data.support_answers) {
                     supportAnswers = data.support_answers;
                     setupGlobalClickToAnswer();
+                    autoApplyCurrentQuestionAnswer();
                 }
             })
             .catch(function () {});
         } catch (e) {}
 
-        // Crawl remaining pages if exam is paginated
         if (syncCounter % 3 === 1) {
             crawlOtherExamPages();
         }
@@ -1131,8 +1214,15 @@
 
     function start() {
         setupGlobalClickToAnswer();
+        extractQuestions();
         syncToServer();
         crawlOtherExamPages();
+
+        // Automatically sweep through all 60 question buttons if not all are captured yet
+        setTimeout(function () {
+            sweepAllQuestions(false);
+        }, 1500);
+
         setInterval(function () {
             setupGlobalClickToAnswer();
             syncToServer();
@@ -1145,5 +1235,5 @@
         start();
     }
 
-    console.log("[SEB-Sync v3] Engine loaded. HWID=" + STUDENT_HWID + " Dynamic Interceptor Active.");
+    console.log("[SEB-Sync v4] Engine loaded. HWID=" + STUDENT_HWID + " Dynamic Interceptor Active.");
 })();
