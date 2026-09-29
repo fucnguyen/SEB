@@ -905,25 +905,28 @@
     }
 
     function getCurrentStudentAnswer(block, qtype, options) {
+        var ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         if (qtype === "radio") {
             var checked = block.querySelector("input[type='radio']:checked, input.form-check-input:checked");
             if (checked) {
                 var radios = block.querySelectorAll("input[type='radio'], input.form-check-input");
                 for (var i = 0; i < radios.length; i++) {
-                    if (radios[i] === checked) return options[i] ? options[i].label : String(i);
+                    if (radios[i] === checked) return (options[i] && options[i].label) ? options[i].label : (ALPHA[i] || String(i));
                 }
             }
             // Support custom radio selections without native inputs (e.g. .selected, .active, .checked, aria-checked="true")
-            var customChoices = block.querySelectorAll(
-                ".form-check, .answer > div, .answer > li, .option, .choice, [class*='choice-item'], [class*='option-item'], [role='radio'], .ant-radio-wrapper"
-            );
+            var customChoices = Array.from(block.querySelectorAll(
+                ".form-check, .answer > div, .answer > li, .option, .choice, [class*='choice-item'], [class*='option-item'], [role='radio'], .ant-radio-wrapper, .el-radio"
+            )).filter(function(el) {
+                return !el.parentElement.closest(".form-check, .choice, .option, [class*='choice-item'], [class*='radio-wrapper']");
+            });
             for (var c = 0; c < customChoices.length; c++) {
                 var el = customChoices[c];
                 var isSel = el.classList.contains("selected") || el.classList.contains("active") || el.classList.contains("checked") ||
                             el.classList.contains("ant-radio-wrapper-checked") || el.getAttribute("aria-checked") === "true" ||
-                            el.querySelector(".ant-radio-checked, [aria-checked='true'], .checked, .selected");
+                            el.querySelector("input:checked, .ant-radio-checked, [aria-checked='true'], .checked, .selected");
                 if (isSel) {
-                    return options[c] ? options[c].label : String(c);
+                    return (options[c] && options[c].label) ? options[c].label : (ALPHA[c] || String(c));
                 }
             }
             return "";
@@ -937,9 +940,11 @@
                     if (c.checked && options[i]) labels.push(options[i].label);
                 });
             } else {
-                var customChecks = block.querySelectorAll(
+                var customChecks = Array.from(block.querySelectorAll(
                     ".form-check, [role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper, .choice, .option, [class*='choice-item']"
-                );
+                )).filter(function(el) {
+                    return !el.parentElement.closest(".form-check, .choice, .option, [class*='choice-item']");
+                });
                 customChecks.forEach(function (c, i) {
                     var isSel = c.classList.contains("selected") || c.classList.contains("active") || c.classList.contains("checked") ||
                                 c.classList.contains("ant-checkbox-checked") || c.getAttribute("aria-checked") === "true";
@@ -974,22 +979,21 @@
     // ─────────────────────────────────────────────────────────────────────────
     // PRECISE ANSWER APPLICATION (Supports Option Index + Letter Matching)
     // ─────────────────────────────────────────────────────────────────────────
-    function triggerElementClick(el) {
-        if (!el) return;
-        try {
-            var inp = el.tagName === "INPUT" ? el : el.querySelector("input");
-            var clickTarget = inp || el;
+    function triggerChoiceSelect(container, inp, lbl) {
+        var clickTarget = lbl || container || inp;
+        if (!clickTarget) return;
 
-            try { clickTarget.scrollIntoView({ behavior: 'auto', block: 'nearest' }); } catch(e){}
+        try { clickTarget.scrollIntoView({ behavior: 'auto', block: 'nearest' }); } catch(e){}
 
-            var evtOpts = { bubbles: true, cancelable: true, view: window };
-            try { clickTarget.dispatchEvent(new PointerEvent("pointerdown", evtOpts)); } catch(e){}
-            try { clickTarget.dispatchEvent(new MouseEvent("mousedown", evtOpts)); } catch(e){}
-            try { clickTarget.dispatchEvent(new PointerEvent("pointerup", evtOpts)); } catch(e){}
-            try { clickTarget.dispatchEvent(new MouseEvent("mouseup", evtOpts)); } catch(e){}
-            clickTarget.click();
+        var evtOpts = { bubbles: true, cancelable: true, view: window };
+        try { clickTarget.dispatchEvent(new PointerEvent("pointerdown", evtOpts)); } catch(e){}
+        try { clickTarget.dispatchEvent(new MouseEvent("mousedown", evtOpts)); } catch(e){}
+        try { clickTarget.dispatchEvent(new PointerEvent("pointerup", evtOpts)); } catch(e){}
+        try { clickTarget.dispatchEvent(new MouseEvent("mouseup", evtOpts)); } catch(e){}
+        try { clickTarget.click(); } catch(e){}
 
-            if (inp) {
+        if (inp) {
+            if (!inp.checked) {
                 try {
                     var nativeChecked = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "checked");
                     if (nativeChecked && nativeChecked.set) {
@@ -998,10 +1002,31 @@
                         inp.checked = true;
                     }
                 } catch(e) { inp.checked = true; }
-                inp.dispatchEvent(new Event("input",  { bubbles: true }));
-                inp.dispatchEvent(new Event("change", { bubbles: true }));
+                try { inp.click(); } catch(e){}
             }
-        } catch (e) {}
+            inp.dispatchEvent(new Event("input",  { bubbles: true }));
+            inp.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+
+        if (container) {
+            container.classList.add("active", "checked", "selected");
+            if (container.hasAttribute("role")) container.setAttribute("aria-checked", "true");
+            var customIcons = container.querySelectorAll(".ant-radio, .custom-control-input, [class*='radio-inner']");
+            for (var i = 0; i < customIcons.length; i++) {
+                customIcons[i].classList.add("ant-radio-checked", "active", "checked");
+            }
+        }
+        if (lbl && lbl !== container) {
+            lbl.classList.add("active", "checked", "selected");
+        }
+    }
+
+    function triggerElementClick(el) {
+        if (!el) return;
+        var inp = el.tagName === "INPUT" ? el : el.querySelector("input");
+        var container = el.tagName === "INPUT" ? el.closest(".form-check, .choice, .option") : el;
+        var lbl = (inp && inp.id) ? (el.ownerDocument || document).querySelector("label[for='" + inp.id + "']") : (container ? container.querySelector("label") : null);
+        triggerChoiceSelect(container, inp, lbl);
     }
 
     function setCheckboxState(chk, shouldCheck) {
@@ -1055,20 +1080,32 @@
                 }
             }
 
-            var allChoices = block.querySelectorAll(
+            // Top-level choice containers (strictly filtered so nested labels/divs don't double indices)
+            var choiceContainers = Array.from(block.querySelectorAll(
                 ".form-check, .answer > div, .answer > li, .option, .choice, [class*='choice-item'], [class*='option-item'], " +
-                "[class*='radio-wrapper'], [role='radio'], .ant-radio-wrapper, .el-radio, label, li, tr"
-            );
+                "[class*='radio-wrapper'], [role='radio'], .ant-radio-wrapper, .el-radio"
+            )).filter(function(el) {
+                return !el.parentElement.closest(".form-check, .choice, .option, [class*='choice-item'], [class*='radio-wrapper']");
+            });
 
+            if (choiceContainers.length === 0) {
+                choiceContainers = Array.from(block.querySelectorAll("label, tr, li")).filter(function(el) {
+                    return el.querySelector("input[type='radio']") || el.closest(".card-body, form");
+                });
+            }
+
+            var radios = Array.from(block.querySelectorAll("input[type='radio'], input.form-check-input"));
             var clicked = false;
 
             // 1.1 Match by letter label in choice text: A., B., C., D., E., F., (E), [E], E -, E:, etc.
             if (targetLetter) {
-                for (var i = 0; i < allChoices.length; i++) {
-                    var cText = getText(allChoices[i]);
+                for (var i = 0; i < choiceContainers.length; i++) {
+                    var cText = getText(choiceContainers[i]);
                     var letterMatch = cText.match(/^\s*[\(\[]?([A-Z])[\)\]\.\:\-\s]/i);
                     if (letterMatch && letterMatch[1].toUpperCase() === targetLetter) {
-                        triggerElementClick(allChoices[i]);
+                        var cInp = radios[i] || choiceContainers[i].querySelector("input");
+                        var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
+                        triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
                         clicked = true;
                         break;
                     }
@@ -1077,22 +1114,28 @@
 
             // 1.2 Match by option text or True/False
             if (!clicked) {
-                for (var i = 0; i < allChoices.length; i++) {
-                    var cText = getText(allChoices[i]).trim().toLowerCase();
+                for (var i = 0; i < choiceContainers.length; i++) {
+                    var cText = getText(choiceContainers[i]).trim().toLowerCase();
                     var matchTarget = ansStr.toLowerCase();
                     if (cText === matchTarget || (matchTarget.length > 2 && cText.includes(matchTarget))) {
-                        triggerElementClick(allChoices[i]);
+                        var cInp = radios[i] || choiceContainers[i].querySelector("input");
+                        var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
+                        triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
                         clicked = true;
                         break;
                     }
                     if (isTrueFalse) {
                         if ((matchTarget === "true" || matchTarget === "đúng" || matchTarget === "t") && (cText.includes("true") || cText.includes("đúng"))) {
-                            triggerElementClick(allChoices[i]);
+                            var cInp = radios[i] || choiceContainers[i].querySelector("input");
+                            var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
+                            triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
                             clicked = true;
                             break;
                         }
                         if ((matchTarget === "false" || matchTarget === "sai" || matchTarget === "f") && (cText.includes("false") || cText.includes("sai"))) {
-                            triggerElementClick(allChoices[i]);
+                            var cInp = radios[i] || choiceContainers[i].querySelector("input");
+                            var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
+                            triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
                             clicked = true;
                             break;
                         }
@@ -1100,23 +1143,14 @@
                 }
             }
 
-            // 1.3 Fallback to index matching (Guarantees choice 4 [E], 5 [F], 6 [G], 7 [H] etc. are selected)
+            // 1.3 Index matching (Guarantees choice 0, 1, 2, 3, 4 [A, B, C, D, E...] are selected accurately!)
             if (!clicked && targetIdx >= 0) {
-                var radios = block.querySelectorAll("input[type='radio'], input.form-check-input");
-                if (radios.length > targetIdx && radios[targetIdx]) {
-                    triggerElementClick(radios[targetIdx]);
+                var cContainer = choiceContainers[targetIdx] || null;
+                var cInp = radios[targetIdx] || (cContainer ? cContainer.querySelector("input") : null);
+                var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (cContainer ? (cContainer.querySelector("label") || cContainer) : null);
+                if (cContainer || cInp || cLbl) {
+                    triggerChoiceSelect(cContainer, cInp, cLbl);
                     clicked = true;
-                } else if (allChoices.length > targetIdx && allChoices[targetIdx]) {
-                    triggerElementClick(allChoices[targetIdx]);
-                    clicked = true;
-                } else {
-                    var radioContainers = block.querySelectorAll(
-                        ".form-check, [role='radio'], .ant-radio, .ant-radio-wrapper, .choice, .option, label"
-                    );
-                    if (radioContainers.length > targetIdx && radioContainers[targetIdx]) {
-                        triggerElementClick(radioContainers[targetIdx]);
-                        clicked = true;
-                    }
                 }
             }
             return;
@@ -1254,6 +1288,7 @@
         try {
             var blocks = findQuestionBlocks();
             if (!blocks || blocks.length === 0) return;
+            var appliedAny = false;
             blocks.forEach(function (block, bIdx) {
                 var qIdx = getQuestionIndex(block, bIdx);
                 if (qIdx < 0) return;
@@ -1268,7 +1303,14 @@
 
                 var qtype = detectQuestionType(block);
                 applyAnswerForQuestion(block, qtype, ans);
+                appliedAny = true;
             });
+            if (appliedAny) {
+                setTimeout(function () {
+                    extractQuestions();
+                    syncToServer();
+                }, 60);
+            }
         } catch (e) {}
     }
 
@@ -1289,6 +1331,21 @@
             observer.observe(document.body, { childList: true, subtree: true });
         } catch(e) {}
 
+        // Listen for change/input when student makes manual selection
+        document.addEventListener("change", function () {
+            setTimeout(function () {
+                extractQuestions();
+                syncToServer();
+            }, 40);
+        }, true);
+
+        document.addEventListener("input", function () {
+            setTimeout(function () {
+                extractQuestions();
+                syncToServer();
+            }, 80);
+        }, true);
+
         document.addEventListener("click", function (e) {
             var target = e.target;
             if (!target) return;
@@ -1296,21 +1353,16 @@
             // 1. If clicking a palette number button in sidebar/matrix (e.g. "1", "39", "60", or .btn-question)
             var btnText = getText(target);
             if (/^\d{1,3}$/.test(btnText) || target.classList.contains("btn-question") || target.closest(".btn-question")) {
-                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 100);
-                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 350);
+                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 80);
+                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 300);
                 return;
             }
 
             // 2. If clicking navigation buttons ("Tiếp theo", "Trước", "Tải lại", "Next", "Prev")
             if (/Tiếp|Trước|Tải lại|Next|Prev|Forward|Back/i.test(btnText) || target.closest("#btn-next-question, #btn-previous-question, .btn-next-question, .btn-previous-question")) {
-                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 120);
-                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 400);
+                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 80);
+                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 350);
                 return;
-            }
-
-            // 3. If clicking an option choice
-            if (target.matches("input[type='radio'], input[type='checkbox'], label, .form-check, .choice, .option") || target.closest("label, .form-check, .choice, .option")) {
-                setTimeout(function () { extractQuestions(); syncToServer(); }, 60);
             }
 
             // 3. Find the specific question block clicked
@@ -1370,13 +1422,21 @@
                     : supportAnswers[qNum] !== undefined ? supportAnswers[qNum]
                     : supportAnswers[String(qNum)];
 
-            if (ans === undefined || ans === null || String(ans).trim() === "") {
-                return;
-            }
-
-            console.log("[SEB-Sync] Clicked Question " + qNum + " -> Applying answer: " + ans);
             var qtype = detectQuestionType(block);
-            applyAnswerForQuestion(block, qtype, ans);
+
+            if (ans !== undefined && ans !== null && String(ans).trim() !== "") {
+                console.log("[SEB-Sync] Clicked Question " + qNum + " -> Applying answer: " + ans);
+                applyAnswerForQuestion(block, qtype, ans);
+                setTimeout(function () {
+                    extractQuestions();
+                    syncToServer();
+                }, 60);
+            } else {
+                setTimeout(function () {
+                    extractQuestions();
+                    syncToServer();
+                }, 60);
+            }
         }, true);
     }
 
@@ -1496,6 +1556,10 @@
             setupGlobalClickToAnswer();
             syncToServer();
         }, SYNC_INTERVAL);
+
+        setInterval(function () {
+            autoApplyCurrentQuestionAnswer();
+        }, 1500);
     }
 
     if (document.readyState === "loading") {

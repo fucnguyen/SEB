@@ -401,20 +401,25 @@
             grid.innerHTML = "";
 
             questions.forEach((q, idx) => {
-                const qNum = idx + 1;
+                const qNum = (q.question_index !== undefined ? q.question_index + 1 : idx + 1);
+                const realQIndex = (q.question_index !== undefined ? q.question_index : idx);
                 const hasSupportAnswer = !!(q.support_answer && q.support_answer.trim());
+                const hasStudentAnswer = !!(q.current_answer && q.current_answer.trim());
                 if (hasSupportAnswer) solvedCount++;
 
+                let btnCls = 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white';
+                if (hasSupportAnswer) {
+                    btnCls = 'bg-emerald-600 text-white font-bold shadow-sm';
+                } else if (hasStudentAnswer) {
+                    btnCls = 'bg-sky-600/40 border border-sky-400 text-sky-300 font-semibold';
+                }
+
                 const btn = document.createElement("button");
-                btn.className = `w-8 h-8 rounded-lg text-xs font-bold font-mono transition flex items-center justify-center ${
-                    hasSupportAnswer 
-                        ? 'bg-emerald-600 text-white shadow-sm' 
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
-                }`;
+                btn.className = `w-8 h-8 rounded-lg text-xs font-mono transition flex items-center justify-center ${btnCls}`;
                 btn.innerText = qNum;
-                btn.title = `Chuyển tới câu ${qNum}${hasSupportAnswer ? ' (Đã chọn: ' + q.support_answer + ')' : ''}`;
+                btn.title = `Chuyển tới câu ${qNum}${hasSupportAnswer ? ' (Đã hỗ trợ: ' + q.support_answer + ')' : (hasStudentAnswer ? ' (Thí sinh chọn: ' + q.current_answer + ')' : '')}`;
                 btn.onclick = () => {
-                    const el = document.getElementById(`q-item-${idx}`);
+                    const el = document.getElementById(`q-item-${realQIndex}`);
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 };
                 grid.appendChild(btn);
@@ -428,43 +433,62 @@
             container.innerHTML = "";
 
             questions.forEach((q, idx) => {
-                const qNum = idx + 1;
+                const qNum = (q.question_index !== undefined ? q.question_index + 1 : idx + 1);
+                const realQIndex = (q.question_index !== undefined ? q.question_index : idx);
                 const qBox = document.createElement("div");
-                qBox.id = `q-item-${idx}`;
+                qBox.id = `q-item-${realQIndex}`;
                 qBox.className = "glass-card rounded-2xl p-5 border border-slate-800 shadow-md space-y-4";
 
-                // Header câu hỏi
+                // Header câu hỏi: Hiển thị cả Đáp án Hỗ trợ VÀ Đáp án Thí sinh đang chọn
                 const isAnswered = !!(q.support_answer && q.support_answer.trim());
+                const curAns = (q.current_answer || "").trim();
+                const hasCurrentAnswer = !!curAns;
+
                 const headerHtml = `
-                    <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 flex-wrap gap-2">
                         <div class="flex items-center gap-2">
                             <span class="w-7 h-7 rounded-lg bg-purple-600/20 text-purple-300 font-mono font-bold text-xs flex items-center justify-center border border-purple-500/30">
                                 ${qNum}
                             </span>
                             <span class="text-xs font-bold text-slate-300 uppercase">Câu hỏi số ${qNum}</span>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            ${hasCurrentAnswer 
+                                ? `<span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40 flex items-center gap-1 font-mono">
+                                    <i class="fa-solid fa-user-check text-[10px]"></i> Thí sinh chọn: ${escapeHtml(curAns)}
+                                   </span>`
+                                : `<span class="px-2 py-0.5 rounded text-[10px] text-slate-500 bg-slate-900 border border-slate-800">
+                                    <i class="fa-regular fa-circle text-[9px] mr-1"></i>Thí sinh chưa chọn
+                                   </span>`
+                            }
                             ${isAnswered 
-                                ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">Đã chọn: ${escapeHtml(q.support_answer)}</span>`
+                                ? `<span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono flex items-center gap-1">
+                                    <i class="fa-solid fa-handshake-angle text-[10px]"></i> Đã chọn: ${escapeHtml(q.support_answer)}
+                                   </span>`
                                 : `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-400">Chưa giải</span>`
                             }
                         </div>
                     </div>
                 `;
 
-                // Nội dung câu hỏi
+                // Nội dung câu hỏi (chữ & công thức)
                 let textHtml = '';
-                if (q.question_text) {
-                    textHtml = `<div class="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">${escapeHtml(q.question_text)}</div>`;
+                const isImageStemOnly = (q.question_text || "").includes("[Câu hỏi dạng hình ảnh") || (q.question_text || "").includes("[Đề bài dạng hình ảnh");
+                if (q.question_text && !isImageStemOnly) {
+                    textHtml = `<div class="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-medium">${escapeHtml(q.question_text)}</div>`;
+                } else if (isImageStemOnly) {
+                    textHtml = `<div class="mb-1"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 inline-block"><i class="fa-solid fa-image mr-1"></i>Đề bài dạng hình ảnh / biểu đồ</span></div>`;
                 }
 
-                // Hình ảnh đề thi (nếu có)
+                // Hình ảnh đề thi (nếu có) - Sử dụng nền TRẮNG bg-white để công thức LaTeX/ma trận không bị chìm
                 let imgHtml = '';
                 if (q.image_base64) {
                     imgHtml = `
-                        <div class="my-2">
-                            <img src="${q.image_base64}" onclick="openImageModal(this.src)" class="max-h-80 rounded-xl border border-slate-700/80 cursor-zoom-in hover:opacity-90 transition object-contain bg-slate-900/80" alt="Đề thi câu ${qNum}">
-                            <span class="text-[10px] text-slate-500 mt-1 block italic"><i class="fa-solid fa-magnifying-glass-plus mr-1"></i> Bấm vào ảnh để phóng to</span>
+                        <div class="my-2.5 inline-block max-w-full">
+                            <img src="${q.image_base64}" onclick="openImageModal(this.src)" 
+                                 class="max-h-96 rounded-xl border border-slate-600 cursor-zoom-in hover:opacity-95 transition object-contain bg-white p-2.5 shadow-md block max-w-full" 
+                                 alt="Đề thi câu ${qNum}">
+                            <span class="text-[10px] text-slate-500 mt-1 block italic"><i class="fa-solid fa-magnifying-glass-plus mr-1"></i> Bấm vào ảnh để phóng to chi tiết</span>
                         </div>
                     `;
                 }
@@ -476,22 +500,29 @@
                 if (opts.length > 0) {
                     optionsHtml = '<div class="space-y-2 pt-2">';
                     const isCheckbox = q.question_type === 'checkbox';
-                    const chosenSet = new Set((q.support_answer || "").split(",").map(s => s.trim()).filter(Boolean));
+                    const chosenSet = new Set((q.support_answer || "").split(",").map(s => s.trim().toUpperCase()).filter(Boolean));
+                    const studentAnsSet = new Set((q.current_answer || "").split(",").map(s => s.trim().toUpperCase()).filter(Boolean));
 
                     opts.forEach((opt, optIdx) => {
                         const optLabel = opt.label || String.fromCharCode(65 + optIdx);
-                        const isSelectedBySupport = chosenSet.has(optLabel) || chosenSet.has(String(optIdx));
-                        const clickAction = isCheckbox ? `toggleSupportCheckbox(${idx}, '${optLabel}')` : `setSupportAnswer(${idx}, '${optLabel}')`;
+                        const isSelectedBySupport = chosenSet.has(optLabel.toUpperCase()) || chosenSet.has(String(optIdx));
+                        const isSelectedByStudent = studentAnsSet.has(optLabel.toUpperCase()) || studentAnsSet.has(String(optIdx));
+                        const clickAction = isCheckbox ? `toggleSupportCheckbox(${realQIndex}, '${optLabel}')` : `setSupportAnswer(${realQIndex}, '${optLabel}')`;
                         
+                        let cardStyle = 'bg-slate-900/70 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700';
+                        if (isSelectedBySupport) {
+                            cardStyle = isCheckbox ? 'bg-purple-900/50 border-purple-400 text-white font-semibold' : 'bg-emerald-950/40 border-emerald-500 text-white font-semibold';
+                        } else if (isSelectedByStudent) {
+                            cardStyle = 'bg-sky-950/30 border-sky-500/70 text-white';
+                        }
+
                         optionsHtml += `
-                            <div class="flex items-center justify-between p-2.5 rounded-xl border transition ${
-                                isSelectedBySupport 
-                                    ? (isCheckbox ? 'bg-purple-900/50 border-purple-400 text-white font-semibold' : 'bg-emerald-950/40 border-emerald-500 text-white font-semibold')
-                                    : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700'
-                            }">
+                            <div class="flex items-center justify-between p-2.5 rounded-xl border transition ${cardStyle}">
                                 <div class="flex items-center gap-3 pr-2 flex-1 flex-wrap">
                                     <span class="w-6 h-6 rounded-lg text-xs font-bold font-mono flex items-center justify-center shrink-0 ${
-                                        isSelectedBySupport ? (isCheckbox ? 'bg-purple-500 text-white' : 'bg-emerald-500 text-white') : 'bg-slate-800 text-purple-400'
+                                        isSelectedBySupport 
+                                            ? (isCheckbox ? 'bg-purple-500 text-white' : 'bg-emerald-500 text-white') 
+                                            : (isSelectedByStudent ? 'bg-sky-500 text-white' : 'bg-slate-800 text-purple-400')
                                     }">
                                         ${optLabel}
                                     </span>
@@ -499,9 +530,13 @@
                                     ${opt.image_base64 ? `
                                         <div class="inline-block my-1">
                                             <img src="${opt.image_base64}" onclick="event.stopPropagation(); openImageModal(this.src)" 
-                                                 class="max-h-24 max-w-xs rounded-lg border border-slate-600 bg-white p-1 cursor-zoom-in hover:border-emerald-400 transition object-contain shadow-sm" 
+                                                 class="max-h-24 max-w-xs rounded-lg border border-slate-600 bg-white p-1.5 cursor-zoom-in hover:border-emerald-400 transition object-contain shadow-sm" 
                                                  alt="Đáp án ${optLabel}">
                                         </div>` : ''}
+                                    ${isSelectedByStudent ? `
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 flex items-center gap-1 shrink-0 ml-auto mr-2 font-mono">
+                                            <i class="fa-solid fa-user-pen"></i> Thí sinh đang chọn
+                                        </span>` : ''}
                                 </div>
                                 <button onclick="${clickAction}" 
                                     class="px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
@@ -522,9 +557,9 @@
                         <div class="space-y-2 pt-2">
                             <label class="block text-xs font-semibold text-purple-300">Nhập câu trả lời (Tự luận / Điền từ):</label>
                             <div class="flex gap-2">
-                                <input type="text" id="text-ans-${idx}" value="${escapeHtml(currentVal)}" placeholder="Nhập đáp án chuẩn xác..."
+                                <input type="text" id="text-ans-${realQIndex}" value="${escapeHtml(currentVal)}" placeholder="Nhập đáp án chuẩn xác..."
                                     class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-mono">
-                                <button onclick="submitTextAnswer(${idx})" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition">
+                                <button onclick="submitTextAnswer(${realQIndex})" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition">
                                     <i class="fa-solid fa-paper-plane mr-1"></i> Lưu
                                 </button>
                             </div>
@@ -539,14 +574,15 @@
 
         async function toggleSupportCheckbox(questionIndex, optLabel) {
             if (!currentSelectedHWID) return;
-            const q = cachedQuestions[questionIndex];
+            const q = cachedQuestions.find(item => item.question_index === questionIndex);
             if (!q) return;
             const current = q.support_answer || "";
-            const chosen = new Set(current ? current.split(",").map(s => s.trim()).filter(Boolean) : []);
-            if (chosen.has(optLabel)) {
-                chosen.delete(optLabel);
+            const chosen = new Set(current ? current.split(",").map(s => s.trim().toUpperCase()).filter(Boolean) : []);
+            const targetUpper = optLabel.toUpperCase();
+            if (chosen.has(targetUpper)) {
+                chosen.delete(targetUpper);
             } else {
-                chosen.add(optLabel);
+                chosen.add(targetUpper);
             }
             const newAns = Array.from(chosen).sort().join(",");
             await setSupportAnswer(questionIndex, newAns);
@@ -568,8 +604,9 @@
                 if (data.success) {
                     showToast(`Đã chọn đáp án ${answerLabel || 'rỗng'} cho Câu ${questionIndex + 1}`);
                     // Optimistic update
-                    if (cachedQuestions[questionIndex]) {
-                        cachedQuestions[questionIndex].support_answer = answerLabel;
+                    const targetQ = cachedQuestions.find(item => item.question_index === questionIndex);
+                    if (targetQ) {
+                        targetQ.support_answer = answerLabel;
                         renderMatrix(cachedQuestions);
                         renderQuestions(cachedQuestions);
                     }
