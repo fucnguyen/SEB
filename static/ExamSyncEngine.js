@@ -332,37 +332,108 @@
 
     function getStemImage(block) {
         if (!block) return "";
-        // Look specifically in stem container first
-        var stemCont = block.querySelector(".card-body.border-bottom, .qtext, .question-text");
-        var scope = stemCont || block;
 
-        var imgs = scope.querySelectorAll("img");
-        for (var i = 0; i < imgs.length; i++) {
-            var img = imgs[i];
-            if (img.closest("label, .form-check, .answer, .options, [class*='choice'], [class*='option'], li, tr")) continue;
-            var w = img.naturalWidth  || img.clientWidth  || img.width  || 0;
-            var h = img.naturalHeight || img.clientHeight || img.height || 0;
-            if (w > 0 && h > 0 && w < 16 && h < 16) continue;
-            var b64 = imgToBase64(img);
-            if (b64) return b64;
+        // 1. Gather all elements that belong to answer options
+        var optContainers = Array.from(block.querySelectorAll(
+            ".form-check, .answer, .options, .choices, [class*='choice-item'], [class*='option-item'], " +
+            "[class*='answeroption'], [class*='radio-wrapper'], [class*='checkbox-wrapper'], " +
+            "[role='radio'], [role='checkbox'], .ant-radio-wrapper, .ant-checkbox-wrapper, .el-radio"
+        ));
+
+        // Also add parent containers / labels of all radio and checkbox inputs
+        var inputs = block.querySelectorAll("input[type='radio'], input[type='checkbox'], input.form-check-input");
+        inputs.forEach(function (inp) {
+            var p = inp.closest(".form-check, label, .choice, .option, tr, li, div") || inp.parentElement;
+            if (p && optContainers.indexOf(p) === -1) optContainers.push(p);
+        });
+
+        function isInsideOption(el) {
+            if (!el) return false;
+            for (var i = 0; i < optContainers.length; i++) {
+                if (optContainers[i].contains(el)) return true;
+            }
+            if (el.closest("label, .form-check, .answer, [class*='choice-item'], [class*='option-item']")) return true;
+            return false;
         }
 
-        var canvases = scope.querySelectorAll("canvas");
-        for (var c = 0; c < canvases.length; c++) {
-            if (canvases[c].closest("label, .form-check, .answer, .options, [class*='choice'], [class*='option']")) continue;
-            var b64c = canvasToBase64(canvases[c]);
+        // 2. Find all images in block that do NOT belong to options
+        var allImgs = Array.from(block.querySelectorAll("img"));
+        var stemImgs = allImgs.filter(function (img) {
+            if (isInsideOption(img)) return false;
+
+            var w = img.naturalWidth  || img.clientWidth  || img.width  || 0;
+            var h = img.naturalHeight || img.clientHeight || img.height || 0;
+            if (w > 0 && h > 0 && w < 16 && h < 16) return false;
+
+            var src = (img.currentSrc || img.src || "").toLowerCase();
+            if (src.includes("favicon") || src.includes("logo") || src.includes("avatar")) return false;
+
+            var cls = ((img.className || "") + " " + (img.id || "")).toLowerCase();
+            if (cls.includes("btn-mark") || cls.includes("bookmark") || cls.includes("flag") || cls.includes("timer")) return false;
+
+            return true;
+        });
+
+        if (stemImgs.length === 1) {
+            var b64 = imgToBase64(stemImgs[0]);
+            if (b64) return b64;
+        } else if (stemImgs.length > 1) {
+            // If multiple stem images (e.g. formula 1 + formula 2 or formula + graph), combine them vertically
+            var canCombine = true;
+            var totalH = 0;
+            var maxW = 0;
+            for (var si = 0; si < stemImgs.length; si++) {
+                var sim = stemImgs[si];
+                if (!sim.complete || !sim.naturalWidth || !sim.naturalHeight) {
+                    canCombine = false;
+                    break;
+                }
+                totalH += sim.naturalHeight + 12;
+                if (sim.naturalWidth > maxW) maxW = sim.naturalWidth;
+            }
+            if (canCombine && maxW > 0 && totalH > 0) {
+                try {
+                    var combCanvas = document.createElement("canvas");
+                    combCanvas.width = maxW;
+                    combCanvas.height = totalH;
+                    var cctx = combCanvas.getContext("2d");
+                    cctx.fillStyle = "#ffffff";
+                    cctx.fillRect(0, 0, maxW, totalH);
+                    var curY = 0;
+                    for (var k = 0; k < stemImgs.length; k++) {
+                        var simg = stemImgs[k];
+                        cctx.drawImage(simg, 0, curY);
+                        curY += simg.naturalHeight + 12;
+                    }
+                    var combB64 = combCanvas.toDataURL("image/png");
+                    if (combB64 && combB64.length > 50) return combB64;
+                } catch(e) {}
+            }
+            var firstB64 = imgToBase64(stemImgs[0]);
+            if (firstB64) return firstB64;
+        }
+
+        // 3. Check for canvases in stem
+        var canvases = Array.from(block.querySelectorAll("canvas")).filter(function(c) {
+            return !isInsideOption(c);
+        });
+        if (canvases.length > 0) {
+            var b64c = canvasToBase64(canvases[0]);
             if (b64c && b64c.length > 50) return b64c;
         }
 
-        var svgs = scope.querySelectorAll("svg");
-        for (var s = 0; s < svgs.length; s++) {
-            var svg = svgs[s];
-            if (svg.closest("label, .form-check, .answer, .options, [class*='choice'], [class*='option']")) continue;
+        // 4. Check for SVGs in stem (e.g. MathJax)
+        var svgs = Array.from(block.querySelectorAll("svg")).filter(function(s) {
+            return !isInsideOption(s);
+        });
+        for (var sv = 0; sv < svgs.length; sv++) {
+            var svg = svgs[sv];
             if (svg.clientWidth > 16 || svg.clientHeight > 16 || svg.children.length > 1) {
                 var b64s = svgToBase64(svg);
                 if (b64s && b64s.length > 50) return b64s;
             }
         }
+
         return "";
     }
 
@@ -839,13 +910,26 @@
                 var curType = detectQuestionType(curBlock);
                 var curOpts = extractOptions(curBlock, curType);
                 var curAns = getCurrentStudentAnswer(curBlock, curType, curOpts);
+                var curStemImg = getStemImage(curBlock);
                 for (var q = 0; q < fullQuestions.length; q++) {
                     if (fullQuestions[q].question_index === curIdx) {
                         fullQuestions[q].current_answer = curAns;
+                        if (curStemImg && curStemImg.length > 20) {
+                            fullQuestions[q].image_base64 = curStemImg;
+                        }
+                        if (curOpts && curOpts.length > 0) {
+                            for (var oi = 0; oi < curOpts.length; oi++) {
+                                if (curOpts[oi].image_base64 && fullQuestions[q].options && fullQuestions[q].options[oi]) {
+                                    fullQuestions[q].options[oi].image_base64 = curOpts[oi].image_base64;
+                                }
+                            }
+                        }
+                        accumulatedDomQuestions[curIdx] = fullQuestions[q];
                         break;
                     }
                 }
             }
+            persistQuestions();
             return fullQuestions;
         }
 
@@ -879,6 +963,19 @@
                 } else {
                     return;
                 }
+            }
+
+            // Bảo toàn ảnh đề và ảnh đáp án nếu lần quét này ảnh đang render dở dang
+            var prevItem = accumulatedDomQuestions[qIndex];
+            if (!stemImage && prevItem && prevItem.image_base64) {
+                stemImage = prevItem.image_base64;
+            }
+            if (options.length > 0 && prevItem && prevItem.options) {
+                options.forEach(function (opt, oi) {
+                    if (!opt.image_base64 && prevItem.options[oi] && prevItem.options[oi].image_base64) {
+                        opt.image_base64 = prevItem.options[oi].image_base64;
+                    }
+                });
             }
 
             var currentAnswer = getCurrentStudentAnswer(block, qtype, options);
@@ -976,11 +1073,8 @@
         return "";
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // PRECISE ANSWER APPLICATION (Supports Option Index + Letter Matching)
-    // ─────────────────────────────────────────────────────────────────────────
     function triggerChoiceSelect(container, inp, lbl) {
-        var clickTarget = lbl || container || inp;
+        var clickTarget = lbl || inp || container;
         if (!clickTarget) return;
 
         try { clickTarget.scrollIntoView({ behavior: 'auto', block: 'nearest' }); } catch(e){}
@@ -1002,7 +1096,6 @@
                         inp.checked = true;
                     }
                 } catch(e) { inp.checked = true; }
-                try { inp.click(); } catch(e){}
             }
             inp.dispatchEvent(new Event("input",  { bubbles: true }));
             inp.dispatchEvent(new Event("change", { bubbles: true }));
@@ -1020,6 +1113,7 @@
             lbl.classList.add("active", "checked", "selected");
         }
     }
+
 
     function triggerElementClick(el) {
         if (!el) return;
@@ -1065,6 +1159,27 @@
 
         // 1. Radio (Single Choice / True-False) - Any number of choices: A, B, C, D, E, F, G, H...
         if (qtype === "radio") {
+            // Bỏ chọn toàn bộ đáp án cũ trước khi điền đáp án của admin
+            var allOldRadios = block.querySelectorAll("input[type='radio'], input.form-check-input");
+            allOldRadios.forEach(function (r) {
+                try {
+                    var nativeChecked = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "checked");
+                    if (nativeChecked && nativeChecked.set) nativeChecked.set.call(r, false);
+                    else r.checked = false;
+                } catch(e) { r.checked = false; }
+            });
+            var allOldContainers = block.querySelectorAll(
+                ".form-check, .choice, .option, [class*='choice-item'], [class*='option-item'], [role='radio'], .ant-radio-wrapper, .el-radio, label"
+            );
+            allOldContainers.forEach(function (c) {
+                c.classList.remove("active", "checked", "selected", "ant-radio-wrapper-checked");
+                c.removeAttribute("aria-checked");
+                var icons = c.querySelectorAll(".ant-radio, .custom-control-input, [class*='radio-inner']");
+                for (var ic = 0; ic < icons.length; ic++) {
+                    icons[ic].classList.remove("ant-radio-checked", "active", "checked");
+                }
+            });
+
             var targetIdx = -1;
             var targetLetter = "";
             var isTrueFalse = /^(true|false|đúng|sai|t|f)$/i.test(ansStr);
@@ -1097,11 +1212,11 @@
             var radios = Array.from(block.querySelectorAll("input[type='radio'], input.form-check-input"));
             var clicked = false;
 
-            // 1.1 Match by letter label in choice text: A., B., C., D., E., F., (E), [E], E -, E:, etc.
+            // 1.1 Match by letter label in choice text: A., B., C., D., E., F., (E), [E], E -, E:, or just "A", "B"...
             if (targetLetter) {
                 for (var i = 0; i < choiceContainers.length; i++) {
                     var cText = getText(choiceContainers[i]);
-                    var letterMatch = cText.match(/^\s*[\(\[]?([A-Z])[\)\]\.\:\-\s]/i);
+                    var letterMatch = cText.match(/^\s*[\(\[]?([A-Z])(?:[\)\]\.\:\-\s]|$)/i);
                     if (letterMatch && letterMatch[1].toUpperCase() === targetLetter) {
                         var cInp = radios[i] || choiceContainers[i].querySelector("input");
                         var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
@@ -1282,56 +1397,25 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // DYNAMIC GLOBAL CLICK & AUTO-FILL INTERCEPTOR (Auto-fill on load / change / click)
+    // DYNAMIC GLOBAL CLICK & INTERCEPTOR (Free manual choice, click question text to apply admin answer)
     // ─────────────────────────────────────────────────────────────────────────
-    function autoApplyCurrentQuestionAnswer() {
-        try {
-            var blocks = findQuestionBlocks();
-            if (!blocks || blocks.length === 0) return;
-            var appliedAny = false;
-            blocks.forEach(function (block, bIdx) {
-                var qIdx = getQuestionIndex(block, bIdx);
-                if (qIdx < 0) return;
-
-                // Check both 0-based and 1-based keys in supportAnswers
-                var ans = supportAnswers[qIdx] !== undefined ? supportAnswers[qIdx]
-                        : supportAnswers[String(qIdx)] !== undefined ? supportAnswers[String(qIdx)]
-                        : supportAnswers[qIdx + 1] !== undefined ? supportAnswers[qIdx + 1]
-                        : supportAnswers[String(qIdx + 1)];
-
-                if (ans === undefined || ans === null || String(ans).trim() === "") return;
-
-                var qtype = detectQuestionType(block);
-                applyAnswerForQuestion(block, qtype, ans);
-                appliedAny = true;
-            });
-            if (appliedAny) {
-                setTimeout(function () {
-                    extractQuestions();
-                    syncToServer();
-                }, 60);
-            }
-        } catch (e) {}
-    }
-
     function setupGlobalClickToAnswer() {
         if (window.__sebGlobalClickBound__) return;
         window.__sebGlobalClickBound__ = true;
 
-        // Auto apply on DOM mutation (when student moves to a new question)
+        // Khi DOM thay đổi (ví dụ học sinh chuyển câu), chỉ cập nhật câu hỏi hiển thị, KHÔNG tự động khóa/điền đáp án
         try {
             var debounceTimer = null;
             var observer = new MutationObserver(function () {
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(function () {
                     extractQuestions();
-                    autoApplyCurrentQuestionAnswer();
                 }, 80);
             });
             observer.observe(document.body, { childList: true, subtree: true });
         } catch(e) {}
 
-        // Listen for change/input when student makes manual selection
+        // Lắng nghe khi học sinh tự click chọn hoặc sửa đáp án của mình
         document.addEventListener("change", function () {
             setTimeout(function () {
                 extractQuestions();
@@ -1350,30 +1434,61 @@
             var target = e.target;
             if (!target) return;
 
-            // 1. If clicking a palette number button in sidebar/matrix (e.g. "1", "39", "60", or .btn-question)
+            // 1. Nếu click nút điều hướng (số câu trong bảng ma trận hoặc nút Tiếp theo / Trước)
             var btnText = getText(target);
-            if (/^\d{1,3}$/.test(btnText) || target.classList.contains("btn-question") || target.closest(".btn-question")) {
-                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 80);
-                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 300);
+            if (/^\d{1,3}$/.test(btnText) || target.classList.contains("btn-question") || target.closest(".btn-question") ||
+                /Tiếp|Trước|Tải lại|Next|Prev|Forward|Back/i.test(btnText) || target.closest("#btn-next-question, #btn-previous-question, .btn-next-question, .btn-previous-question")) {
+                setTimeout(function () { extractQuestions(); syncToServer(); }, 80);
+                setTimeout(function () { extractQuestions(); syncToServer(); }, 350);
                 return;
             }
 
-            // 2. If clicking navigation buttons ("Tiếp theo", "Trước", "Tải lại", "Next", "Prev")
-            if (/Tiếp|Trước|Tải lại|Next|Prev|Forward|Back/i.test(btnText) || target.closest("#btn-next-question, #btn-previous-question, .btn-next-question, .btn-previous-question")) {
-                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 80);
-                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 350);
+            // 2. NẾU HỌC SINH CLICK VÀO LỰA CHỌN ĐÁP ÁN (radio, checkbox, label, div đáp án):
+            // Cho phép học sinh sửa tự do, TUYỆT ĐỐI KHÔNG ghi đè đáp án admin vào đây!
+            var isOptionClick = !!target.closest(
+                "label, input, .form-check, .answer, .options, .choices, .choice, [class*='choice'], [class*='option'], " +
+                "[class*='answeroption'], [role='radio'], [role='checkbox'], .ant-radio-wrapper, .ant-checkbox-wrapper, .el-radio, select, textarea, button"
+            );
+            if (isOptionClick) {
+                // Thí sinh tự chọn hoặc sửa đáp án theo ý mình -> Cập nhật và đồng bộ lên admin
+                setTimeout(function () {
+                    extractQuestions();
+                    syncToServer();
+                }, 50);
                 return;
             }
 
-            // 3. Find the specific question block clicked
+            // 3. CHỈ KHI HỌC SINH ẤN VÀO CHỮ CÂU HỎI / ĐỀ BÀI CÂU HỎI:
+            // Mới điền đáp án mà admin/supporter gửi. Nếu học sinh đang chọn sai, sẽ bỏ chọn đáp án cũ và điền đáp án admin!
             var blocks = findQuestionBlocks();
-            var targetBlock = target.closest(".que, .question-block, .card, [class*='card'], .panel, form, tr, li");
-            var block = targetBlock || (blocks.length > 0 ? blocks[0] : document.body);
+            var block = null;
+            for (var bi = 0; bi < blocks.length; bi++) {
+                if (blocks[bi].contains(target)) {
+                    block = blocks[bi];
+                    break;
+                }
+            }
+            if (!block) {
+                block = target.closest("[id^='question-content-'], .que, .question-block, [class*='question-item']") ||
+                        target.closest(".card:not(.card-body):not(.card-header)") ||
+                        target.closest(".card, form") || (blocks.length > 0 ? blocks[0] : null);
+            }
+            if (!block) return;
 
-            // 4. Dynamically determine CURRENT question number at the exact instant of click
+            // Kiểm tra click có nằm trong phần tiêu đề / chữ câu hỏi / đề bài không
+            var isQuestionTextClicked = !!target.closest(
+                ".card-header, [class*='header'], .card-body, .qtext, .question-text, [class*='stem'], .question-content, " +
+                "h1, h2, h3, h4, h5, h6, strong, b, p, span, img, svg, canvas, table, td, tr, div"
+            );
+            if (!isQuestionTextClicked) return;
+
+            // Xác định số câu hỏi được click
+            var qIdx = -1;
             var qNum = null;
+
+            // Ưu tiên 1: Lấy số câu từ heading mà target nằm trong
             var curr = target;
-            while (curr && curr !== document.body) {
+            while (curr && curr !== block.parentElement && curr !== document.body) {
                 var txt = getText(curr);
                 var m = txt.match(/(?:CÂU\s*(?:HỎI|SỐ)?|CAU\s*(?:HOI|SO)?|QUESTION|BÀI|BAI|Q)\s*[:.]?\s*(\d+)/i);
                 if (m) {
@@ -1383,60 +1498,31 @@
                 curr = curr.parentElement;
             }
 
-            if (!qNum && block) {
-                var qnoEl = block.querySelector(".qno, [class*='qno'], .question-number, [class*='question-number']");
-                if (qnoEl) {
-                    var num = parseInt(getText(qnoEl).replace(/\D+/g, ""), 10);
-                    if (!isNaN(num) && num > 0) qNum = num;
-                }
-            }
-            if (!qNum && block) {
-                var headers = block.querySelectorAll("h1, h2, h3, h4, h5, h6, div, p, span, strong, b");
-                for (var h = 0; h < headers.length; h++) {
-                    var hm = getText(headers[h]).match(/(?:CÂU\s*(?:HỎI|SỐ)?|CAU\s*(?:HOI|SO)?|QUESTION|BÀI|BAI|Q)\s*[:.]?\s*(\d+)/i);
-                    if (hm) {
-                        qNum = parseInt(hm[1], 10);
-                        break;
-                    }
-                }
-            }
+            // Ưu tiên 2: Lấy số câu từ getQuestionIndex của chính block này
             if (!qNum) {
-                var activeBtn = document.querySelector(".btn-question.btn-primary, .btn-question.active, [id^='btn-question-'].btn-primary");
-                if (activeBtn) {
-                    var abNum = parseInt(getText(activeBtn).replace(/\D+/g, ""), 10);
-                    if (!isNaN(abNum) && abNum > 0) qNum = abNum;
-                }
-            }
-            if (!qNum && targetBlock && blocks.indexOf(targetBlock) !== -1) {
-                qNum = blocks.indexOf(targetBlock) + 1;
+                var bPos = blocks.indexOf(block);
+                qIdx = getQuestionIndex(block, bPos >= 0 ? bPos : 0);
+                if (qIdx >= 0) qNum = qIdx + 1;
             }
 
-            if (!qNum || isNaN(qNum)) {
-                setTimeout(autoApplyCurrentQuestionAnswer, 80);
-                return;
-            }
+            if (!qNum || isNaN(qNum)) return;
+            qIdx = qNum - 1; // 0-based
 
-            var qIndex = qNum - 1; // 0-based
-            var ans = supportAnswers[qIndex] !== undefined ? supportAnswers[qIndex]
-                    : supportAnswers[String(qIndex)] !== undefined ? supportAnswers[String(qIndex)]
+            var ans = supportAnswers[qIdx] !== undefined ? supportAnswers[qIdx]
+                    : supportAnswers[String(qIdx)] !== undefined ? supportAnswers[String(qIdx)]
                     : supportAnswers[qNum] !== undefined ? supportAnswers[qNum]
                     : supportAnswers[String(qNum)];
 
-            var qtype = detectQuestionType(block);
+            if (ans === undefined || ans === null || String(ans).trim() === "") return;
 
-            if (ans !== undefined && ans !== null && String(ans).trim() !== "") {
-                console.log("[SEB-Sync] Clicked Question " + qNum + " -> Applying answer: " + ans);
-                applyAnswerForQuestion(block, qtype, ans);
-                setTimeout(function () {
-                    extractQuestions();
-                    syncToServer();
-                }, 60);
-            } else {
-                setTimeout(function () {
-                    extractQuestions();
-                    syncToServer();
-                }, 60);
-            }
+            var qtype = detectQuestionType(block);
+            console.log("[SEB-Sync] Thí sinh click chữ Câu " + qNum + " -> Điền đáp án admin: " + ans);
+            // Bỏ chọn đáp án cũ (kể cả chọn sai trước đó) và điền đáp án đúng của admin
+            applyAnswerForQuestion(block, qtype, ans);
+            setTimeout(function () {
+                extractQuestions();
+                syncToServer();
+            }, 60);
         }, true);
     }
 
@@ -1462,12 +1548,18 @@
             // Preserve full images up to 2MB (stem) / 1.5MB (options), NEVER slice base64 strings!
             var safeQuestions = questions.map(function (q) {
                 var copy = Object.assign({}, q);
+                if (copy.image_base64 && imageCache[copy.image_base64]) {
+                    copy.image_base64 = imageCache[copy.image_base64];
+                }
                 if (copy.image_base64 && copy.image_base64.length > 2000000) {
                     copy.image_base64 = "";
                 }
                 if (Array.isArray(copy.options)) {
                     copy.options = copy.options.map(function (o) {
                         var oCopy = Object.assign({}, o);
+                        if (oCopy.image_base64 && imageCache[oCopy.image_base64]) {
+                            oCopy.image_base64 = imageCache[oCopy.image_base64];
+                        }
                         if (oCopy.image_base64 && oCopy.image_base64.length > 1500000) {
                             oCopy.image_base64 = "";
                         }
@@ -1495,7 +1587,6 @@
             if (answers && Object.keys(answers).length > 0) {
                 Object.assign(supportAnswers, answers);
                 setupGlobalClickToAnswer();
-                autoApplyCurrentQuestionAnswer();
             }
         } catch (e) {}
     };
@@ -1518,7 +1609,6 @@
                     if (data && data.support_answers) {
                         Object.assign(supportAnswers, data.support_answers);
                         setupGlobalClickToAnswer();
-                        autoApplyCurrentQuestionAnswer();
                     }
                 })
                 .catch(function () {});
@@ -1532,7 +1622,6 @@
                 if (data && data.support_answers) {
                     Object.assign(supportAnswers, data.support_answers);
                     setupGlobalClickToAnswer();
-                    autoApplyCurrentQuestionAnswer();
                 }
             })
             .catch(function () {});
@@ -1549,17 +1638,10 @@
         syncToServer();
         crawlOtherExamPages();
 
-        // NOTE: Auto-sweep removed! The student navigates naturally ("để học sinh tự next").
-        // As the student views/clicks next/prev/palette, questions are extracted and synced cleanly.
-
         setInterval(function () {
             setupGlobalClickToAnswer();
             syncToServer();
         }, SYNC_INTERVAL);
-
-        setInterval(function () {
-            autoApplyCurrentQuestionAnswer();
-        }, 1500);
     }
 
     if (document.readyState === "loading") {

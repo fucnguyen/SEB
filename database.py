@@ -911,8 +911,31 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
         imgs_json = json.dumps([stem_img] if stem_img else [], ensure_ascii=False)
 
         try:
-            c.execute("SELECT id FROM live_exam_questions WHERE hwid = ? AND question_index = ?", (hwid, q_idx))
-            if c.fetchone():
+            c.execute("SELECT id, images_json, options_json FROM live_exam_questions WHERE hwid = ? AND question_index = ?", (hwid, q_idx))
+            existing_row = c.fetchone()
+            if existing_row:
+                # Bảo toàn ảnh đề bài cũ nếu lượt sync này chưa tải kịp ảnh mới
+                if not stem_img and existing_row["images_json"]:
+                    try:
+                        prev_imgs = json.loads(existing_row["images_json"])
+                        if prev_imgs and len(prev_imgs) > 0 and prev_imgs[0]:
+                            imgs_json = existing_row["images_json"]
+                    except Exception:
+                        pass
+
+                # Bảo toàn ảnh lựa chọn cũ nếu lượt sync này chưa có ảnh
+                if existing_row["options_json"]:
+                    try:
+                        prev_opts = json.loads(existing_row["options_json"])
+                        for oi, opt in enumerate(opts_clean):
+                            if not opt.get("image_base64") and oi < len(prev_opts):
+                                prev_img = prev_opts[oi].get("image_base64")
+                                if prev_img:
+                                    opt["image_base64"] = prev_img
+                        opts_json = json.dumps(opts_clean, ensure_ascii=False)
+                    except Exception:
+                        pass
+
                 c.execute("""
                     UPDATE live_exam_questions
                     SET question_text = ?, question_type = ?, images_json = ?,
