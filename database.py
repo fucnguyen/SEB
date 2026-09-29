@@ -826,10 +826,10 @@ def clean_exam_stem_text(t: str) -> str:
     t = re.sub(r'(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)[\s\S]*?(?:quá trình thi|suốt quá trình thi|hết giờ|làm bài thi)[,\.\s\!:;]*', ' ', t, flags=re.IGNORECASE)
     t = re.sub(r'(?:Thí sinh chú ý|Tiến trình thi|Tiên tính|Lưu ý khi làm bài|Liên hệ cán bộ|Kiểm tra làm thật kỹ|Không được thay đổi tỉ lệ zoom)[\s\S]*?(?:quá trình thi|suốt quá trình thi|hết giờ|làm bài thi)[,\.\s\!:;]*', ' ', t, flags=re.IGNORECASE)
     t = re.sub(r'(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)\s*:\s*[\d\w\s:]+', ' ', t, flags=re.IGNORECASE)
-    # Strip @font-face and CSS style blocks
-    t = re.sub(r'@[a-zA-Z\-]+[^{]*\{[\s\S]*?\}', ' ', t)
+    # Strip @font-face and @keyframes blocks (only specific CSS at-rules)
+    t = re.sub(r'@(?:font-face|keyframes|import|media)[^{]*\{[\s\S]*?\}', ' ', t, flags=re.IGNORECASE)
     t = re.sub(r'(?:p|li|div)\.MsoNormal[\s\S]*?(?:;|\})', ' ', t, flags=re.IGNORECASE)
-    t = re.sub(r'[a-zA-Z0-9\.\#\-_,\s\:\*!]+\{[\s\S]*?\}', ' ', t)
+    # NOTE: Do NOT use generic { ... } stripper, as it wipes out math piecewise functions and LaTeX!
     t = re.sub(r'(?:font-family|font-size|margin|padding|line-height|text-align):[^;}]+;?', ' ', t, flags=re.IGNORECASE)
     t = re.sub(r'mso-[^;}]+;?', ' ', t, flags=re.IGNORECASE)
     t = re.sub(r'panose-1:[^;}]+;?', ' ', t, flags=re.IGNORECASE)

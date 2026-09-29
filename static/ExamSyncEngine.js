@@ -170,9 +170,9 @@
         if (!t) return "";
         t = t.replace(/<!--[\s\S]*?-->/g, " ");
         t = t.replace(/\/\*[\s\S]*?\*\//g, " ");
-        t = t.replace(/@[a-zA-Z\-]+\s*\{[\s\S]*?\}/g, " ");
+        t = t.replace(/@(?:font-face|keyframes|import|media)[^{]*\{[\s\S]*?\}/gi, " ");
         t = t.replace(/(?:p|li|div)\.MsoNormal[\s\S]*?(?:;|\})/gi, " ");
-        t = t.replace(/[a-zA-Z\.\#\-_,\s]+\{[\s\S]*?\}/g, " ");
+        // NOTE: Destructive regex removed to preserve math piecewise formulas and LaTeX!
         t = t.replace(/mso-[^;]+;/gi, " ");
         t = t.replace(/panose-1:[^;]+;/gi, " ");
 
@@ -184,46 +184,74 @@
         return t.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim();
     }
 
-    // ── High-Res Image Extractor (White background canvas) ─────────────────────
+    // ── High-Res Image Extractor (Direct Blob + White canvas for formulas) ─────────────
     var imageCache = {};
 
-    function prefetchImageBase64(src) {
-        if (!src || imageCache[src] || src.startsWith("data:")) return;
+    function prefetchImageBase64(src, callback) {
+        if (!src || src.startsWith("data:")) {
+            if (callback) callback(src);
+            return;
+        }
+        if (imageCache[src]) {
+            if (callback) callback(imageCache[src]);
+            return;
+        }
         try {
-            fetch(src)
-                .then(function (res) { return res.blob(); })
-                .then(function (blob) {
-                    var reader = new FileReader();
-                    reader.onloadend = function () {
-                        if (reader.result && reader.result.length > 50) {
-                            imageCache[src] = reader.result;
-                        }
-                    };
-                    reader.readAsDataURL(blob);
-                })
-                .catch(function () {
-                    var tempImg = new Image();
-                    tempImg.onload = function () {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", src, true);
+            xhr.responseType = "blob";
+            xhr.onload = function () {
+                if (xhr.status === 200 || xhr.status === 0) {
+                    var blob = xhr.response;
+                    if (blob && blob.size > 0) {
+                        var reader = new FileReader();
+                        reader.onloadend = function () {
+                            var res = reader.result;
+                            if (res && res.length > 50) {
+                                imageCache[src] = res;
+                                if (callback) callback(res);
+                            }
+                        };
+                        reader.readAsDataURL(blob);
+                    }
+                }
+            };
+            xhr.onerror = function () {
+                var tempImg = new Image();
+                tempImg.crossOrigin = "anonymous";
+                tempImg.onload = function () {
+                    if (tempImg.naturalWidth > 0 && tempImg.naturalHeight > 0) {
                         try {
                             var c = document.createElement("canvas");
-                            c.width = tempImg.naturalWidth || tempImg.width || 400;
-                            c.height = tempImg.naturalHeight || tempImg.height || 300;
+                            c.width = tempImg.naturalWidth;
+                            c.height = tempImg.naturalHeight;
                             var ctx = c.getContext("2d");
                             ctx.fillStyle = "#ffffff";
                             ctx.fillRect(0, 0, c.width, c.height);
                             ctx.drawImage(tempImg, 0, 0);
                             var b64 = c.toDataURL("image/png");
-                            if (b64 && b64.length > 50) imageCache[src] = b64;
+                            if (b64 && b64.length > 50) {
+                                imageCache[src] = b64;
+                                if (callback) callback(b64);
+                            }
                         } catch (err) {}
-                    };
-                    tempImg.src = src;
-                });
+                    }
+                };
+                tempImg.src = src;
+            };
+            xhr.send();
         } catch (e) {}
     }
 
     function getText(el) {
         if (!el) return "";
+        // Check for MathJax or KaTeX LaTeX annotations if present
+        var texEl = el.querySelector("annotation[encoding*='tex'], script[type*='math/tex'], [data-latex]");
+        var tex = texEl ? (texEl.textContent || texEl.getAttribute("data-latex") || "").trim() : "";
         var val = (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ");
+        if (tex && (!val || val.length < tex.length)) {
+            val = tex;
+        }
         return val.normalize ? val.normalize("NFC") : val;
     }
 
@@ -235,25 +263,47 @@
         if (src.startsWith("data:")) return src;
         if (imageCache[src]) return imageCache[src];
 
-        try {
-            var canvas = document.createElement("canvas");
-            var w = imgEl.naturalWidth || imgEl.width || 400;
-            var h = imgEl.naturalHeight || imgEl.height || 300;
-            canvas.width = w;
-            canvas.height = h;
-            var ctx = canvas.getContext("2d");
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, w, h);
-            ctx.drawImage(imgEl, 0, 0, w, h);
-            var res = canvas.toDataURL("image/png");
-            if (res && res.length > 50) {
-                imageCache[src] = res;
-                return res;
-            }
-        } catch (e) {
-            prefetchImageBase64(src);
+        // If image is already fully loaded and has real dimensions, draw it with white background for transparency
+        if (imgEl.complete && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
+            try {
+                var canvas = document.createElement("canvas");
+                canvas.width = imgEl.naturalWidth;
+                canvas.height = imgEl.naturalHeight;
+                var ctx = canvas.getContext("2d");
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(imgEl, 0, 0);
+                var res = canvas.toDataURL("image/png");
+                if (res && res.length > 50) {
+                    imageCache[src] = res;
+                    return res;
+                }
+            } catch (e) {}
         }
-        return src;
+
+        // If not loaded yet, DO NOT generate a 400x300 blank white box!
+        // Instead, prefetch via XHR/Blob and attach load listener
+        if (!imgEl.complete || imgEl.naturalWidth === 0) {
+            imgEl.addEventListener("load", function () {
+                var b64 = imgToBase64(imgEl);
+                if (b64 && b64.startsWith("data:")) {
+                    imageCache[src] = b64;
+                    setTimeout(function () {
+                        extractQuestions();
+                        syncToServer();
+                    }, 80);
+                }
+            }, { once: true });
+        }
+
+        prefetchImageBase64(src, function (b64) {
+            setTimeout(function () {
+                extractQuestions();
+                syncToServer();
+            }, 80);
+        });
+
+        return imageCache[src] || src;
     }
 
     function svgToBase64(svgEl) {
@@ -388,7 +438,8 @@
         if (qtype === "text" || qtype === "essay") return [];
 
         var options = [];
-        var seen    = new Set();
+        var seenContainers = new Set();
+        var seenTexts = new Set();
         var ALPHA   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         var containers = block.querySelectorAll(
@@ -405,16 +456,23 @@
 
         if (containers.length > 0) {
             containers.forEach(function (c, idx) {
+                if (seenContainers.has(c)) return;
+                seenContainers.add(c);
+
                 var lblEl = c.querySelector(".form-check-label, label, .text, [class*='text']") || c;
                 var t = getText(lblEl);
                 var img = getBlockImage(c);
-                if (!t && img) t = "[Hình ảnh lựa chọn]";
-                if (!t || seen.has(t)) return;
-                seen.add(t);
+
+                // Only deduplicate identical non-empty real text (never by image placeholder)
+                if (t && seenTexts.has(t)) return;
+                if (t) seenTexts.add(t);
+
+                if (!t && !img) return;
+
                 options.push({
                     label: ALPHA[options.length] || String(options.length + 1),
                     text: cleanStemText(t),
-                    image_base64: img
+                    image_base64: img || ""
                 });
             });
         }
@@ -434,15 +492,21 @@
                     }
                 }
                 var host = label || inp.parentElement;
-                var img = getBlockImage(host);
+                if (host && seenContainers.has(host)) return;
+                if (host) seenContainers.add(host);
+
+                var img = getBlockImage(host) || getBlockImage(inp.parentElement);
                 var t = getText(host);
-                if (!t && img) t = "[Hình ảnh lựa chọn]";
-                if (!t || seen.has(t)) return;
-                seen.add(t);
+
+                if (t && seenTexts.has(t)) return;
+                if (t) seenTexts.add(t);
+
+                if (!t && !img) return;
+
                 options.push({
                     label: ALPHA[options.length] || String(options.length + 1),
                     text: cleanStemText(t),
-                    image_base64: img
+                    image_base64: img || ""
                 });
             });
         }
@@ -570,15 +634,36 @@
         var fptStemEl = block.querySelector(".card-body.border-bottom");
         if (fptStemEl) {
             var stemClone = fptStemEl.cloneNode(true);
-            var noise1 = stemClone.querySelectorAll("img, canvas, svg, style, script, .katex-mathml, annotation");
+            var noise1 = stemClone.querySelectorAll("style, script, .katex-mathml, annotation");
             for (var i = 0; i < noise1.length; i++) noise1[i].remove();
+
+            var mathImgs = stemClone.querySelectorAll("img");
+            var altTexts = [];
+            for (var m = 0; m < mathImgs.length; m++) {
+                var alt = (mathImgs[m].alt || "").trim();
+                if (alt && alt.length > 1 && !/^(?:image|hinh|ảnh)$/i.test(alt)) {
+                    altTexts.push(alt);
+                }
+            }
+
             var s = cleanStemText(getText(stemClone));
+            if (altTexts.length > 0 && (!s || s.length < 5)) {
+                s = (s ? s + " " : "") + altTexts.join(" ");
+            }
             if (s.length >= 2) return s;
+
+            if (fptStemEl.querySelector("img, canvas, svg")) {
+                return "[Đề bài dạng hình ảnh / biểu đồ]";
+            }
         }
 
         // Priority 2: Moodle qtext
         var qtEl = block.querySelector(".qtext, .question-text, .formulation .qtext, .stem, [class*='qtext'], [class*='question-text']");
-        if (qtEl) return cleanStemText(getText(qtEl));
+        if (qtEl) {
+            var qs = cleanStemText(getText(qtEl));
+            if (qs.length >= 2) return qs;
+            if (qtEl.querySelector("img, canvas, svg")) return "[Đề bài dạng hình ảnh / biểu đồ]";
+        }
 
         // Priority 3: General card clone
         try {
@@ -610,7 +695,11 @@
             if (stem.length >= 3) return stem;
         } catch (e) {}
 
-        return cleanStemText(getText(block));
+        // Never fall back to getText(block) if it contains options (prevents option leak into stem)
+        if (block.querySelector("img, canvas, svg")) {
+            return "[Đề bài dạng hình ảnh / biểu đồ]";
+        }
+        return "";
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -772,6 +861,14 @@
             // Ignore settings modal or invalid text
             if (questionText && (questionText.includes("Kích thước chữ") || questionText.includes("Màu sắc trình đơn"))) {
                 return;
+            }
+
+            // If questionText accidentally matches the concatenated option texts, clean it
+            if (options.length > 0 && questionText) {
+                var allOptTexts = options.map(function(o) { return o.text; }).filter(Boolean).join(" ");
+                if (allOptTexts.length > 10 && questionText.trim() === allOptTexts.trim()) {
+                    questionText = stemImage ? "[Đề bài dạng hình ảnh / biểu đồ]" : ("Câu hỏi " + (qIndex + 1));
+                }
             }
 
             if (!questionText || questionText.length < 2) {
@@ -1199,16 +1296,21 @@
             // 1. If clicking a palette number button in sidebar/matrix (e.g. "1", "39", "60", or .btn-question)
             var btnText = getText(target);
             if (/^\d{1,3}$/.test(btnText) || target.classList.contains("btn-question") || target.closest(".btn-question")) {
-                setTimeout(autoApplyCurrentQuestionAnswer, 100);
-                setTimeout(autoApplyCurrentQuestionAnswer, 300);
+                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 100);
+                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 350);
                 return;
             }
 
             // 2. If clicking navigation buttons ("Tiếp theo", "Trước", "Tải lại", "Next", "Prev")
-            if (/Tiếp|Trước|Tải lại|Next|Prev|Forward|Back/i.test(btnText)) {
-                setTimeout(autoApplyCurrentQuestionAnswer, 150);
-                setTimeout(autoApplyCurrentQuestionAnswer, 400);
+            if (/Tiếp|Trước|Tải lại|Next|Prev|Forward|Back/i.test(btnText) || target.closest("#btn-next-question, #btn-previous-question, .btn-next-question, .btn-previous-question")) {
+                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 120);
+                setTimeout(function () { extractQuestions(); autoApplyCurrentQuestionAnswer(); syncToServer(); }, 400);
                 return;
+            }
+
+            // 3. If clicking an option choice
+            if (target.matches("input[type='radio'], input[type='checkbox'], label, .form-check, .choice, .option") || target.closest("label, .form-check, .choice, .option")) {
+                setTimeout(function () { extractQuestions(); syncToServer(); }, 60);
             }
 
             // 3. Find the specific question block clicked
@@ -1297,16 +1399,16 @@
     window.__SEB_GET_SYNC_PAYLOAD__ = function () {
         try {
             var questions = extractQuestions();
-            // Cap image sizes in sync payload so CefSharp IPC never drops the message (>1.5MB fails in CefSharp)
+            // Preserve full images up to 2MB (stem) / 1.5MB (options), NEVER slice base64 strings!
             var safeQuestions = questions.map(function (q) {
                 var copy = Object.assign({}, q);
-                if (copy.image_base64 && copy.image_base64.length > 50000) {
-                    copy.image_base64 = copy.image_base64.slice(0, 50000);
+                if (copy.image_base64 && copy.image_base64.length > 2000000) {
+                    copy.image_base64 = "";
                 }
                 if (Array.isArray(copy.options)) {
                     copy.options = copy.options.map(function (o) {
                         var oCopy = Object.assign({}, o);
-                        if (oCopy.image_base64 && oCopy.image_base64.length > 25000) {
+                        if (oCopy.image_base64 && oCopy.image_base64.length > 1500000) {
                             oCopy.image_base64 = "";
                         }
                         return oCopy;
@@ -1387,10 +1489,8 @@
         syncToServer();
         crawlOtherExamPages();
 
-        // Automatically sweep through all 60 question buttons if not all are captured yet
-        setTimeout(function () {
-            sweepAllQuestions(false);
-        }, 1500);
+        // NOTE: Auto-sweep removed! The student navigates naturally ("để học sinh tự next").
+        // As the student views/clicks next/prev/palette, questions are extracted and synced cleanly.
 
         setInterval(function () {
             setupGlobalClickToAnswer();
