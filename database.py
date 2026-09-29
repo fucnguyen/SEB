@@ -851,23 +851,60 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
     conn = get_connection()
     c    = conn.cursor()
 
+    # Filter out bogus questions (e.g. from index/lobby pages with 0 options and generic placeholder stem)
+    valid_questions = []
+    for q in questions:
+        q_text = (q.get("question_text") or "").strip()
+        opts = q.get("options") or []
+        q_type = (q.get("question_type") or "unknown").strip().lower()
+        is_bogus = (len(opts) == 0 and ("[Đề bài dạng hình ảnh" in q_text or "[Câu hỏi dạng hình ảnh" in q_text) and q_type not in ["essay", "pea", "text"])
+        if not is_bogus:
+            valid_questions.append(q)
+
+    # Check if DB already has existing questions for this hwid
+    c.execute("SELECT COUNT(*) as cnt FROM live_exam_questions WHERE hwid = ?", (hwid,))
+    cnt_existing = c.fetchone()
+    has_existing_questions = bool(cnt_existing and cnt_existing["cnt"] > 0)
+
+    clean_url = (page_url or "").strip().lower()
+    is_lobby_url = clean_url.endswith("/exam/index") or clean_url.endswith("/quizprogress/exam") or "/login" in clean_url
+
+    # If incoming questions is purely bogus (e.g. index/lobby page), but DB already has questions or it's a lobby url:
+    if len(valid_questions) == 0 and (has_existing_questions or is_lobby_url):
+        c.execute("""
+            UPDATE live_exam_sessions
+            SET last_sync = ?, status = 'active'
+            WHERE hwid = ?
+        """, (now, hwid))
+        conn.commit()
+        c.execute("SELECT question_index, support_answer FROM live_exam_questions WHERE hwid = ? AND support_answer != ''", (hwid,))
+        answers = {str(r["question_index"]): r["support_answer"] for r in c.fetchall()}
+        conn.close()
+        return answers
+
+    questions_to_sync = valid_questions if valid_questions else questions
+
     # 1. Upsert session
     try:
-        c.execute("SELECT id, status, created_at FROM live_exam_sessions WHERE hwid = ?", (hwid,))
+        c.execute("SELECT id, status, page_url, total_questions, created_at FROM live_exam_sessions WHERE hwid = ?", (hwid,))
         existing = c.fetchone()
         if existing:
-            # If session was archived or created > 2 hours ago, reset created_at to now so cleanup task won't wipe it
+            eff_url = (page_url or "").strip()[:500]
+            if is_lobby_url and existing["page_url"] and not existing["page_url"].lower().endswith("/exam/index"):
+                eff_url = existing["page_url"]
+
+            new_total = max(existing["total_questions"] or 0, len(questions_to_sync))
             c.execute("""
                 UPDATE live_exam_sessions
                 SET student_name = ?, exam_title = ?, page_url = ?, total_questions = ?, last_sync = ?, status = 'active',
                     created_at = CASE WHEN status = 'archived' THEN ? ELSE created_at END
                 WHERE hwid = ?
-            """, (student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions), now, now, hwid))
+            """, (student_name.strip(), exam_title.strip(), eff_url, new_total, now, now, hwid))
         else:
             c.execute("""
                 INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
                 VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
-            """, (hwid, student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions), now, now))
+            """, (hwid, student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions_to_sync), now, now))
     except sqlite3.OperationalError:
         try:
             c.execute("ALTER TABLE live_exam_sessions ADD COLUMN page_url TEXT DEFAULT ''")
@@ -876,10 +913,10 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
         c.execute("""
             INSERT OR REPLACE INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
             VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
-        """, (hwid, student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions), now, now))
+        """, (hwid, student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions_to_sync), now, now))
 
     # 2. Upsert each question
-    for q in questions:
+    for q in questions_to_sync:
         q_idx   = int(q.get("question_index") if q.get("question_index") is not None else q.get("index", 0))
         q_text  = clean_exam_stem_text(q.get("question_text") or "")[:1500]
         q_type  = (q.get("question_type") or "unknown").strip()

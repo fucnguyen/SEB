@@ -2763,7 +2763,7 @@
                 }
                 questions.forEach((q, idx) => {
                     let qtype = q.question_type || "radio";
-                    const isPeaExam = (currentExamName || "").toUpperCase().includes("PEA") || (currentExamHWID || "").toUpperCase().includes("PEA") || (q.options && q.options.length === 0);
+                    const isPeaExam = (currentExamName || "").toUpperCase().includes("PEA") || (currentExamHWID || "").toUpperCase().includes("PEA") || (qtype === "pea" || qtype === "practical");
                     if (qtype === "essay" || qtype === "pea" || qtype === "practical" || isPeaExam) {
                         qtype = "essay";
                     } else if (qtype === "MultipleChoice" || qtype === "multiple_choice" || qtype === "choice" || !["radio", "checkbox", "text", "essay"].includes(qtype)) {

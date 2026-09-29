@@ -53,10 +53,12 @@
         if (savedAcc) {
             var parsedAcc = JSON.parse(savedAcc);
             if (parsedAcc && typeof parsedAcc === "object") {
-                // Filter out any bogus questions from settings modal
+                // Filter out any bogus questions from settings modal or lobby
                 Object.keys(parsedAcc).forEach(function(k) {
                     var item = parsedAcc[k];
-                    if (item && item.question_text && !item.question_text.includes("Kích thước chữ") && !item.question_text.includes("Màu sắc trình đơn")) {
+                    if (item && item.question_text) {
+                        if (item.question_text.includes("Kích thước chữ") || item.question_text.includes("Màu sắc trình đơn")) return;
+                        if ((!item.options || item.options.length === 0) && (item.question_text.includes("[Đề bài dạng hình ảnh") || item.question_text.includes("[Câu hỏi dạng hình ảnh"))) return;
                         accumulatedDomQuestions[k] = item;
                     }
                 });
@@ -591,8 +593,15 @@
     function findQuestionBlocks(rootDoc) {
         var doc = rootDoc || document;
 
-        // 1. FPT / LMS specific containers: [id^='question-content-'] or .card.border-secondary
-        var fptCards = doc.querySelectorAll("[id^='question-content-'], .card.border-secondary");
+        // Skip non-exam URLs (index/lobby/login/account/dashboard)
+        var locPath = "";
+        try { locPath = (window.location.pathname || "").toLowerCase(); } catch(e){}
+        if (locPath.endsWith("/exam/index") || locPath.endsWith("/quizprogress/exam") || locPath.endsWith("/quizprogress") || locPath.includes("/login") || locPath.includes("/account") || locPath.includes("/dashboard")) {
+            return [];
+        }
+
+        // 1. FPT / LMS specific containers: [id^='question-content-'] or [id*='question-content-']
+        var fptCards = doc.querySelectorAll("[id^='question-content-'], [id*='question-content-']");
         if (fptCards.length > 0) {
             var validCards = [];
             for (var f = 0; f < fptCards.length; f++) {
@@ -628,8 +637,8 @@
         }
         if (fptBlocks.length > 0) return fptBlocks;
 
-        // 4. Fallback: Any container holding choices, strictly excluding settings modal
-        var radios = doc.querySelectorAll("input[type='radio'], input[type='checkbox'], input.form-check-input");
+        // 4. Fallback: Any container holding radio choices (at least 2 options), strictly excluding settings modal
+        var radios = doc.querySelectorAll("input[type='radio'], input[type='radio'].form-check-input");
         for (var r = 0; r < radios.length; r++) {
             var radio = radios[r];
             if (radio.closest(".modal, #submitModal, [class*='setting'], [class*='config']")) continue;
@@ -637,8 +646,11 @@
             if (hostCard && !seenContainers.has(hostCard)) {
                 var hTxt = getText(hostCard);
                 if (hTxt.includes("Kích thước chữ") || hTxt.includes("Màu sắc thanh trạng thái")) continue;
-                seenContainers.add(hostCard);
-                fptBlocks.push(hostCard);
+                var cardRadios = hostCard.querySelectorAll("input[type='radio']");
+                if (cardRadios.length >= 2 || /(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*\d+/i.test(hTxt)) {
+                    seenContainers.add(hostCard);
+                    fptBlocks.push(hostCard);
+                }
             }
         }
         if (fptBlocks.length > 0) return fptBlocks;
@@ -963,6 +975,11 @@
                 } else {
                     return;
                 }
+            }
+
+            // Never extract a bogus question with 0 options and placeholder image text
+            if ((!options || options.length === 0) && (questionText.includes("[Đề bài dạng hình ảnh") || questionText.includes("[Câu hỏi dạng hình ảnh"))) {
+                if (qtype !== "essay" && qtype !== "text") return;
             }
 
             // Bảo toàn ảnh đề và ảnh đáp án nếu lần quét này ảnh đang render dở dang
