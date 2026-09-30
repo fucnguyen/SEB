@@ -2483,15 +2483,19 @@
                     div.onclick = () => selectExamStudent(s.hwid, s.student_name, s.exam_title);
 
                     const lastSync = s.last_sync ? s.last_sync.split(" ")[1] : "—";
+                    const isFinished = (s.status === 'finished' || s.status === 'archived');
+                    const badgeHtml = isFinished 
+                        ? `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30">🏁 Đã nộp bài (< 24h)</span>`
+                        : `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-[10px] text-emerald-400 font-semibold">LIVE</span></span>`;
+
                     div.innerHTML = `
                         <div class="flex items-center gap-2.5">
-                            <div class="w-9 h-9 rounded-full bg-emerald-600/30 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-sm font-bold shrink-0">🧑‍🎓</div>
+                            <div class="w-9 h-9 rounded-full ${isFinished ? 'bg-blue-600/30 border border-blue-500/40 text-blue-400' : 'bg-emerald-600/30 border border-emerald-500/40 text-emerald-400'} flex items-center justify-center text-sm font-bold shrink-0">🧑‍🎓</div>
                             <div class="min-w-0 flex-1">
                                 <div class="font-bold text-xs text-white truncate">${escapeHtml(s.student_name || "Học sinh")}</div>
                                 <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.exam_title || "Đang thi...")}</div>
-                                <div class="flex items-center gap-2 mt-0.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                    <span class="text-[10px] text-emerald-400 font-semibold">LIVE</span>
+                                <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                                    ${badgeHtml}
                                     <span class="text-[10px] text-slate-500">• Sync: ${lastSync}</span>
                                     <span class="text-[10px] text-slate-400 font-bold">• ${s.question_count || s.total_questions || 0} câu</span>
                                 </div>
@@ -2633,23 +2637,28 @@
                 list.forEach(item => {
                     const kb = Math.round((item.file_size_bytes || 0) / 1024);
                     html += `
-                        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition">
-                            <div class="space-y-0.5">
-                                <div class="text-xs font-bold text-white flex items-center gap-1.5">
-                                    <i class="fa-solid fa-file-zipper text-amber-400"></i>
-                                    ${escapeHtml(item.archive_filename)}
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition gap-2">
+                            <div class="space-y-0.5 min-w-0 flex-1">
+                                <div class="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                                    <i class="fa-solid fa-file-zipper text-amber-400 shrink-0"></i>
+                                    <span class="truncate">${escapeHtml(item.archive_filename)}</span>
                                 </div>
-                                <div class="text-[11px] text-slate-400">
-                                    <span>${escapeHtml(item.student_name || "Thí sinh")}</span> • 
-                                    <span class="text-slate-500">${escapeHtml(item.exam_title || "Đề thi")}</span> • 
-                                    <span class="text-emerald-400 font-semibold">${item.total_questions || 0} câu</span> • 
+                                <div class="text-[11px] text-slate-400 flex flex-wrap items-center gap-1.5">
+                                    <span class="font-semibold text-slate-300">${escapeHtml(item.student_name || "Thí sinh")}</span> • 
+                                    <span class="text-slate-400">${escapeHtml(item.exam_title || "Đề thi")}</span> • 
+                                    <span class="text-emerald-400 font-bold">${item.total_questions || 0} câu</span> • 
                                     <span class="text-slate-500">${kb} KB</span> • 
-                                    <span class="text-slate-500">${item.created_at || ""}</span>
+                                    <span class="text-purple-400"><i class="fa-regular fa-clock mr-1"></i>${item.created_at || ""}</span>
                                 </div>
                             </div>
-                            <a href="/api/admin/download-archive/${encodeURIComponent(item.archive_filename)}" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow" download>
-                                <i class="fa-solid fa-download"></i> Tải ZIP
-                            </a>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <button onclick="reviewArchivedExam('${escapeHtml(item.archive_filename)}', '${escapeHtml(item.student_name)}', '${escapeHtml(item.exam_title)}')" class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow" title="Xem lại toàn bộ câu hỏi, ảnh và đáp án của đề này">
+                                    <i class="fa-solid fa-eye"></i> Xem Lại
+                                </button>
+                                <a href="/api/admin/download-archive/${encodeURIComponent(item.archive_filename)}" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow" download title="Tải file ZIP source đầy đủ">
+                                    <i class="fa-solid fa-download"></i> Tải ZIP
+                                </a>
+                            </div>
                         </div>
                     `;
                 });
@@ -2657,6 +2666,44 @@
                 container.innerHTML = html;
             } catch(e) {
                 container.innerHTML = `<div class="text-center py-6 text-rose-400 text-xs">Lỗi tải danh sách: ${e.message}</div>`;
+            }
+        }
+
+        async function reviewArchivedExam(filename, studentName, examTitle) {
+            closeArchivedSourcesModal();
+            currentExamHWID = null; // Tạm ngắt live polling để xem đề lưu trữ
+            currentExamVersion = "";
+            document.getElementById("current-exam-student").innerHTML = `🧑‍🎓 ${escapeHtml(studentName)} <span class="px-2 py-0.5 bg-blue-600/30 text-blue-400 rounded-md text-[10px] uppercase font-bold ml-1.5">Lưu trữ (< 24h)</span>`;
+            document.getElementById("current-exam-title").innerText = examTitle || filename;
+            document.getElementById("exam-stats-badge").classList.remove("hidden");
+
+            const container = document.getElementById("exam-questions-container");
+            container.innerHTML = `<div class="text-center py-16 text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin text-2xl text-blue-400 mb-2 block"></i> Đang tải đề thi từ kho lưu trữ 24h...</div>`;
+
+            try {
+                const res = await fetch(`/api/admin/archived-exam-questions/${encodeURIComponent(filename)}`);
+                const data = await res.json();
+                if (data.status === "ok" && data.questions) {
+                    cachedCurrentQuestions = data.questions;
+                    renderExamQuestions(data.questions);
+
+                    // Bật các nút chức năng in ấn / tải ảnh
+                    const btnZip = document.getElementById("btn-export-zip");
+                    const btnPrint = document.getElementById("btn-print-exam");
+                    const btnCopy = document.getElementById("btn-copy-formatted-ans");
+                    const btnArchive = document.getElementById("btn-archive-session");
+                    const btnReset = document.getElementById("btn-reset-session");
+
+                    if (btnZip) btnZip.classList.remove("hidden");
+                    if (btnPrint) btnPrint.classList.remove("hidden");
+                    if (btnCopy) btnCopy.classList.remove("hidden");
+                    if (btnArchive) btnArchive.classList.add("hidden");
+                    if (btnReset) btnReset.classList.add("hidden");
+                } else {
+                    container.innerHTML = `<div class="text-center py-16 text-rose-400 text-xs">Không thể đọc câu hỏi từ file lưu trữ!</div>`;
+                }
+            } catch(e) {
+                container.innerHTML = `<div class="text-center py-16 text-rose-400 text-xs">Lỗi tải dữ liệu: ${e.message}</div>`;
             }
         }
 

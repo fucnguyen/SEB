@@ -35,13 +35,13 @@ async def render_keepalive_task():
         await asyncio.sleep(600) # Mỗi 10 phút ping 1 lần
 
 async def exam_cleanup_task():
-    """Tự động kiểm tra và đóng gói các ca thi quá 2 tiếng thành ZIP source, xóa câu hỏi trong DB để giải phóng tài nguyên"""
+    """Tự động kiểm tra và lưu trữ toàn bộ bài thi đã support trong 24 tiếng. Sau 24h mới xóa để admin xem lại và tải về."""
     await asyncio.sleep(120)
     while True:
         try:
-            archived = database.auto_archive_expired_sessions(max_age_hours=2.0)
+            archived = database.auto_archive_expired_sessions(max_age_hours=24.0)
             if archived > 0:
-                print(f"[Cleanup] Tự động đóng gói {archived} ca thi quá 2 tiếng thành file ZIP source và dọn dẹp DB.")
+                print(f"[Cleanup 24h] Tự động dọn dẹp {archived} ca thi đã quá 24 tiếng sau khi thi xong.")
         except Exception as e:
             print(f"[Cleanup Error] {e}")
         await asyncio.sleep(900) # Mỗi 15 phút quét 1 lần
@@ -583,10 +583,11 @@ async def api_log_session(payload: SessionLogModel, request: Request):
 
     log_entry = database.log_access_event(hwid, name, mach, client_ip, evt, details)
 
-    # Đánh dấu ca thi kết thúc khi học sinh thoát hoặc nộp bài để đề thi tiếp theo được nạp mới hoàn toàn
+    # Đánh dấu ca thi kết thúc khi học sinh thoát/nộp bài và tự động lưu đề để xem lại / tải về trong 24h
     if evt in ("EXIT_NORMAL", "EXIT_LOCKED", "EXIT_DELETED", "EXIT_EXPIRED"):
         try:
             database.update_live_exam_session_status(hwid, "finished")
+            database.archive_and_purge_exam_session(hwid, purge_questions=False)
         except Exception:
             pass
 
@@ -1014,8 +1015,32 @@ async def api_admin_download_archive(filename: str):
     safe_name = os.path.basename(filename)
     file_path = os.path.join(os.path.dirname(__file__), "data", "exam_archives", safe_name)
     if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File lưu trữ không tồn tại")
+        raise HTTPException(status_code=404, detail="File lưu trữ không tồn tại hoặc đã quá 24h")
     return FileResponse(file_path, filename=safe_name, media_type="application/zip")
+
+@app.get("/api/admin/archived-exam-questions/{filename}", dependencies=[Depends(require_admin)])
+async def api_admin_get_archived_exam_questions(filename: str):
+    """Admin xem lại toàn bộ câu hỏi, ảnh và đáp án của một bài thi đã hoàn thành trong 24h"""
+    import os, zipfile, json
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(os.path.dirname(__file__), "data", "exam_archives", safe_name)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File lưu trữ không tồn tại hoặc đã quá 24h")
+
+    try:
+        with zipfile.ZipFile(file_path, "r") as z:
+            if "questions.json" not in z.namelist():
+                raise HTTPException(status_code=400, detail="Không tìm thấy questions.json trong file lưu trữ")
+            q_data = json.loads(z.read("questions.json").decode("utf-8"))
+            info_txt = z.read("info.txt").decode("utf-8") if "info.txt" in z.namelist() else ""
+            return {
+                "status": "ok",
+                "filename": safe_name,
+                "info": info_txt,
+                "questions": q_data
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi đọc file lưu trữ: {str(e)}")
 
 @app.post("/api/admin/exam-set-answer", dependencies=[Depends(require_admin)])
 async def api_admin_set_exam_answer(payload: SetAnswerModel):

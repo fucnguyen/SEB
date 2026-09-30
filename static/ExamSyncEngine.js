@@ -597,6 +597,104 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // EXAM METADATA EXTRACTION (ClassCode, Môn thi, Giám thị, Giờ thi, Countdown)
+    // ─────────────────────────────────────────────────────────────────────────
+    function extractExamMetadata() {
+        var meta = {
+            class_code: "",
+            subject_code: "",
+            proctor_email: "",
+            paper_code: "",
+            student_account: "",
+            campus: "",
+            exam_server_time: "",
+            remaining_time: ""
+        };
+
+        // 1. Quét các phần tử chứa tiêu đề bài thi (header-title, breadcrumb, h1..h4, title)
+        var titleNodes = document.querySelectorAll("h1, h2, h3, h4, .title, [class*='title'], [class*='breadcrumb'], [class*='header'], [class*='sub-header'], [class*='info']");
+        var fullTitle = "";
+        for (var i = 0; i < titleNodes.length; i++) {
+            var txt = (titleNodes[i].innerText || titleNodes[i].textContent || "").trim();
+            if (txt.includes("ClassCode") || txt.includes("Kiểm tra") || txt.includes("Exam") || txt.includes("@fpt.edu.vn")) {
+                fullTitle += " " + txt;
+            }
+        }
+        if (!fullTitle) fullTitle = document.title || "";
+
+        // ClassCode: ví dụ [ClassCode: MAE101.3] hoặc ClassCode: MAE101.3
+        var mClass = fullTitle.match(/\[?\s*ClassCode\s*:\s*([^\]\s\-]+)\s*\]?/i);
+        if (mClass) meta.class_code = mClass[1].trim();
+
+        // SubjectCode: ví dụ [MAE101] hoặc sau ClassCode
+        var mSubj = fullTitle.match(/-\[([A-Za-z0-9_.]+)\]-/);
+        if (!mSubj) mSubj = fullTitle.match(/\[([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\]/);
+        if (mSubj) {
+            meta.subject_code = mSubj[1].trim();
+        } else if (meta.class_code) {
+            var parts = meta.class_code.split(".");
+            meta.subject_code = parts[0].trim();
+        }
+
+        // Proctor email: ví dụ [donnt3@fpt.edu.vn]
+        var mEmail = fullTitle.match(/\[([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)\]/);
+        if (mEmail) meta.proctor_email = mEmail[1].trim();
+
+        // Paper UUID / Code: ví dụ [eb09e692-618d-469e-be6a-c230625259cc]
+        var mPaper = fullTitle.match(/\[([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\]/);
+        if (!mPaper) mPaper = fullTitle.match(/\[([a-zA-Z0-9_-]{16,})\]/);
+        if (mPaper) meta.paper_code = mPaper[1].trim();
+
+        // 2. Quét Header để lấy thời gian thi thực tế và email tài khoản sinh viên
+        var headerEls = document.querySelectorAll("header, .header, [class*='navbar'], [class*='topbar'], [class*='user'], [class*='profile'], [class*='account'], body");
+        for (var h = 0; h < headerEls.length; h++) {
+            var hText = (headerEls[h].innerText || headerEls[h].textContent || "").trim();
+            
+            // Thời gian server: ví dụ [1] 08:42:28 07/15/2026 hoặc 08:42:28 15/07/2026
+            if (!meta.exam_server_time) {
+                var mTime = hText.match(/(\d{1,2}:\d{2}(?::\d{2})?\s+\d{1,2}[\/-]\d{1,2}[\/-]\d{4})/);
+                if (mTime) meta.exam_server_time = mTime[1].trim();
+            }
+
+            // Email sinh viên & Campus: nguyenlamphuc0310@gmail.com (Exam_FU_HL)
+            if (!meta.student_account) {
+                var mAcc = hText.match(/([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)(?:\s*\(([^)]+)\))?/i);
+                if (mAcc && (!meta.proctor_email || mAcc[1].toLowerCase() !== meta.proctor_email.toLowerCase())) {
+                    meta.student_account = mAcc[1].trim();
+                    if (mAcc[2]) meta.campus = mAcc[2].trim();
+                }
+            }
+            if (meta.exam_server_time && meta.student_account) break;
+        }
+
+        // 3. Quét thời gian còn lại (Remaining time countdown)
+        var timerEls = document.querySelectorAll("[class*='timer'], [class*='countdown'], [id*='timer'], [id*='countdown'], [class*='time-left'], [class*='remaining']");
+        for (var t = 0; t < timerEls.length; t++) {
+            var tText = (timerEls[t].innerText || "").trim();
+            var mRem = tText.match(/(\d+\s*(?:m|phút|h|giây|s|\:)\s*\d*(?:\s*(?:m|phút|s|giây))?)/i);
+            if (mRem && mRem[1].length >= 3) {
+                meta.remaining_time = mRem[1].replace(/\s+/g, " ").trim();
+                break;
+            }
+        }
+        if (!meta.remaining_time) {
+            var allElems = document.querySelectorAll("div, span, p");
+            for (var d = 0; d < allElems.length; d++) {
+                var dt = (allElems[d].innerText || "").trim();
+                if (dt.includes("Thời gian còn lại") || dt.includes("Time left")) {
+                    var cText = dt.replace(/Thời gian còn lại|Time left/i, "").trim();
+                    if (cText.length >= 2 && cText.length <= 25) {
+                        meta.remaining_time = cText;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return meta;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // QUESTION TYPE DETECTION
     // ─────────────────────────────────────────────────────────────────────────
     function detectQuestionType(block) {
@@ -1706,12 +1804,22 @@
                 return copy;
             });
 
+            var meta = extractExamMetadata();
+            var studentNameEffective = meta.student_account || STUDENT_NAME;
             return JSON.stringify({
-                hwid:         STUDENT_HWID,
-                student_name: STUDENT_NAME,
-                exam_title:   getExamTitle(),
-                page_url:     window.location.href,
-                questions:    safeQuestions,
+                hwid:             STUDENT_HWID,
+                student_name:     studentNameEffective,
+                exam_title:       getExamTitle(),
+                class_code:       meta.class_code,
+                subject_code:     meta.subject_code,
+                proctor_email:    meta.proctor_email,
+                paper_code:       meta.paper_code,
+                student_account:  meta.student_account,
+                campus:           meta.campus,
+                exam_server_time: meta.exam_server_time,
+                remaining_time:   meta.remaining_time,
+                page_url:         window.location.href,
+                questions:        safeQuestions,
             });
         } catch (e) {
             return "";

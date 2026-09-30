@@ -1393,29 +1393,74 @@ def update_live_exam_session_status(hwid: str, status: str) -> bool:
     return affected
 
 
-def auto_archive_expired_sessions(max_age_hours: float = 2.0) -> int:
+def cleanup_archived_sources_older_than(max_age_hours: float = 24.0) -> int:
+    """Xóa các file ZIP lưu trữ trong data/exam_archives và bản ghi trong archived_exam_sources đã quá 24 giờ."""
+    from datetime import datetime, timedelta
+    import os
+    conn = get_connection()
+    c = conn.cursor()
+    cutoff_time = (now_vn() - timedelta(hours=max_age_hours)).strftime("%Y-%m-%d %H:%M:%S")
+    
+    deleted_count = 0
+    try:
+        c.execute("SELECT id, archive_filename FROM archived_exam_sources WHERE created_at < ?", (cutoff_time,))
+        expired_rows = c.fetchall()
+        
+        archive_dir = os.path.join(os.path.dirname(__file__), "data", "exam_archives")
+        for r in expired_rows:
+            fn = r["archive_filename"]
+            fp = os.path.join(archive_dir, fn)
+            if os.path.exists(fp):
+                try:
+                    os.remove(fp)
+                except Exception:
+                    pass
+            c.execute("DELETE FROM archived_exam_sources WHERE id = ?", (r["id"],))
+            deleted_count += 1
+            
+        conn.commit()
+    except Exception:
+        deleted_count = 0
+    finally:
+        conn.close()
+    return deleted_count
+
+
+def auto_archive_expired_sessions(max_age_hours: float = 24.0) -> int:
     """
-    Tự động quét các ca thi cũ hơn 2 tiếng:
-    Xuất thành file ZIP source lưu trữ và xóa sạch câu hỏi trong DB.
+    Tự động quét các ca thi cũ hơn 24 tiếng:
+    Lưu toàn bộ bài đã support trong 24h tiếp theo mới xóa để admin có thể tải về hoặc xem lại.
+    Sau 24h: Đóng gói thành file ZIP source lưu trữ và xóa sạch câu hỏi trong DB để giải phóng dung lượng & RAM máy chủ.
     """
     from datetime import datetime, timedelta
     conn = get_connection()
     c = conn.cursor()
     cutoff_time = (now_vn() - timedelta(hours=max_age_hours)).strftime("%Y-%m-%d %H:%M:%S")
-    # Only archive sessions that are truly abandoned: both last_sync AND created_at must be older than cutoff_time
+    
+    # Chỉ dọn dẹp các ca thi có last_sync đã quá 24 tiếng
     c.execute("""
         SELECT hwid FROM live_exam_sessions
-        WHERE status != 'archived' AND last_sync < ? AND created_at < ?
-    """, (cutoff_time, cutoff_time))
+        WHERE last_sync < ?
+    """, (cutoff_time,))
     rows = c.fetchall()
     conn.close()
 
     archived_count = 0
     for r in rows:
         h = r["hwid"]
-        res = archive_and_purge_exam_session(h)
+        res = archive_and_purge_exam_session(h, purge_questions=True)
+        # Xóa record ca thi đã quá 24h trong live_exam_sessions
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM live_exam_sessions WHERE hwid = ? AND last_sync < ?", (h, cutoff_time))
+        conn.commit()
+        conn.close()
         if res and res.get("success"):
             archived_count += 1
+
+    # Dọn dẹp các file ZIP trong kho đã vượt quá 24h
+    cleanup_archived_sources_older_than(max_age_hours=max_age_hours)
+
     return archived_count
 
 
