@@ -1926,6 +1926,7 @@ def get_support_assigned_exams_for_date(support_key: str, target_date: Optional[
     c.execute("""
         SELECT a.*, 
                s.exam_title, s.total_questions, s.status as session_status, s.last_sync,
+               s.remaining_time, s.exam_server_time, s.subject_code,
                l.student_name as lic_student_name, l.machine_name, l.ip_address, l.status as lic_status
         FROM support_assignments a
         LEFT JOIN live_exam_sessions s ON a.hwid = s.hwid
@@ -1966,7 +1967,10 @@ def get_support_assigned_exams_for_date(support_key: str, target_date: Optional[
             "total_questions": d.get("total_questions") or 0,
             "session_status": d.get("session_status") or ("active" if is_online else "pending"),
             "last_sync": last_sync_str,
-            "is_online": is_online
+            "is_online": is_online,
+            "remaining_time": d.get("remaining_time") or "",
+            "exam_server_time": d.get("exam_server_time") or "",
+            "subject_code": d.get("subject_code") or ""
         })
 
     return {
