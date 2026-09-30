@@ -659,90 +659,170 @@
 
         <!-- TAB 6: Live Exam Support & Real-time Synchronizer -->
         <div id="tab-exam-support" class="hidden space-y-4">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <!-- View Mode Switcher: Chế độ VIPER (Từng câu) vs Chế độ Cuộn Toàn Bộ -->
+            <div class="flex items-center justify-between flex-wrap gap-2 px-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-layer-group text-emerald-400"></i> Giao diện:
+                    </span>
+                    <button id="btn-mode-viper" onclick="switchViperViewMode('viper')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
+                        <i class="fa-solid fa-eye"></i> Chuẩn VIPER (Từng Câu)
+                    </button>
+                    <button id="btn-mode-scroll" onclick="switchViperViewMode('scroll')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-slate-800 text-slate-300 hover:bg-slate-700">
+                        <i class="fa-solid fa-list-ol"></i> Xem Toàn Bộ (Cuộn)
+                    </button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="openArchivedSourcesModal()" class="px-3 py-1.5 bg-amber-950/40 hover:bg-amber-900 border border-amber-600/50 text-amber-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm">
+                        <i class="fa-solid fa-folder-open text-amber-400"></i> Kho Source Đề ZIP
+                    </button>
+                    <button onclick="currentExamVersion = ''; loadExamQuestions()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
+                        <i class="fa-solid fa-arrows-rotate"></i> Cập nhật câu hỏi
+                    </button>
+                </div>
+            </div>
+
+            <!-- TRUE 3-COLUMN VIPER GRID (Left: Tools/Students | Center: Big Question | Right: Answer Matrix) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
                 
-                <!-- Cột trái (4 cols): Danh sách thí sinh đang thi -->
-                <div class="lg:col-span-4 glass-card rounded-2xl p-4 border border-slate-800 space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-slate-800">
-                        <h3 class="font-bold text-sm text-white flex items-center gap-2">
-                            <i class="fa-solid fa-graduation-cap text-emerald-400"></i> Ca Thi Đang Kết Nối
-                        </h3>
-                        <button onclick="loadExamSessions()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 transition">
-                            <i class="fa-solid fa-rotate"></i> Làm mới
-                        </button>
+                <!-- Cột 1 (Trái - 3 cols): Danh sách thí sinh & Công cụ đề -->
+                <div class="lg:col-span-3 space-y-4">
+                    <!-- Danh sách thí sinh đang kết nối -->
+                    <div class="glass-card rounded-2xl p-4 border border-slate-800 space-y-3">
+                        <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                            <h3 class="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-graduation-cap text-emerald-400"></i> Ca Thi Đang Kết Nối
+                            </h3>
+                            <button onclick="loadExamSessions()" class="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition" title="Tải lại danh sách">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                        </div>
+                        <div id="exam-sessions-list" class="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+                            <div class="text-xs text-slate-500 text-center py-8">Chưa có thí sinh nào kết nối ca thi...</div>
+                        </div>
                     </div>
-                    <div id="exam-sessions-list" class="space-y-2 max-h-[680px] overflow-y-auto pr-1">
-                        <div class="text-xs text-slate-500 text-center py-10">Chưa có thí sinh nào kết nối ca thi...</div>
+
+                    <!-- Hộp Công Cụ Đề Thi (Xuất đề, Source PEA, In PDF) -->
+                    <div class="glass-card rounded-2xl p-4 border border-slate-800 space-y-2.5">
+                        <div class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-slate-800">
+                            <i class="fa-solid fa-toolbox text-cyan-400"></i> Công Cụ Đề Thi
+                        </div>
+                        <div class="space-y-1.5">
+                            <button id="btn-export-zip" onclick="downloadAllQuestionsZip(false)" class="w-full text-left px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition border border-slate-800 hover:border-slate-700">
+                                <i class="fa-solid fa-file-zipper text-emerald-400 w-4"></i> Xuất Đề Sạch (HD)
+                            </button>
+                            <button id="btn-export-zip-ans" onclick="downloadAllQuestionsZip(true)" class="w-full text-left px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition border border-slate-800 hover:border-slate-700">
+                                <i class="fa-solid fa-file-circle-check text-indigo-400 w-4"></i> Tải ZIP + Đáp Án
+                            </button>
+                            <button id="btn-generate-pea-src" onclick="triggerPeaSourceGen()" class="w-full text-left px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition border border-slate-800 hover:border-slate-700">
+                                <i class="fa-solid fa-code text-cyan-400 w-4"></i> Tạo Source Code PEA
+                            </button>
+                            <button id="btn-copy-formatted-ans" onclick="triggerCopyFormattedAnswers()" class="w-full text-left px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition border border-slate-800 hover:border-slate-700">
+                                <i class="fa-solid fa-copy text-amber-400 w-4"></i> Copy Toàn Bộ Đáp Án
+                            </button>
+                            <button id="btn-print-exam" onclick="printOrExportExam()" class="w-full text-left px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition border border-slate-800 hover:border-slate-700">
+                                <i class="fa-solid fa-print text-blue-400 w-4"></i> In / Xuất File PDF
+                            </button>
+                            <button id="btn-reset-session" onclick="triggerResetSession()" class="w-full text-left px-3 py-2 bg-rose-950/30 hover:bg-rose-900/60 text-rose-300 rounded-xl text-xs font-semibold flex items-center gap-2 transition border border-rose-900/50">
+                                <i class="fa-solid fa-arrows-rotate text-rose-400 w-4"></i> Đổi Đề Mới (Reset)
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Cột phải (8 cols): Chi tiết câu hỏi và bảng gán đáp án -->
-                <div class="lg:col-span-8 glass-card rounded-2xl p-5 border border-slate-800 space-y-4">
-                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-3 border-b border-slate-800">
-                        <div>
-                            <div class="flex items-center gap-2.5 flex-wrap">
-                                <h3 id="current-exam-student" class="font-black text-lg sm:text-xl text-white">Chưa chọn thí sinh</h3>
-                                <span id="current-exam-subject-badge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-black font-mono bg-purple-500/25 text-purple-300 border border-purple-500/40"></span>
-                                <span id="exam-stats-badge" class="hidden px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[11px] font-bold font-mono flex items-center gap-1.5">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> LIVE SYNC
-                                </span>
+                <!-- Cột 2 (Giữa - 6 cols): Đấu trường câu hỏi VIPER (Font to 18px-20px, thẻ đáp án to) -->
+                <div class="lg:col-span-6 space-y-4">
+                    <div class="glass-card rounded-2xl p-5 sm:p-6 border border-slate-800 shadow-2xl space-y-4 min-h-[580px]">
+                        <!-- Top Header Bar của bài thi -->
+                        <div class="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-800/80 flex-wrap">
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h3 id="current-exam-student" class="font-black text-xl text-white">Chưa chọn thí sinh</h3>
+                                    <span id="current-exam-subject-badge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-black font-mono bg-purple-500/25 text-purple-300 border border-purple-500/40"></span>
+                                    <span id="exam-stats-badge" class="hidden px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[11px] font-bold font-mono flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> LIVE SYNC
+                                    </span>
+                                </div>
+                                <p id="current-exam-title" class="text-xs text-slate-400 mt-1">Chọn thí sinh ở cột bên trái để tải đề</p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <span id="current-exam-timer-pill" class="hidden px-3 py-1 rounded-xl text-xs font-black font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 shadow-sm">
                                     <i class="fa-solid fa-hourglass-half text-amber-400 animate-spin" style="animation-duration: 4s;"></i> <span id="current-exam-timer-text">--:--</span>
                                 </span>
-                                <span id="current-exam-time-pill" class="hidden px-2.5 py-1 rounded-xl text-xs font-mono bg-slate-800/90 text-slate-300 border border-slate-700 flex items-center gap-1.5">
+                                <span id="current-exam-time-pill" class="hidden px-2.5 py-1 rounded-xl text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5">
                                     <i class="fa-solid fa-clock text-slate-400"></i> <span id="current-exam-time-text"></span>
                                 </span>
                             </div>
-                            <p id="current-exam-title" class="text-xs sm:text-sm text-slate-400 mt-1 font-medium">Chọn một thí sinh ở danh sách bên trái để xem đề và gán đáp án</p>
                         </div>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <button id="btn-generate-pea-src" onclick="triggerPeaSourceGen()" class="hidden px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-cyan-600/20" title="Tạo Source Code Mẫu (C/C++/Java/C#) Cho Bài Thi PEA Practical">
-                                <i class="fa-solid fa-code"></i> Tạo Source PEA
-                            </button>
-                            <button id="btn-download-pea-template" onclick="triggerPeaTemplateDownload()" class="hidden px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-indigo-600/20" title="Tải Starter Project ZIP Đề Thi PEA">
-                                <i class="fa-solid fa-box-archive"></i> Tải Starter ZIP PEA
-                            </button>
-                            <button id="btn-copy-formatted-ans" onclick="triggerCopyFormattedAnswers()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Copy Toàn Bộ Đáp Án Ra Văn Bản">
-                                <i class="fa-solid fa-copy"></i> Copy Đáp Án
-                            </button>
-                            <button id="btn-export-zip" onclick="downloadAllQuestionsZip(false)" class="hidden px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20" title="Tải trọn bộ ảnh đề thi sạch chuẩn HD (không kèm đáp án) đóng gói ZIP">
-                                <i class="fa-solid fa-file-zipper"></i> Tải ZIP Đề Sạch (HD)
-                            </button>
-                            <button id="btn-export-zip-ans" onclick="downloadAllQuestionsZip(true)" class="hidden px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-indigo-600/20" title="Tải trọn bộ ảnh có đánh dấu đáp án hỗ trợ đóng gói ZIP">
-                                <i class="fa-solid fa-file-circle-check"></i> Tải ZIP + Đáp Án
-                            </button>
-                            <button id="btn-print-exam" onclick="printOrExportExam()" class="hidden px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition" title="In hoặc lưu đề thi ra file PDF chuẩn LaTeX">
-                                <i class="fa-solid fa-print"></i> In / Xuất PDF
-                            </button>
-                            <button id="btn-archive-session" onclick="triggerArchiveSession()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Đóng gói đề thi, ảnh và đáp án thành file ZIP và dọn dẹp khỏi bộ nhớ máy chủ">
-                                <i class="fa-solid fa-box-archive"></i> Lưu Source ZIP & Dọn Dẹp
-                            </button>
-                            <button id="btn-reset-session" onclick="triggerResetSession()" class="hidden px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-rose-600/20" title="Lưu trữ đề cũ và xóa trắng câu hỏi để sẵn sàng cho thí sinh làm đề mới tinh khôi (chống dồn đề)">
-                                <i class="fa-solid fa-arrows-rotate"></i> Bắt Đầu Đề Mới (Reset)
-                            </button>
-                            <button onclick="openArchivedSourcesModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700" title="Xem danh sách các đề thi đã đóng gói thành file ZIP">
-                                <i class="fa-solid fa-folder-open"></i> Kho Source Đề ZIP
-                            </button>
-                            <button onclick="currentExamVersion = ''; loadExamQuestions()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
-                                <i class="fa-solid fa-arrows-rotate"></i> Cập nhật câu hỏi
-                            </button>
+
+                        <!-- VIPER Single Question Display Container -->
+                        <div id="viper-single-question-container">
+                            <div class="text-center py-24 text-slate-500 text-sm">
+                                <i class="fa-solid fa-file-circle-question text-4xl mb-3 block text-slate-600"></i>
+                                Vui lòng chọn thí sinh từ danh sách bên trái để bắt đầu.
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Bảng Ma Trận Nhanh Chuyển Đến Câu Hỏi (Viper Jump Grid) -->
-                    <div id="exam-question-matrix" class="hidden flex-wrap gap-1.5 p-3 bg-slate-900/90 rounded-xl border border-slate-800/80 my-2 items-center shadow-inner"></div>
-
-                    <!-- Khối câu hỏi -->
-                    <div id="exam-questions-container" class="space-y-4 max-h-[680px] overflow-y-auto pr-2">
-                        <div class="text-center py-16 text-slate-500 text-xs">
-                            <i class="fa-solid fa-file-circle-question text-3xl mb-2 block text-slate-600"></i>
-                            Vui lòng chọn thí sinh để tải câu hỏi và bắt đầu hỗ trợ ca thi.
+                        <!-- Khối cuộn toàn bộ câu hỏi (ẩn khi ở chế độ Viper) -->
+                        <div id="exam-questions-container" class="hidden space-y-4 max-h-[720px] overflow-y-auto pr-2">
                         </div>
                     </div>
                 </div>
+
+                <!-- Cột 3 (Phải - 3 cols): Khối Hành Động & Ma Trận VIPER -->
+                <div class="lg:col-span-3 space-y-4">
+                    <!-- Hộp Gán Đáp Án Nhanh To Bự (VIPER Quick Answer Pad) -->
+                    <div class="glass-card rounded-2xl p-5 border border-slate-800 shadow-xl space-y-4 sticky top-4">
+                        <!-- Navigation Counter -->
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
+                            <button onclick="navigateViperQuestion(-1)" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition border border-slate-700 active:scale-95" title="Câu trước (Phím ←)">
+                                <i class="fa-solid fa-chevron-left text-xs"></i>
+                            </button>
+                            <div class="text-center">
+                                <div id="viper-question-counter" class="text-base font-black text-white font-mono">0 / 0</div>
+                                <div class="text-[10px] text-slate-400 font-semibold uppercase">Tiến Độ Làm Bài</div>
+                            </div>
+                            <button onclick="navigateViperQuestion(1)" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition border border-slate-700 active:scale-95" title="Câu sau (Phím →)">
+                                <i class="fa-solid fa-chevron-right text-xs"></i>
+                            </button>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="space-y-1">
+                            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                                <div id="viper-progress-fill" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                                <span id="viper-answered-count">0 đã giải</span>
+                                <span id="viper-total-count">0 câu</span>
+                            </div>
+                        </div>
+
+                        <!-- Big Giant Answer Buttons (A, B, C, D, E) -->
+                        <div class="space-y-2">
+                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                <i class="fa-solid fa-hand-pointer text-emerald-400"></i> Đáp Án Hỗ Trợ:
+                            </div>
+                            <div id="viper-answer-buttons-pad" class="grid grid-cols-4 gap-2">
+                                <div class="text-center py-4 text-xs text-slate-500 col-span-4">Chưa chọn câu hỏi</div>
+                            </div>
+                        </div>
+
+                        <!-- Bảng Ma Trận 5 Cột Chuẩn VIPER (Viper 5-Column Jump Grid) -->
+                        <div class="space-y-2 pt-2 border-t border-slate-800/80">
+                            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                <span><i class="fa-solid fa-table-cells text-purple-400 mr-1"></i> Danh Sách Câu:</span>
+                                <span class="text-[10px] text-slate-500 font-normal">Click để chuyển</span>
+                            </div>
+                            <div id="exam-question-matrix" class="grid grid-cols-5 gap-1.5 max-h-[340px] overflow-y-auto pr-1 p-2 bg-slate-900/90 rounded-xl border border-slate-800/80 shadow-inner">
+                                <div class="text-center py-6 text-xs text-slate-500 col-span-5">Trống</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
-
         
         <!-- TAB: Tao De Thi -->
         <div id="tab-exam-builder" class="hidden space-y-4">
@@ -3675,6 +3755,9 @@
 
             // Run KaTeX math rendering on all elements in container
             renderMathContent(container);
+
+            // Also render in VIPER Single-Question view
+            renderViperQuestion(currentViperQuestionIndex);
         }
 
         async function loadExamQuestions(silent = false) {
@@ -4808,6 +4891,294 @@
                 alert(successMsg);
             });
         }
+
+    
+        // ══════════════════════════════════════════════════════════════════════
+        // VIPER SINGLE-QUESTION ENGINE & NAVIGATION
+        // ══════════════════════════════════════════════════════════════════════
+        let currentViperQuestionIndex = 0;
+        let viperViewMode = 'viper'; // 'viper' | 'scroll'
+
+        function switchViperViewMode(mode) {
+            viperViewMode = mode;
+            const btnViper = document.getElementById("btn-mode-viper");
+            const btnScroll = document.getElementById("btn-mode-scroll");
+            const viperBox = document.getElementById("viper-single-question-container");
+            const scrollBox = document.getElementById("exam-questions-container");
+
+            if (mode === 'viper') {
+                btnViper.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30";
+                btnScroll.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-slate-800 text-slate-300 hover:bg-slate-700";
+                if (viperBox) viperBox.classList.remove("hidden");
+                if (scrollBox) scrollBox.classList.add("hidden");
+                renderViperQuestion(currentViperQuestionIndex);
+            } else {
+                btnViper.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-slate-800 text-slate-300 hover:bg-slate-700";
+                btnScroll.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30";
+                if (viperBox) viperBox.classList.add("hidden");
+                if (scrollBox) scrollBox.classList.remove("hidden");
+            }
+        }
+
+        function navigateViperQuestion(direction) {
+            if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) return;
+            let nextIdx = currentViperQuestionIndex + direction;
+            if (nextIdx < 0) nextIdx = 0;
+            if (nextIdx >= cachedCurrentQuestions.length) nextIdx = cachedCurrentQuestions.length - 1;
+            currentViperQuestionIndex = nextIdx;
+            renderViperQuestion(currentViperQuestionIndex);
+        }
+
+        function renderViperQuestion(index) {
+            currentViperQuestionIndex = index;
+            const container = document.getElementById("viper-single-question-container");
+            if (!container) return;
+
+            if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-24 text-slate-500 text-sm">
+                        <i class="fa-solid fa-file-circle-question text-4xl mb-3 block text-slate-600"></i>
+                        Chưa có câu hỏi nào trong đề thi này.
+                    </div>`;
+                updateViperRightSidebar();
+                return;
+            }
+
+            if (index < 0) index = 0;
+            if (index >= cachedCurrentQuestions.length) index = cachedCurrentQuestions.length - 1;
+
+            const q = cachedCurrentQuestions[index];
+            const qNum = (q.question_index !== undefined ? q.question_index + 1 : index + 1);
+            let qtype = q.question_type || "radio";
+            const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const opts = q.options || [];
+
+            const chosenAns = q.support_answer || "";
+            const curAns = q.current_answer || "";
+            const chosenSet = new Set(chosenAns ? chosenAns.split(",").map(s => s.trim()) : []);
+
+            const cleanStem = cleanDisplayQuestionText(q.question_text);
+            const formattedStem = prepareMathHtml(cleanStem);
+
+            // Stem image
+            let imgHtml = "";
+            if (q.image_base64) {
+                imgHtml = `
+                    <div class="my-4 text-center">
+                        <img src="${q.image_base64}" 
+                             onclick="openImageLightbox('${q.image_base64.replace(/'/g, "\\'")}', 'Câu ${qNum} - Đề bài & Hình vẽ')" 
+                             class="rounded-2xl max-h-[380px] w-auto max-w-full object-contain border border-slate-300 cursor-zoom-in hover:border-emerald-500 transition-all shadow-xl bg-white p-3 inline-block" 
+                             alt="Hình câu ${qNum}">
+                        <div class="text-xs text-slate-400 mt-1 italic"><i class="fa-solid fa-magnifying-glass-plus mr-1"></i> Bấm vào ảnh để phóng to chi tiết HD</div>
+                    </div>`;
+            }
+
+            // Options HTML (VIPER Full-Width Cards)
+            let optionsHtml = "";
+            if (opts.length > 0) {
+                optionsHtml = '<div class="space-y-3 pt-2">';
+                opts.forEach((opt, oi) => {
+                    const optObj = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt, image_base64: "" };
+                    const lbl = optObj.label || ALPHA[oi] || String(oi);
+                    const idxStr = String(oi);
+                    const isChosen = chosenSet.has(idxStr) || chosenSet.has(lbl);
+                    const isStudentChosen = curAns && (
+                        curAns.split(",").map(s => s.trim().toUpperCase()).includes(lbl.toUpperCase()) ||
+                        curAns.split(",").map(s => s.trim()).includes(idxStr)
+                    );
+
+                    let cardClass = "p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 group my-2 shadow-sm";
+                    if (isChosen) {
+                        cardClass += " bg-emerald-950/40 border-emerald-500 shadow-xl shadow-emerald-500/20";
+                    } else if (isStudentChosen) {
+                        cardClass += " bg-sky-950/30 border-sky-500 shadow-md shadow-sky-500/20";
+                    } else {
+                        cardClass += " bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 hover:border-slate-600";
+                    }
+
+                    const circleCls = isChosen
+                        ? "bg-emerald-500 border-2 border-emerald-400 text-white shadow-lg shadow-emerald-500/40 scale-105"
+                        : (isStudentChosen
+                            ? "bg-sky-500 border-2 border-sky-400 text-white shadow-md shadow-sky-500/40"
+                            : "bg-slate-800 border-2 border-slate-600 text-slate-300 group-hover:border-emerald-400 group-hover:text-emerald-400");
+
+                    const rawOptText = (optObj.text !== "[Hình ảnh lựa chọn]" && optObj.text) ? optObj.text : "";
+                    const formattedOpt = prepareMathHtml(rawOptText);
+
+                    const optImg = optObj.image_base64
+                        ? `<img src="${optObj.image_base64}" onclick="event.stopPropagation(); openImageLightbox('${optObj.image_base64.replace(/'/g, "\\'")}', 'Đáp án [${lbl}]')" class="h-16 object-contain rounded-xl border border-slate-300 ml-2 cursor-zoom-in bg-white p-2 shadow" loading="lazy">`
+                        : "";
+
+                    optionsHtml += `
+                        <div onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cardClass}">
+                            <span class="w-11 h-11 rounded-2xl font-black text-base flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${circleCls}">
+                                ${escapeHtml(lbl)}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                ${formattedOpt ? `<div class="text-base sm:text-lg text-slate-100 font-semibold leading-relaxed math-rendered select-text">${escapeHtml(formattedOpt)}</div>` : ''}
+                                ${optImg}
+                            </div>
+                            ${isChosen ? `
+                                <span class="px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 ml-auto shrink-0 flex items-center gap-1.5 font-mono shadow-sm">
+                                    <i class="fa-solid fa-check text-emerald-400"></i> ĐÁP ÁN
+                                </span>` : (isStudentChosen ? `
+                                <span class="px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 ml-auto shrink-0 flex items-center gap-1 font-mono">
+                                    <i class="fa-solid fa-user-pen text-sky-400"></i> Thí sinh chọn
+                                </span>` : '')
+                            }
+                        </div>`;
+                });
+                optionsHtml += '</div>';
+            }
+
+            container.innerHTML = `
+                <div class="space-y-5 animate-fadeIn">
+                    <!-- Viper Question Header Tags -->
+                    <div class="flex items-center justify-between gap-3 pb-3 border-b border-slate-800/80 flex-wrap">
+                        <div class="flex items-center gap-2">
+                            <span class="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-500/30">
+                                Câu ${qNum}
+                            </span>
+                            <span class="px-3 py-1 rounded-xl text-xs font-bold border border-blue-500/30 bg-blue-500/10 text-blue-400">
+                                Trắc nghiệm
+                            </span>
+                            <span class="px-3 py-1 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800 text-slate-400">
+                                ${opts.length} đáp án
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${curAns ? `<span class="px-3 py-1 rounded-xl text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 flex items-center gap-1.5 font-mono"><i class="fa-solid fa-user-pen text-sky-400"></i> Thí sinh: <strong class="text-white">${escapeHtml(curAns)}</strong></span>` : ''}
+                            <button onclick="downloadQuestionAsImage(${index}, false)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border border-slate-700" title="Tải ảnh đề thi sạch HD">
+                                <i class="fa-solid fa-camera text-sky-400"></i> Ảnh Đề
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- GIANT VIPER QUESTION STEM (Font 18px-20px) -->
+                    <div class="text-lg sm:text-xl text-white font-bold leading-relaxed math-rendered select-text py-2 tracking-wide">
+                        ${escapeHtml(formattedStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : "(Đang tải...)"))}
+                    </div>
+
+                    ${imgHtml}
+
+                    <!-- VIPER OPTIONS LIST -->
+                    ${optionsHtml}
+
+                    <!-- Bottom Navigation bar -->
+                    <div class="flex items-center justify-between pt-4 border-t border-slate-800/80 text-xs text-slate-400">
+                        <button onclick="navigateViperQuestion(-1)" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl font-bold flex items-center gap-2 border border-slate-800 transition active:scale-95">
+                            <i class="fa-solid fa-arrow-left"></i> Câu Trước (Phím ←)
+                        </button>
+                        <span class="font-mono text-slate-500">Phím tắt: 1, 2, 3, 4 chọn A, B, C, D</span>
+                        <button onclick="navigateViperQuestion(1)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition active:scale-95">
+                            Câu Sau (Phím →) <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            renderMathContent(container);
+            updateViperRightSidebar();
+        }
+
+        function updateViperRightSidebar() {
+            if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) return;
+            const total = cachedCurrentQuestions.length;
+            const curr = currentViperQuestionIndex + 1;
+            const q = cachedCurrentQuestions[currentViperQuestionIndex];
+
+            // Counter
+            const counter = document.getElementById("viper-question-counter");
+            if (counter) counter.innerText = `${curr} / ${total}`;
+
+            // Progress bar
+            let answeredCount = 0;
+            cachedCurrentQuestions.forEach(item => {
+                if (item.support_answer) answeredCount++;
+            });
+            const progressFill = document.getElementById("viper-progress-fill");
+            if (progressFill) progressFill.style.width = `${Math.round((answeredCount / total) * 100)}%`;
+
+            const ansCountEl = document.getElementById("viper-answered-count");
+            if (ansCountEl) ansCountEl.innerText = `${answeredCount} đã giải`;
+            const totCountEl = document.getElementById("viper-total-count");
+            if (totCountEl) totCountEl.innerText = `${total} câu`;
+
+            // Big Answer Buttons Pad
+            const pad = document.getElementById("viper-answer-buttons-pad");
+            if (pad && q) {
+                const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                const opts = q.options || [];
+                const chosenAns = (q.support_answer || "").trim().toUpperCase();
+                const chosenSet = new Set(chosenAns ? chosenAns.split(",").map(s => s.trim()) : []);
+
+                let padHtml = "";
+                const countBtns = opts.length > 0 ? opts.length : 4;
+                for (let oi = 0; oi < countBtns; oi++) {
+                    const lbl = ALPHA[oi] || String(oi + 1);
+                    const idxStr = String(oi);
+                    const isActive = chosenSet.has(idxStr) || chosenSet.has(lbl);
+                    const cls = isActive
+                        ? "h-14 rounded-2xl font-black text-lg bg-emerald-500 border-2 border-emerald-400 text-white shadow-xl shadow-emerald-500/50 scale-105 transition-all"
+                        : "h-14 rounded-2xl font-black text-lg bg-slate-800 border-2 border-slate-700 text-slate-300 hover:bg-emerald-600/20 hover:border-emerald-500 hover:text-emerald-400 transition-all active:scale-95";
+                    padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cls}">[${lbl}]</button>`;
+                }
+                if (chosenAns) {
+                    padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="col-span-4 py-1.5 bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 rounded-xl text-xs border border-slate-700 transition" title="Xóa đáp án đã chọn">✕ Bỏ chọn</button>`;
+                }
+                pad.innerHTML = padHtml;
+            }
+
+            // 5-Column Question Matrix Grid
+            const matrix = document.getElementById("exam-question-matrix");
+            if (matrix) {
+                let mHtml = "";
+                cachedCurrentQuestions.forEach((item, idx) => {
+                    const qNum = idx + 1;
+                    const isCurrent = idx === currentViperQuestionIndex;
+                    const hasSupport = !!item.support_answer;
+                    const hasStudent = !!item.current_answer;
+
+                    let bgCls = "";
+                    if (isCurrent) {
+                        bgCls = "bg-gradient-to-tr from-emerald-500 to-teal-400 text-white font-black shadow-lg shadow-emerald-500/40 border-2 border-white scale-105 z-10";
+                    } else if (hasSupport) {
+                        bgCls = "bg-emerald-600 text-white font-bold border border-emerald-400/80";
+                    } else if (hasStudent) {
+                        bgCls = "bg-sky-600/40 text-sky-200 font-bold border border-sky-400/60";
+                    } else {
+                        bgCls = "bg-slate-800 text-slate-400 border border-slate-700/80 hover:bg-slate-700 hover:text-white";
+                    }
+
+                    mHtml += `
+                        <button onclick="renderViperQuestion(${idx})" class="h-10 rounded-xl text-xs font-mono font-bold flex items-center justify-center transition-all ${bgCls}">
+                            ${qNum}
+                        </button>`;
+                });
+                matrix.innerHTML = mHtml;
+            }
+        }
+
+        // Global Keyboard Shortcuts for Viper
+        document.addEventListener("keydown", function(e) {
+            // Only trigger if in exam support tab and not typing in an input
+            const activeTab = document.getElementById("tab-exam-support");
+            if (!activeTab || activeTab.classList.contains("hidden")) return;
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+            if (tag === "input" || tag === "textarea") return;
+
+            if (e.key === "ArrowLeft") {
+                navigateViperQuestion(-1);
+            } else if (e.key === "ArrowRight") {
+                navigateViperQuestion(1);
+            } else if (e.key >= "1" && e.key <= "5") {
+                const optIdx = parseInt(e.key, 10) - 1;
+                if (cachedCurrentQuestions && cachedCurrentQuestions[currentViperQuestionIndex]) {
+                    const q = cachedCurrentQuestions[currentViperQuestionIndex];
+                    chooseAnswer(currentExamHWID, q.question_index, String(optIdx));
+                }
+            }
+        });
 
     </script>
 </body>

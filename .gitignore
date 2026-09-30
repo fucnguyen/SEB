@@ -1,10 +1,12 @@
 __pycache__/
 *.py[cod]
-*$py.class
+*.class
 *.db
 .env
-data/
+data/*
+!data/exam_archives/
+!data/exam_archives/*.zip
 *.exe
 *.zip
+!data/exam_archives/*.zip
 !seed_data.json
-

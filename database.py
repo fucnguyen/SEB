@@ -773,8 +773,83 @@ def seed_initial_data(cursor):
                     sa.get("status", "active")
                 ))
 
+        # 5. Nạp live_exam_sessions (Đảm bảo không bao giờ mất ca thi cũ như Đỗ Văn Đông khi redeploy Render)
+        for ses in seed.get("live_exam_sessions", []):
+            shwid = ses.get("hwid", "").strip()
+            if not shwid:
+                continue
+            cursor.execute("SELECT id FROM live_exam_sessions WHERE hwid = ?", (shwid,))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO live_exam_sessions (
+                        hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at,
+                        remaining_time, exam_server_time, subject_code, class_code, campus
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    shwid, ses.get("student_name", "Thí sinh"), ses.get("exam_title", ""),
+                    ses.get("page_url", ""), ses.get("total_questions", 0), ses.get("status", "active"),
+                    ses.get("last_sync") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                    ses.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                    ses.get("remaining_time", ""), ses.get("exam_server_time", ""),
+                    ses.get("subject_code", ""), ses.get("class_code", ""), ses.get("campus", "")
+                ))
+
+        # 6. Nạp live_exam_questions
+        for q in seed.get("live_exam_questions", []):
+            qhwid = q.get("hwid", "").strip()
+            qidx = q.get("question_index")
+            if not qhwid or qidx is None:
+                continue
+            cursor.execute("SELECT id FROM live_exam_questions WHERE hwid = ? AND question_index = ?", (qhwid, qidx))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO live_exam_questions (
+                        hwid, question_index, question_text, question_type, images_json, options_json,
+                        current_answer, support_answer, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    qhwid, qidx, q.get("question_text", ""), q.get("question_type", "unknown"),
+                    q.get("images_json", "[]"), q.get("options_json", "[]"),
+                    q.get("current_answer", ""), q.get("support_answer", ""),
+                    q.get("updated_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S")
+                ))
+
+        # 7. Nạp archived_exam_sources (Kho source đề ZIP)
         try:
-            print(f"[Seed] Successfully seeded {len(seed.get('licenses', []))} licenses, {len(seed.get('download_requests', []))} downloads, and {len(seed.get('support_keys', []))} support keys.")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS archived_exam_sources (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    hwid TEXT,
+                    student_name TEXT,
+                    exam_title TEXT,
+                    archive_filename TEXT UNIQUE,
+                    file_size_bytes INTEGER,
+                    total_questions INTEGER,
+                    created_at TEXT
+                )
+            """)
+            for arc in seed.get("archived_exam_sources", []):
+                afname = arc.get("archive_filename", "").strip()
+                if not afname:
+                    continue
+                cursor.execute("SELECT id FROM archived_exam_sources WHERE archive_filename = ?", (afname,))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO archived_exam_sources (
+                            hwid, student_name, exam_title, archive_filename, file_size_bytes, total_questions, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        arc.get("hwid", ""), arc.get("student_name", ""), arc.get("exam_title", ""),
+                        afname, arc.get("file_size_bytes", 0), arc.get("total_questions", 0),
+                        arc.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S")
+                    ))
+        except Exception:
+            pass
+
+        try:
+            print(f"[Seed] Successfully seeded {len(seed.get('licenses', []))} licenses, {len(seed.get('live_exam_sessions', []))} exam sessions, and {len(seed.get('live_exam_questions', []))} questions.")
         except Exception:
             pass
     except Exception as e:
@@ -791,7 +866,11 @@ def sync_seed_file():
             "licenses": data.get("licenses", []),
             "download_requests": data.get("download_requests", []),
             "support_keys": data.get("support_keys", []),
-            "support_assignments": data.get("support_assignments", [])
+            "support_assignments": data.get("support_assignments", []),
+            "live_exam_sessions": data.get("live_exam_sessions", []),
+            "live_exam_questions": data.get("live_exam_questions", []),
+            "archived_exam_sources": data.get("archived_exam_sources", []),
+            "access_logs": data.get("access_logs", [])
         }
         import json
         with open(SEED_FILE_PATH, "w", encoding="utf-8") as f:
@@ -819,6 +898,30 @@ def export_all_data() -> Dict[str, Any]:
     c.execute("SELECT * FROM chat_messages ORDER BY id ASC")
     chat_messages = [dict(r) for r in c.fetchall()]
     
+    c.execute("SELECT * FROM live_exam_sessions ORDER BY id ASC")
+    live_exam_sessions = [dict(r) for r in c.fetchall()]
+
+    c.execute("SELECT * FROM live_exam_questions ORDER BY id ASC")
+    live_exam_questions = [dict(r) for r in c.fetchall()]
+
+    try:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS archived_exam_sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hwid TEXT,
+                student_name TEXT,
+                exam_title TEXT,
+                archive_filename TEXT UNIQUE,
+                file_size_bytes INTEGER,
+                total_questions INTEGER,
+                created_at TEXT
+            )
+        """)
+        c.execute("SELECT * FROM archived_exam_sources ORDER BY id ASC")
+        archived_exam_sources = [dict(r) for r in c.fetchall()]
+    except Exception:
+        archived_exam_sources = []
+
     c.execute("SELECT * FROM access_logs ORDER BY id DESC LIMIT 1000")
     access_logs = [dict(r) for r in c.fetchall()]
     
@@ -832,6 +935,9 @@ def export_all_data() -> Dict[str, Any]:
         "download_requests": download_requests,
         "support_keys": support_keys,
         "support_assignments": support_assignments,
+        "live_exam_sessions": live_exam_sessions,
+        "live_exam_questions": live_exam_questions,
+        "archived_exam_sources": archived_exam_sources,
         "chat_messages": chat_messages,
         "access_logs": access_logs,
         "settings": settings
@@ -1684,6 +1790,46 @@ def list_archived_exam_sources(limit: int = 50) -> List[Dict[str, Any]]:
                 created_at TEXT
             )
         """)
+        # Tự động quét và đồng bộ các file ZIP trong thư mục data/exam_archives nếu chưa có trong DB
+        archive_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "exam_archives")
+        if os.path.exists(archive_dir):
+            for fname in os.listdir(archive_dir):
+                if fname.lower().endswith(".zip"):
+                    c.execute("SELECT id FROM archived_exam_sources WHERE archive_filename = ?", (fname,))
+                    if not c.fetchone():
+                        fpath = os.path.join(archive_dir, fname)
+                        fsize = os.path.getsize(fpath)
+                        total_q = 0
+                        hwid = ""
+                        st_name = "Thí sinh"
+                        title = "Kỳ thi"
+                        try:
+                            import zipfile, json
+                            with zipfile.ZipFile(fpath, "r") as z:
+                                if "questions.json" in z.namelist():
+                                    q_data = json.loads(z.read("questions.json").decode("utf-8"))
+                                    total_q = len(q_data)
+                                    if total_q > 0:
+                                        hwid = q_data[0].get("hwid", "")
+                                if "info.txt" in z.namelist():
+                                    info_str = z.read("info.txt").decode("utf-8", "ignore")
+                                    for line in info_str.splitlines():
+                                        if "Tên thí sinh:" in line:
+                                            st_name = line.split(":", 1)[1].strip()
+                                        elif "Kỳ thi:" in line:
+                                            title = line.split(":", 1)[1].strip()
+                        except Exception:
+                            pass
+                        import datetime
+                        mtime = os.path.getmtime(fpath)
+                        created_str = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+                        c.execute("""
+                            INSERT OR IGNORE INTO archived_exam_sources
+                            (hwid, student_name, exam_title, archive_filename, file_size_bytes, total_questions, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (hwid, st_name, title, fname, fsize, total_q, created_str))
+            conn.commit()
+
         c.execute("SELECT * FROM archived_exam_sources ORDER BY created_at DESC LIMIT ?", (limit,))
         rows = [dict(r) for r in c.fetchall()]
     except Exception:
