@@ -806,26 +806,46 @@
     // QUESTION TYPE DETECTION
     // ─────────────────────────────────────────────────────────────────────────
     function detectQuestionType(block) {
-        var txt = getText(block).toUpperCase();
-        if (txt.includes("SINGLECHOICE") || txt.includes("SINGLE-CHOICE")) return "radio";
-        if (txt.includes("MULTICHOICE") || txt.includes("MULTI-CHOICE"))   return "checkbox";
+        if (!block) return "radio";
 
+        // 1. Uu tien tuyet doi: Kiem tra the input thuc te tren giao dien DOM
+        var radios = block.querySelectorAll("input[type='radio'], [role='radio'], .ant-radio, input.form-check-input[type='radio']");
+        var checks = block.querySelectorAll("input[type='checkbox'], [role='checkbox'], .ant-checkbox, input.form-check-input[type='checkbox']");
+
+        if (radios.length > 0 && checks.length === 0) return "radio";
+        if (checks.length > 0 && radios.length === 0) return "checkbox";
+
+        // 2. Kiem tra chi dan de bai cu the (Moodle, FPT Exam, Blackboard, Canvas)
+        var txt = (getText(block) || "").toLowerCase();
+        if (txt.includes("select one or more") || txt.includes("choose one or more") || 
+            txt.includes("chọn một hoặc nhiều") || txt.includes("nhiều đáp án") || 
+            txt.includes("select all that apply") || txt.includes("multiple answers") ||
+            txt.includes("chọn các đáp án") || txt.includes("chọn tất cả") ||
+            txt.includes("có thể chọn nhiều")) {
+            return "checkbox";
+        }
+        if (txt.includes("select one:") || txt.includes("choose one") || 
+            txt.includes("choose 1 answer") || txt.includes("chọn một:") || 
+            txt.includes("chọn 1 đáp án") || txt.includes("single choice") ||
+            txt.includes("chỉ chọn một")) {
+            return "radio";
+        }
+
+        // 3. Kiem tra cac loai cau hoi khac (Tu luan, dien tu, ghep noi)
         var cls = (block.className || "").toLowerCase();
         if (cls.includes("shortanswer") || cls.includes("short-answer") || cls.includes("numerical")) return "text";
-        if (cls.includes("essay"))    return "essay";
-        if (cls.includes("truefalse"))return "radio";
+        if (cls.includes("essay") || cls.includes("practical") || cls.includes("pea")) return "essay";
+        if (cls.includes("truefalse")) return "radio";
 
-        var radios    = block.querySelectorAll("input[type='radio'], [role='radio'], .ant-radio, input.form-check-input[type='radio']");
-        var checks    = block.querySelectorAll("input[type='checkbox'], [role='checkbox'], .ant-checkbox, input.form-check-input[type='checkbox']");
         var selects   = block.querySelectorAll("select");
         var textareas = block.querySelectorAll("textarea, [contenteditable='true'], [class*='rich-editor'], [class*='ql-editor'], .note-editable, iframe");
-        var textins   = block.querySelectorAll("input[type='text'], input[type='number'], input[type='email'], input[type='search'], input.form-control:not(textarea)");
+        var textins   = block.querySelectorAll("input[type='text'], input[type='number'], input[type='email'], input[type='search']");
 
-        if (radios.length > 0)    return "radio";
-        if (checks.length > 0)    return "checkbox";
         if (selects.length > 0)   return "select";
         if (textareas.length > 0) return "essay";
         if (textins.length > 0)   return "text";
+
+        if (checks.length > 0)    return "checkbox";
         return "radio";
     }
 
