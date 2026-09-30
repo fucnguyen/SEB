@@ -1454,7 +1454,7 @@
     }
 
     function triggerChoiceSelect(container, inp, lbl) {
-        var clickTarget = lbl || inp || container;
+        var clickTarget = inp || lbl || container;
         if (!clickTarget) return;
 
         try { clickTarget.scrollIntoView({ behavior: 'auto', block: 'nearest' }); } catch(e){}
@@ -1575,86 +1575,55 @@
                 }
             }
 
-            // Top-level choice containers (strictly filtered so nested labels/divs don't double indices)
-            var choiceContainers = Array.from(block.querySelectorAll(
-                ".form-check, .answer > div, .answer > li, .option, .choice, [class*='choice-item'], [class*='option-item'], " +
-                "[class*='radio-wrapper'], [role='radio'], .ant-radio-wrapper, .el-radio"
-            )).filter(function(el) {
-                return !el.parentElement.closest(".form-check, .choice, .option, [class*='choice-item'], [class*='radio-wrapper']");
-            });
-
-            if (choiceContainers.length === 0) {
-                choiceContainers = Array.from(block.querySelectorAll("label, tr, li")).filter(function(el) {
-                    return el.querySelector("input[type='radio']") || el.closest(".card-body, form");
-                });
-            }
-
             var radios = Array.from(block.querySelectorAll("input[type='radio'], input.form-check-input[type='radio']"));
             var clicked = false;
 
-            // 1.1 Ưu tiên 1: Khớp theo nhãn chữ cái xuất hiện ở đầu text lựa chọn: A., B., C., (C), [C]...
-            if (targetLetter) {
-                for (var i = 0; i < choiceContainers.length; i++) {
-                    var cText = getText(choiceContainers[i]);
-                    var letterMatch = cText.match(/^\s*[\(\[]?([A-Z])(?:[\)\]\.\:\-\s]|$)/i);
-                    if (letterMatch && letterMatch[1].toUpperCase() === targetLetter) {
-                        var cInp = radios[i] || choiceContainers[i].querySelector("input");
-                        var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
-                        triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
-                        clicked = true;
-                        break;
-                    }
-                }
+            // ƯU TIÊN 1 TUYỆT ĐỐI: Dùng trực tiếp radios[targetIdx]!
+            // extractOptions quét chính xác các thẻ input theo thứ tự DOM để gán nhãn A, B, C, D...
+            // Do đó radios[targetIdx] CHÍNH XÁC 100% là input của đáp án admin đã chọn (0=A, 1=B, 2=C, 3=D, 4=E, 5=F, 6=G...)!
+            if (targetIdx >= 0 && targetIdx < radios.length) {
+                var rInp = radios[targetIdx];
+                var rContainer = rInp.closest("label, .form-check, .choice, .option, [class*='choice-item'], [class*='option-item'], tr, li") || rInp.parentElement;
+                var rLbl = (rInp.id ? (block.ownerDocument || document).querySelector("label[for='" + rInp.id + "']") : null) || (rContainer ? rContainer.querySelector("label") : null);
+                triggerChoiceSelect(rContainer, rInp, rLbl);
+                clicked = true;
+                return;
             }
 
-            // 1.2 Ưu tiên 2: Khớp chính xác theo vị trí Index (Lựa chọn 0 = A, 1 = B, 2 = C, 3 = D, 4 = E...)
-            // TUYỆT ĐỐI ƯU TIÊN VỊ TRÍ TRƯỚC SO VỚI TEXT NỘI DUNG (Để tránh nhầm đáp án "C" với lựa chọn có giá trị số là "2"!)
-            if (!clicked && targetIdx >= 0) {
-                if (radios.length > targetIdx) {
-                    var rInp = radios[targetIdx];
-                    var rContainer = choiceContainers[targetIdx] || rInp.closest(".form-check, .choice, .option, label") || rInp.parentElement;
-                    var rLbl = (rInp && rInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + rInp.id + "']") : (rContainer ? rContainer.querySelector("label") : null);
-                    triggerChoiceSelect(rContainer, rInp, rLbl);
-                    clicked = true;
-                } else if (choiceContainers.length > targetIdx) {
-                    var cContainer = choiceContainers[targetIdx];
-                    var cInp = cContainer.querySelector("input") || (radios.length > targetIdx ? radios[targetIdx] : null);
-                    var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (cContainer.querySelector("label") || cContainer);
+            // Ưu tiên 2: Fallback cho giao diện custom không dùng thẻ input radio
+            if (!clicked && radios.length === 0) {
+                var customRadios = Array.from(block.querySelectorAll(
+                    "[role='radio'], .ant-radio-wrapper, .el-radio, .choice-item, .option-item, .form-check"
+                )).filter(function(el) {
+                    return !el.parentElement.closest("[role='radio'], .ant-radio-wrapper, .el-radio, .choice-item, .option-item, .form-check");
+                });
+
+                if (targetIdx >= 0 && targetIdx < customRadios.length) {
+                    var cContainer = customRadios[targetIdx];
+                    var cInp = cContainer.querySelector("input") || cContainer;
+                    var cLbl = cContainer.querySelector("label") || cContainer;
                     triggerChoiceSelect(cContainer, cInp, cLbl);
                     clicked = true;
+                    return;
                 }
             }
 
-            // 1.3 Ưu tiên 3: Khớp theo nội dung text (chỉ áp dụng khi là Đúng/Sai hoặc đáp án dạng chuỗi chữ dài)
-            if (!clicked) {
-                var isSingleCode = /^[A-Za-z0-9]$/.test(ansStr);
-                if (!isSingleCode || isTrueFalse) {
-                    for (var i = 0; i < choiceContainers.length; i++) {
-                        var cText = getText(choiceContainers[i]).trim().toLowerCase();
-                        var matchTarget = ansStr.toLowerCase();
-                        if (cText === matchTarget || (matchTarget.length > 2 && cText.includes(matchTarget))) {
-                            var cInp = radios[i] || choiceContainers[i].querySelector("input");
-                            var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
-                            triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
-                            clicked = true;
-                            break;
-                        }
-                        if (isTrueFalse) {
-                            if ((matchTarget === "true" || matchTarget === "đúng" || matchTarget === "t") && (cText.includes("true") || cText.includes("đúng"))) {
-                                var cInp = radios[i] || choiceContainers[i].querySelector("input");
-                                var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
-                                triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
-                                clicked = true;
-                                break;
-                            }
-                            if ((matchTarget === "false" || matchTarget === "sai" || matchTarget === "f") && (cText.includes("false") || cText.includes("sai"))) {
-                                var cInp = radios[i] || choiceContainers[i].querySelector("input");
-                                var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
-                                triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
-                                clicked = true;
-                                break;
-                            }
-                        }
+            // Ưu tiên 3: Khớp theo nội dung text (chỉ áp dụng khi là Đúng/Sai hoặc text chuỗi dài không có index)
+            if (!clicked && (isTrueFalse || ansStr.length > 2)) {
+                var searchTargets = radios.length > 0 ? radios : block.querySelectorAll("label, .form-check, .choice, .option");
+                var matchTarget = ansStr.toLowerCase();
+                for (var si = 0; si < searchTargets.length; si++) {
+                    var sEl = searchTargets[si];
+                    var sHost = sEl.closest("label, .form-check, .choice, .option, tr, li") || sEl.parentElement;
+                    var sText = getText(sHost).trim().toLowerCase();
+                    if (sText.includes(matchTarget) ||
+                        (isTrueFalse && ((matchTarget === "true" || matchTarget === "đúng") && (sText.includes("true") || sText.includes("đúng")))) ||
+                        (isTrueFalse && ((matchTarget === "false" || matchTarget === "sai") && (sText.includes("false") || sText.includes("sai"))))) {
+                        var sInp = sEl.tagName === "INPUT" ? sEl : sHost.querySelector("input");
+                        var sLbl = (sInp && sInp.id ? (block.ownerDocument || document).querySelector("label[for='" + sInp.id + "']") : null) || sHost.querySelector("label") || sHost;
+                        triggerChoiceSelect(sHost, sInp, sLbl);
+                        clicked = true;
+                        break;
                     }
                 }
             }
@@ -1793,16 +1762,13 @@
         if (window.__sebGlobalClickBound__) return;
         window.__sebGlobalClickBound__ = true;
 
-        // Khi DOM thay đổi (ví dụ học sinh chuyển câu), cập nhật câu hỏi hiển thị & tự động điền nếu chế độ auto-fill đang bật
+        // Khi DOM thay đổi (ví dụ học sinh chuyển câu), cập nhật câu hỏi hiển thị
         try {
             var debounceTimer = null;
             var observer = new MutationObserver(function () {
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(function () {
                     extractQuestions();
-                    if (window.__sebAutoFillActive__ && !isAutoFillingSweep) {
-                        autoFillVisibleQuestions();
-                    }
                 }, 80);
             });
             observer.observe(document.body, { childList: true, subtree: true });
@@ -1834,25 +1800,21 @@
                 setTimeout(function () { 
                     extractQuestions(); 
                     syncToServer(); 
-                    if (window.__sebAutoFillActive__ && !isAutoFillingSweep) {
-                        autoFillVisibleQuestions();
-                    }
                 }, 80);
                 setTimeout(function () { 
                     extractQuestions(); 
                     syncToServer(); 
-                    if (window.__sebAutoFillActive__ && !isAutoFillingSweep) {
-                        autoFillVisibleQuestions();
-                    }
                 }, 350);
                 return;
             }
 
-            // 2. NẾU HỌC SINH CLICK VÀO LỰA CHỌN ĐÁP ÁN (radio, checkbox, label, div đáp án):
+            // 2. NẾU HỌC SINH CLICK VÀO LỰA CHỌN ĐÁP ÁN (radio, checkbox):
             // Cho phép học sinh sửa tự do, TUYỆT ĐỐI KHÔNG ghi đè đáp án admin vào đây!
-            var isOptionClick = !!target.closest(
-                "label, input, .form-check, .answer, .options, .choices, .choice, [class*='choice'], [class*='option'], " +
-                "[class*='answeroption'], [role='radio'], [role='checkbox'], .ant-radio-wrapper, .ant-checkbox-wrapper, .el-radio, select, textarea, button"
+            var isOptionClick = !!(
+                target.tagName === "INPUT" ||
+                target.closest("input[type='radio'], input[type='checkbox']") ||
+                (target.tagName === "LABEL" && target.htmlFor && document.getElementById(target.htmlFor)) ||
+                target.closest(".form-check-input, .custom-control-input, [role='radio'], [role='checkbox'], select, textarea")
             );
             if (isOptionClick) {
                 // Thí sinh tự chọn hoặc sửa đáp án theo ý mình -> Cập nhật và đồng bộ lên admin
@@ -1863,8 +1825,8 @@
                 return;
             }
 
-            // 3. CHỈ KHI HỌC SINH ẤN VÀO CHỮ CÂU HỎI / ĐỀ BÀI CÂU HỎI:
-            // Mới điền đáp án mà admin/supporter gửi. Nếu học sinh đang chọn sai, sẽ bỏ chọn đáp án cũ và điền đáp án admin!
+            // 3. KHI HỌC SINH ẤN VÀO CHỮ CÂU HỎI / ĐỀ BÀI CÂU HỎI:
+            // Mới điền đáp án mà admin/supporter gửi và tự động lưu. Nếu học sinh đang chọn sai, sẽ bỏ chọn đáp án cũ và điền đáp án admin!
             var blocks = findQuestionBlocks();
             var block = null;
             for (var bi = 0; bi < blocks.length; bi++) {
@@ -1921,9 +1883,10 @@
             if (ans === undefined || ans === null || String(ans).trim() === "") return;
 
             var qtype = detectQuestionType(block);
-            console.log("[SEB-Sync] Thí sinh click chữ Câu " + qNum + " -> Điền đáp án admin: " + ans);
-            // Bỏ chọn đáp án cũ (kể cả chọn sai trước đó) và điền đáp án đúng của admin
+            console.log("[SEB-Sync] Thí sinh click câu hỏi " + qNum + " -> Điền đáp án admin: " + ans);
+            // Bỏ chọn đáp án cũ và điền đáp án đúng của admin, sau đó tự động bấm Lưu
             applyAnswerForQuestion(block, qtype, ans);
+            autoClickSaveAnswerBtn(block);
             setTimeout(function () {
                 extractQuestions();
                 syncToServer();
@@ -2093,6 +2056,7 @@
                 if (mIdx >= matrixBtns.length) {
                     clearInterval(sweepTimer);
                     isAutoFillingSweep = false;
+                    window.__sebAutoFillActive__ = false;
                     console.log("[SEB-Sync] ⚡ Hoàn tất quét toàn bộ ma trận câu hỏi!");
                     
                     // Quay về câu 1
@@ -2139,6 +2103,7 @@
                             if (isNextDisabled || fwdCount > 65) {
                                 clearInterval(fwdTimer);
                                 isAutoFillingSweep = false;
+                                window.__sebAutoFillActive__ = false;
                                 try {
                                     fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
                                         method: "POST",
@@ -2157,6 +2122,7 @@
                     rewindCount++;
                 }, 100);
             } else {
+                window.__sebAutoFillActive__ = false;
                 console.log("[SEB-Sync] ⚡ Đã tự động điền " + filledCount + " câu hỏi hiển thị!");
                 try {
                     fetch(SERVER_URL + "/api/exam/ack-auto-fill", {

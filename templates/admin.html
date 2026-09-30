@@ -809,14 +809,8 @@
                             <i class="fa-solid fa-bolt text-sm"></i>
                             <span>⚡ ĐIỀN FULL ĐÁP ÁN</span>
                         </button>
-                        <div class="flex items-center justify-center pt-1">
-                            <label class="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 font-semibold select-none hover:text-emerald-400 transition">
-                                <input type="checkbox" id="admin-auto-trigger-on-full" onchange="toggleAdminAutoTriggerOnFull(this.checked)" class="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer">
-                                <span>Tự động điền khi đủ 100%</span>
-                            </label>
-                        </div>
                         <p class="text-[10px] text-slate-400 text-center leading-relaxed">
-                            Sau khi Support chọn hết đáp án, bấm nút này để <strong class="text-emerald-400">máy thí sinh tự động tick chọn toàn bộ</strong> bài thi!
+                            Bấm nút này khi sẵn sàng để <strong class="text-emerald-400">máy thí sinh tự động điền toàn bộ</strong> bài thi!
                         </p>
                     </div>
 
@@ -5112,7 +5106,7 @@
                         : "";
 
                     optionsHtml += `
-                        <div onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cardClass}">
+                        <div onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}')" class="${cardClass}">
                             <span class="w-12 h-12 rounded-2xl font-black text-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${circleCls}">
                                 ${escapeHtml(lbl)}
                             </span>
@@ -5220,7 +5214,6 @@
                     btnAutoFill.classList.remove("ring-4", "ring-emerald-400", "animate-pulse");
                 }
             }
-            checkAutoTriggerAdmin();
 
             // Big Answer Buttons Pad
             const pad = document.getElementById("viper-answer-buttons-pad");
@@ -5274,28 +5267,6 @@
                         </button>`;
                 });
                 matrix.innerHTML = mHtml;
-            }
-        }
-
-        let hasAutoTriggeredAdminForSession = false;
-
-        function toggleAdminAutoTriggerOnFull(checked) {
-            localStorage.setItem("seb_admin_auto_trigger_full", checked ? "1" : "0");
-            if (checked) {
-                showToast("Đã bật chế độ: Tự động điền máy thí sinh khi chọn đủ 100% đáp án");
-                checkAutoTriggerAdmin();
-            } else {
-                showToast("Đã tắt chế độ tự động điền khi đủ 100%");
-            }
-        }
-
-        function checkAutoTriggerAdmin() {
-            const isAuto = localStorage.getItem("seb_admin_auto_trigger_full") === "1";
-            if (!isAuto || hasAutoTriggeredAdminForSession || !currentExamHWID) return;
-            if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) return;
-            const answeredCount = cachedCurrentQuestions.filter(q => q.support_answer && q.support_answer.trim()).length;
-            if (answeredCount === cachedCurrentQuestions.length && cachedCurrentQuestions.length > 0) {
-                triggerAutoFillAllAnswers(true);
             }
         }
 
@@ -5387,11 +5358,13 @@
                 navigateViperQuestion(-1);
             } else if (e.key === "ArrowRight") {
                 navigateViperQuestion(1);
-            } else if (e.key >= "1" && e.key <= "5") {
+            } else if (e.key >= "1" && e.key <= "9") {
                 const optIdx = parseInt(e.key, 10) - 1;
                 if (cachedCurrentQuestions && cachedCurrentQuestions[currentViperQuestionIndex]) {
                     const q = cachedCurrentQuestions[currentViperQuestionIndex];
-                    chooseAnswer(currentExamHWID, q.question_index, String(optIdx));
+                    const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                    const chosenLbl = ALPHA[optIdx] || String(optIdx + 1);
+                    chooseAnswer(currentExamHWID, q.question_index, chosenLbl);
                 }
             }
         });

@@ -224,10 +224,6 @@
                         <i class="fa-solid fa-table-cells text-purple-400"></i> Ma trận câu hỏi:
                     </span>
                     <div class="flex items-center gap-3">
-                        <label class="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 font-semibold select-none hover:text-emerald-400 transition">
-                            <input type="checkbox" id="support-auto-fill-on-full" onchange="toggleSupportAutoTriggerOnFull(this.checked)" class="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer">
-                            <span>Tự động điền khi đủ 100%</span>
-                        </label>
                         <span class="text-slate-400 font-mono text-[11px]">
                             Tiến độ: <strong id="matrix-progress-text" class="text-emerald-400 font-bold">0/0</strong> câu đã giải
                         </span>
@@ -566,7 +562,6 @@
                     autofillBtn.classList.remove("animate-pulse", "scale-105");
                 }
             }
-            checkAutoTriggerSupport();
         }
 
         function renderQuestions(questions) {
@@ -783,18 +778,6 @@
             setSupportAnswer(questionIndex, val);
         }
 
-        let hasAutoTriggeredSupportForSession = false;
-
-        function toggleSupportAutoTriggerOnFull(checked) {
-            localStorage.setItem("seb_support_auto_trigger_full", checked ? "1" : "0");
-            if (checked) {
-                showToast("Đã bật: Tự động điền máy thí sinh khi chọn đủ 100% đáp án");
-                checkAutoTriggerSupport();
-            } else {
-                showToast("Đã tắt chế độ tự động điền khi đủ 100%");
-            }
-        }
-
         async function triggerSupportAutoFill(isSilent = false) {
             if (!currentSelectedHWID) {
                 if (!isSilent) alert("Vui lòng chọn một thí sinh trước!");
@@ -828,7 +811,6 @@
                 const data = await res.json();
                 if (data.success) {
                     showToast(`⚡ ĐÃ GỬI LỆNH ĐIỀN FULL ĐÁP ÁN THÀNH CÔNG!`);
-                    hasAutoTriggeredSupportForSession = true;
                 } else {
                     if (!isSilent) alert("Lỗi: " + (data.message || data.detail || "Không thể gửi lệnh"));
                 }
@@ -839,16 +821,6 @@
                     btn.disabled = false;
                     if (btnText) btnText.innerText = `⚡ Điền Full Đáp Án (${answeredCount}/${cachedQuestions.length})`;
                 }
-            }
-        }
-
-        function checkAutoTriggerSupport() {
-            const isAutoEnabled = localStorage.getItem("seb_support_auto_trigger_full") === "1";
-            if (!isAutoEnabled || hasAutoTriggeredSupportForSession || !currentSelectedHWID) return;
-            if (!cachedQuestions || cachedQuestions.length === 0) return;
-            const answeredCount = cachedQuestions.filter(q => q.support_answer && q.support_answer.trim()).length;
-            if (answeredCount === cachedQuestions.length && cachedQuestions.length > 0) {
-                triggerSupportAutoFill(true);
             }
         }
 
