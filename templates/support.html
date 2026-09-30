@@ -30,13 +30,23 @@
         body { 
             font-family: var(--app-font-family); 
             font-size: var(--app-font-size);
+            background-color: #0b0f19;
+            background-image: 
+                radial-gradient(at 15% 15%, rgba(99, 102, 241, 0.12) 0px, transparent 45%),
+                radial-gradient(at 85% 20%, rgba(139, 92, 246, 0.10) 0px, transparent 45%),
+                radial-gradient(at 50% 90%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+            background-attachment: fixed;
+            background-size: cover;
+            color: #f1f5f9;
             transition: background-color 0.25s ease, color 0.25s ease;
         }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         .glass-card {
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(15, 23, 42, 0.75) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
             transition: all 0.25s ease;
         }
         .glow-box-purple {

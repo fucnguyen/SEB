@@ -32,17 +32,43 @@
         body { 
             font-family: var(--app-font-family); 
             font-size: var(--app-font-size);
+            background-color: #0b0f19;
+            background-image: 
+                radial-gradient(at 15% 15%, rgba(99, 102, 241, 0.12) 0px, transparent 45%),
+                radial-gradient(at 85% 20%, rgba(139, 92, 246, 0.10) 0px, transparent 45%),
+                radial-gradient(at 50% 90%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+            background-attachment: fixed;
+            background-size: cover;
+            color: #f1f5f9;
             transition: background-color 0.25s ease, color 0.25s ease;
         }
         .glass-card {
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(15, 23, 42, 0.75) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
             transition: all 0.25s ease;
         }
+        .tab-active-pill {
+            background: var(--primary-gradient, linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 18px -2px rgba(139, 92, 246, 0.45) !important;
+        }
+        .tab-active-pill span[id^="badge-"] {
+            background: rgba(255, 255, 255, 0.25) !important;
+            color: #ffffff !important;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 7px; height: 7px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.35); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.6); }
+
         /* Light Theme Overrides */
         html.theme-mode-light body {
             background-color: #f8fafc !important;
+            background-image: none !important;
             color: #0f172a !important;
         }
         html.theme-mode-light .glass-card {
@@ -76,6 +102,7 @@
         /* OLED Mode Overrides */
         html.theme-mode-oled body {
             background-color: #000000 !important;
+            background-image: none !important;
         }
         html.theme-mode-oled .glass-card {
             background: #000000 !important;
@@ -87,46 +114,48 @@
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-purple-600 selection:text-white">
 
     <!-- Top Admin Bar -->
-    <header class="border-b border-slate-800 bg-slate-950/80 sticky top-0 z-50 backdrop-blur-xl">
-        <div class="w-full px-4 sm:px-8 h-16 flex items-center justify-between">
+    <header class="border-b border-slate-800/80 bg-slate-950/85 sticky top-0 z-50 backdrop-blur-2xl shadow-lg">
+        <div class="max-w-[1580px] w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3 sm:space-x-4">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20 border border-white/10" id="header-logo">
+                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg border border-white/10" id="header-logo" style="background: var(--primary-gradient)">
                     <i class="fa-solid fa-crown text-base"></i>
                 </div>
                 <div>
-                    <h1 class="font-extrabold text-base sm:text-lg leading-tight text-white flex items-center gap-2" id="header-title-text">
+                    <h1 class="font-black text-base sm:text-lg leading-tight text-white flex items-center gap-2" id="header-title-text">
                         SEB Admin Console
-                        <span class="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/30 font-mono font-bold">ONLINE</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold flex items-center gap-1" style="background: var(--primary-badge-bg); color: var(--primary-badge-text); border: 1px solid var(--primary-badge-border)">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ONLINE
+                        </span>
                     </h1>
                     <p class="text-[11px] text-slate-400 hidden sm:block">Quản trị Phê duyệt Telegram & Bản quyền Mã máy (HWID)</p>
                 </div>
 
                 <!-- TOP SYSTEM MODE SWITCHER TABS (SEB vs EOS/PEA) -->
-                <div class="hidden md:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 ml-4">
-                    <button id="system-mode-seb" onclick="setSystemMode('SEB')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-blue-600 text-white shadow-md shadow-blue-600/30">
+                <div class="hidden md:flex items-center bg-slate-900/90 p-1 rounded-2xl border border-slate-800 ml-4 shadow-inner">
+                    <button id="system-mode-seb" onclick="setSystemMode('SEB')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-blue-600 text-white shadow-md shadow-blue-600/30">
                         <i class="fa-solid fa-shield-halved"></i> HỆ THỐNG SEB
                     </button>
-                    <button id="system-mode-eos" onclick="setSystemMode('EOS')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white">
+                    <button id="system-mode-eos" onclick="setSystemMode('EOS')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white">
                         <i class="fa-solid fa-graduation-cap"></i> HỆ THỐNG EOS & PEA
                     </button>
                 </div>
             </div>
 
             <div class="flex items-center space-x-2 sm:space-x-3">
-                <button onclick="downloadBackupJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Sao lưu toàn bộ dữ liệu">
+                <button onclick="downloadBackupJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Sao lưu toàn bộ dữ liệu">
                     <i class="fa-solid fa-download text-[11px] text-emerald-400"></i> <span class="hidden sm:inline">Sao Lưu</span>
                 </button>
-                <button onclick="triggerRestoreJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Khôi phục dữ liệu">
+                <button onclick="triggerRestoreJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Khôi phục dữ liệu">
                     <i class="fa-solid fa-upload text-[11px] text-amber-400"></i> <span class="hidden sm:inline">Khôi Phục</span>
                 </button>
                 <input type="file" id="backup-file-input" accept=".json" class="hidden" onchange="handleRestoreFile(event)">
                 
                 <!-- Appearance Customizer Button -->
-                <button onclick="window.toggleAppearanceModal()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-purple-300 border border-purple-500/30 shadow-sm" title="Tùy biến giao diện: Màu sắc, Chế độ sáng/tối & Phông chữ">
-                    <i class="fa-solid fa-palette text-amber-400"></i> <span class="hidden sm:inline">Giao Diện</span>
+                <button onclick="window.toggleAppearanceModal()" class="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-white border border-purple-500/40 shadow-md shadow-purple-500/20 hover:scale-105 active:scale-95" style="background: var(--primary-gradient)" title="Tùy biến giao diện: Màu sắc, Chế độ sáng/tối & Phông chữ">
+                    <i class="fa-solid fa-palette text-amber-300"></i> <span class="hidden sm:inline">Giao Diện & Đổi Màu</span>
                 </button>
 
                 <!-- Dynamic Header Key Generator Button -->
@@ -134,7 +163,7 @@
                     <i class="fa-solid fa-key text-[11px]"></i> <span id="header-create-key-text">Tạo Key SEB</span>
                 </button>
                 
-                <a href="/admin/logout" class="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-xs font-semibold flex items-center gap-1 transition" title="Đăng xuất">
+                <a href="/admin/logout" class="p-2 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-xl text-xs font-semibold flex items-center justify-center transition border border-slate-700" title="Đăng xuất">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 </a>
             </div>
@@ -142,147 +171,187 @@
 
         <!-- Mobile System Switcher Bar -->
         <div class="flex md:hidden border-t border-slate-800 bg-slate-900/90 p-1.5 justify-center space-x-2">
-            <button id="mobile-mode-seb" onclick="setSystemMode('SEB')" class="flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 bg-blue-600 text-white">
+            <button id="mobile-mode-seb" onclick="setSystemMode('SEB')" class="flex-1 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 bg-blue-600 text-white">
                 <i class="fa-solid fa-shield-halved"></i> SEB
             </button>
-            <button id="mobile-mode-eos" onclick="setSystemMode('EOS')" class="flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400">
+            <button id="mobile-mode-eos" onclick="setSystemMode('EOS')" class="flex-1 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400">
                 <i class="fa-solid fa-graduation-cap"></i> EOS & PEA
             </button>
         </div>
     </header>
 
     <!-- Main Admin Container -->
-    <main class="w-full px-4 sm:px-8 py-5 sm:py-6 flex-1 space-y-6">
+    <main class="max-w-[1580px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 space-y-6">
 
         <!-- Top Stats Row (2 cols on mobile, 4 on desktop) -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div class="glass-card rounded-2xl p-4 border border-slate-800/80 flex items-center justify-between">
-                <div>
-                    <span class="text-[11px] text-slate-400 font-semibold block uppercase">Xin tải chờ duyệt</span>
-                    <span id="stat-pending-dl" class="text-xl sm:text-2xl font-black text-amber-400 mt-0.5 block">0</span>
+            <div class="glass-card rounded-2xl p-4 sm:p-5 border border-amber-500/25 bg-gradient-to-br from-amber-500/10 via-slate-900/60 to-slate-950/80 shadow-lg shadow-amber-500/5 hover:border-amber-500/40 hover:-translate-y-0.5 transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] uppercase tracking-wider font-extrabold text-amber-400/90 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Xin Tải Chờ Duyệt
+                        </span>
+                        <span id="stat-pending-dl" class="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight mt-1 block">0</span>
+                    </div>
+                    <div class="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 text-lg shadow-inner">
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
+                    </div>
                 </div>
-                <div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 text-lg">
-                    <i class="fa-solid fa-cloud-arrow-down"></i>
-                </div>
-            </div>
-
-            <div class="glass-card rounded-2xl p-4 border border-slate-800/80 flex items-center justify-between">
-                <div>
-                    <span class="text-[11px] text-slate-400 font-semibold block uppercase">Mã máy chờ duyệt</span>
-                    <span id="stat-pending-act" class="text-xl sm:text-2xl font-black text-indigo-400 mt-0.5 block">0</span>
-                </div>
-                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 text-lg">
-                    <i class="fa-solid fa-microchip"></i>
+                <div class="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-amber-400/75">
+                    <span>Yêu cầu tải gói phần mềm</span>
+                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
                 </div>
             </div>
 
-            <div class="glass-card rounded-2xl p-4 border border-slate-800/80 flex items-center justify-between">
-                <div>
-                    <span class="text-[11px] text-slate-400 font-semibold block uppercase">Bản quyền đang chạy</span>
-                    <span id="stat-active-lic" class="text-xl sm:text-2xl font-black text-emerald-400 mt-0.5 block">0</span>
+            <div class="glass-card rounded-2xl p-4 sm:p-5 border border-indigo-500/25 bg-gradient-to-br from-indigo-500/10 via-slate-900/60 to-slate-950/80 shadow-lg shadow-indigo-500/5 hover:border-indigo-500/40 hover:-translate-y-0.5 transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] uppercase tracking-wider font-extrabold text-indigo-400/90 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Mã Máy Chờ Duyệt
+                        </span>
+                        <span id="stat-pending-act" class="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight mt-1 block">0</span>
+                    </div>
+                    <div class="w-11 h-11 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-lg shadow-inner">
+                        <i class="fa-solid fa-microchip"></i>
+                    </div>
                 </div>
-                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 text-lg">
-                    <i class="fa-solid fa-circle-check"></i>
+                <div class="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-indigo-400/75">
+                    <span>Thí sinh đợi kích hoạt HWID</span>
+                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
                 </div>
             </div>
 
-            <div class="glass-card rounded-2xl p-4 border border-slate-800/80 flex items-center justify-between">
-                <div>
-                    <span class="text-[11px] text-slate-400 font-semibold block uppercase">Đã khóa / Hết hạn</span>
-                    <span id="stat-locked-lic" class="text-xl sm:text-2xl font-black text-rose-400 mt-0.5 block">0</span>
+            <div class="glass-card rounded-2xl p-4 sm:p-5 border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 via-slate-900/60 to-slate-950/80 shadow-lg shadow-emerald-500/5 hover:border-emerald-500/40 hover:-translate-y-0.5 transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] uppercase tracking-wider font-extrabold text-emerald-400/90 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Bản Quyền Đang Chạy
+                        </span>
+                        <span id="stat-active-lic" class="text-2xl sm:text-3xl font-black text-emerald-300 font-mono tracking-tight mt-1 block">0</span>
+                    </div>
+                    <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg shadow-inner">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
                 </div>
-                <div class="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 text-lg">
-                    <i class="fa-solid fa-ban"></i>
+                <div class="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-emerald-400/75 font-mono">
+                    <span>100% Sẵn sàng hỗ trợ</span>
+                    <i class="fa-solid fa-bolt text-[10px]"></i>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 sm:p-5 border border-rose-500/25 bg-gradient-to-br from-rose-500/10 via-slate-900/60 to-slate-950/80 shadow-lg shadow-rose-500/5 hover:border-rose-500/40 hover:-translate-y-0.5 transition-all duration-300">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] uppercase tracking-wider font-extrabold text-rose-400/90 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Đã Khóa / Hết Hạn
+                        </span>
+                        <span id="stat-locked-lic" class="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight mt-1 block">0</span>
+                    </div>
+                    <div class="w-11 h-11 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 text-lg shadow-inner">
+                        <i class="fa-solid fa-ban"></i>
+                    </div>
+                </div>
+                <div class="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-rose-400/75">
+                    <span>Bản quyền bị thu hồi / hết hạn</span>
+                    <i class="fa-solid fa-shield-halved text-[10px]"></i>
                 </div>
             </div>
         </div>
 
         <!-- SUB-NAVIGATION BAR FOR SEB SYSTEM MODE -->
-        <div id="subtab-bar-seb" class="flex flex-wrap items-center border-b border-slate-800 gap-x-4 sm:gap-x-6 gap-y-2 text-xs sm:text-sm font-bold pb-2">
-            <button onclick="switchTab('tab-downloads')" id="btn-tab-downloads" class="pb-2 border-b-2 border-blue-500 text-blue-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-download text-blue-400"></i> Yêu Cầu Tải (<span id="badge-dl">0</span>)
+        <div id="subtab-bar-seb" class="bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800/90 backdrop-blur-xl flex flex-wrap items-center gap-1.5 shadow-xl">
+            <button onclick="switchTab('tab-downloads')" id="btn-tab-downloads" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-cloud-arrow-down text-sm"></i> Yêu Cầu Tải (<span id="badge-dl" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300">0</span>)
             </button>
-            <button onclick="switchTab('tab-licenses')" id="btn-tab-licenses" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-key text-blue-400"></i> Quản Lý Mã Máy HWID (<span id="badge-lic">0</span>)
+            <button onclick="switchTab('tab-licenses')" id="btn-tab-licenses" class="tab-btn tab-active-pill px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fa-solid fa-key text-sm"></i> Quản Lý Mã Máy HWID (<span id="badge-lic" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/20 text-white">0</span>)
             </button>
-            <button onclick="switchTab('tab-seb-main')" id="btn-tab-seb-main" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-blue-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-shield-halved text-blue-400"></i> Hỗ Trợ Ca Thi SEB (<span id="badge-seb-count">0</span>)
+            <button onclick="switchTab('tab-seb-main')" id="btn-tab-seb-main" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-shield-halved text-sm"></i> Hỗ Trợ Ca Thi SEB (<span id="badge-seb-count" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300">0</span>)
             </button>
-            <button onclick="switchTab('tab-exam-support')" id="btn-tab-exam-support" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-blue-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-layer-group text-blue-400"></i> Tất Cả Ca Thi (<span id="badge-live-exams">0</span>)
+            <button onclick="switchTab('tab-exam-support')" id="btn-tab-exam-support" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-layer-group text-sm"></i> Tất Cả Ca Thi (<span id="badge-live-exams" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300">0</span>)
             </button>
-            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-exam-builder" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-orange-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-pen-to-square text-orange-400"></i> Tạo Đề Thi SEB
+            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-exam-builder" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-pen-to-square text-sm text-orange-400"></i> Tạo Đề Thi SEB
             </button>
-            <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Vào / Thoát (<span id="badge-logs">0</span>)
+            <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-clock-rotate-left text-sm"></i> Lịch Sử Vào / Thoát (<span id="badge-logs" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300">0</span>)
             </button>
-            <button onclick="switchTab('tab-chats')" id="btn-tab-chats" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-comments"></i> Tin Nhắn Chat (<span id="badge-chat">0</span>)
+            <button onclick="switchTab('tab-chats')" id="btn-tab-chats" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-comments text-sm"></i> Tin Nhắn Chat (<span id="badge-chat" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300">0</span>)
             </button>
-            <button onclick="switchTab('tab-settings')" id="btn-tab-settings" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-gears"></i> Cấu Hình Hệ Thống
+            <button onclick="switchTab('tab-settings')" id="btn-tab-settings" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-gears text-sm"></i> Cấu Hình Hệ Thống
             </button>
-            <button onclick="switchTab('tab-support-mgmt')" id="btn-tab-support-mgmt" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-purple-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-headset text-purple-400"></i> Quản Lý Support & Phân Ca (<span id="badge-support-keys-count">0</span>)
+            <button onclick="switchTab('tab-support-mgmt')" id="btn-tab-support-mgmt" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-headset text-sm text-purple-400"></i> Quản Lý Support & Phân Ca (<span id="badge-support-keys-count" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300">0</span>)
             </button>
         </div>
 
         <!-- SUB-NAVIGATION BAR FOR EOS & PEA SYSTEM MODE -->
-        <div id="subtab-bar-eos" class="hidden flex flex-wrap items-center border-b border-slate-800 gap-x-4 sm:gap-x-6 gap-y-2 text-xs sm:text-sm font-bold pb-2">
-            <button onclick="switchTab('tab-fpt-main')" id="btn-tab-fpt-main" class="pb-2 border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-graduation-cap text-emerald-400"></i> Hỗ Trợ Ca Thi EOS & PEA (<span id="badge-fpt-count">0</span>)
+        <div id="subtab-bar-eos" class="hidden bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800/90 backdrop-blur-xl flex flex-wrap items-center gap-1.5 shadow-xl">
+            <button onclick="switchTab('tab-fpt-main')" id="btn-tab-fpt-main" class="tab-btn tab-active-pill px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap text-sm"></i> Hỗ Trợ Ca Thi EOS & PEA (<span id="badge-fpt-count" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/20 text-white">0</span>)
             </button>
-            <button onclick="switchTab('tab-licenses')" id="btn-tab-eos-licenses" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-key text-emerald-400"></i> Quản Lý Mã Máy EOS/PEA
+            <button onclick="switchTab('tab-licenses')" id="btn-tab-eos-licenses" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-key text-sm"></i> Quản Lý Mã Máy EOS/PEA
             </button>
-            <button onclick="switchTab('tab-downloads')" id="btn-tab-eos-downloads" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-download text-emerald-400"></i> Yêu Cầu Tải EOS/PEA
+            <button onclick="switchTab('tab-downloads')" id="btn-tab-eos-downloads" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-cloud-arrow-down text-sm"></i> Yêu Cầu Tải EOS/PEA
             </button>
-            <button onclick="switchTab('tab-exam-support')" id="btn-tab-eos-all-exams" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-emerald-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-layer-group text-emerald-400"></i> Tất Cả Ca Thi FPT
+            <button onclick="switchTab('tab-exam-support')" id="btn-tab-eos-all-exams" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-layer-group text-sm"></i> Tất Cả Ca Thi FPT
             </button>
-            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-eos-builder" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-orange-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-pen-to-square text-orange-400"></i> Tạo Đề Thi FPT
+            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-eos-builder" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-pen-to-square text-sm text-orange-400"></i> Tạo Đề Thi FPT
             </button>
-            <button onclick="switchTab('tab-logs')" id="btn-tab-eos-logs" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Vào / Thoát
+            <button onclick="switchTab('tab-logs')" id="btn-tab-eos-logs" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-clock-rotate-left text-sm"></i> Lịch Sử Vào / Thoát
             </button>
-            <button onclick="switchTab('tab-chats')" id="btn-tab-eos-chats" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-comments"></i> Tin Nhắn Chat FPT
+            <button onclick="switchTab('tab-chats')" id="btn-tab-eos-chats" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-comments text-sm"></i> Tin Nhắn Chat FPT
             </button>
-            <button onclick="switchTab('tab-settings')" id="btn-tab-eos-settings" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-gears"></i> Cấu Hình EOS/PEA
+            <button onclick="switchTab('tab-settings')" id="btn-tab-eos-settings" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-gears text-sm"></i> Cấu Hình EOS/PEA
             </button>
-            <button onclick="switchTab('tab-support-mgmt')" id="btn-tab-eos-support-mgmt" class="pb-2 border-b-2 border-transparent text-slate-400 hover:text-purple-400 flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-headset text-purple-400"></i> Quản Lý Support & Phân Ca
+            <button onclick="switchTab('tab-support-mgmt')" id="btn-tab-eos-support-mgmt" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+                <i class="fa-solid fa-headset text-sm text-purple-400"></i> Quản Lý Support & Phân Ca
             </button>
         </div>
 
         <!-- TAB 1: Download Requests -->
         <div id="tab-downloads" class="space-y-4">
-            <div class="glass-card rounded-2xl overflow-hidden shadow-xl border border-slate-800">
-                <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/60">
-                    <h3 class="font-bold text-xs sm:text-sm text-white">Yêu Cầu Tải File Cài Đặt (~205 MB)</h3>
-                    <button onclick="loadDownloadRequests()" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-semibold">
-                        <i class="fa-solid fa-arrows-rotate"></i> Làm mới
+            <div class="glass-card rounded-2xl overflow-hidden shadow-2xl border border-slate-800/80">
+                <div class="p-4 sm:p-5 border-b border-slate-800/80 flex justify-between items-center bg-slate-900/40">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white text-base shadow-lg shadow-amber-500/20">
+                            <i class="fa-solid fa-cloud-arrow-down"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-extrabold text-sm sm:text-base text-white">Yêu Cầu Tải File Cài Đặt (~205 MB)</h3>
+                            <p class="text-[11px] text-slate-400">Phê duyệt quyền tải gói cài đặt phòng thi an toàn cho thí sinh</p>
+                        </div>
+                    </div>
+                    <button onclick="loadDownloadRequests()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-2 transition border border-slate-700 shadow-sm">
+                        <i class="fa-solid fa-arrows-rotate text-amber-400"></i> Làm Mới
                     </button>
                 </div>
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-900/80 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
+                        <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-bold text-[11px]">
                             <tr>
-                                <th class="p-3">Học sinh</th>
-                                <th class="p-3">Hệ điều hành</th>
-                                <th class="p-3">Email / SĐT</th>
-                                <th class="p-3">IP Đăng Ký</th>
-                                <th class="p-3">Thời gian</th>
-                                <th class="p-3">Trạng thái</th>
-                                <th class="p-3 text-right">Thao tác</th>
+                                <th class="py-3.5 px-4">Học Sinh</th>
+                                <th class="py-3.5 px-4">Hệ Điều Hành</th>
+                                <th class="py-3.5 px-4">Email / SĐT</th>
+                                <th class="py-3.5 px-4">IP Đăng Ký</th>
+                                <th class="py-3.5 px-4">Thời Gian</th>
+                                <th class="py-3.5 px-4">Trạng Thái</th>
+                                <th class="py-3.5 px-4 text-right">Thao Tác</th>
                             </tr>
                         </thead>
-                        <tbody id="download-requests-table" class="divide-y divide-slate-800/80 text-slate-300">
+                        <tbody id="download-requests-table" class="divide-y divide-slate-800/60 text-slate-300">
                             <!-- Rows loaded via JS -->
                         </tbody>
                     </table>
@@ -292,14 +361,36 @@
 
         <!-- TAB 2: Licenses & HWIDs -->
         <div id="tab-licenses" class="hidden space-y-4">
-            <div class="glass-card rounded-2xl overflow-hidden shadow-xl border border-slate-800">
-                <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-slate-900/60">
-                    <h3 class="font-bold text-xs sm:text-sm text-white">Danh Sách Mã Máy (HWID) Đã Kích Hoạt</h3>
-                    <div class="flex items-center gap-2.5">
-                        <input type="text" id="search-hwid" placeholder="Tìm theo tên hoặc HWID..." 
-                            class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 w-full sm:w-64"
-                            oninput="filterLicenseTable()">
-                        <button onclick="loadLicenses()" class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-semibold shrink-0">
+            <div class="glass-card rounded-2xl overflow-hidden shadow-2xl border border-slate-800/80">
+                <div class="p-4 sm:p-5 border-b border-slate-800/80 flex flex-col lg:flex-row justify-between lg:items-center gap-4 bg-slate-900/40">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white text-base shadow-lg shadow-purple-500/25">
+                            <i class="fa-solid fa-microchip"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
+                                Danh Sách Mã Máy (HWID) Đã Kích Hoạt
+                                <span id="badge-total-lic-header" class="px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">0</span>
+                            </h3>
+                            <p class="text-[11px] text-slate-400">Kiểm soát bản quyền thi, thời hạn sử dụng và phân bổ máy thi an toàn</p>
+                        </div>
+                    </div>
+
+                    <!-- Quick filters + Search bar -->
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <div class="flex items-center bg-slate-950/70 p-1 rounded-xl border border-slate-800 text-xs">
+                            <button onclick="setLicenseFilter('all')" id="lic-filter-all" class="px-3 py-1.5 rounded-lg font-bold transition bg-purple-600 text-white shadow-sm">Tất cả</button>
+                            <button onclick="setLicenseFilter('active')" id="lic-filter-active" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-400 hover:text-white">Đang chạy</button>
+                            <button onclick="setLicenseFilter('pending')" id="lic-filter-pending" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-400 hover:text-white">Chờ duyệt</button>
+                            <button onclick="setLicenseFilter('locked')" id="lic-filter-locked" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-400 hover:text-white">Đã khóa</button>
+                        </div>
+                        <div class="relative flex-1 sm:w-64">
+                            <input type="text" id="search-hwid" placeholder="Tìm tên, HWID, email, IP..." 
+                                class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                                oninput="filterLicenseTable()">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        </div>
+                        <button onclick="loadLicenses()" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition border border-slate-700 shadow-sm" title="Tải lại">
                             <i class="fa-solid fa-arrows-rotate"></i>
                         </button>
                     </div>
@@ -307,17 +398,17 @@
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-900/80 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
+                        <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-bold text-[11px]">
                             <tr>
-                                <th class="p-3">Học sinh</th>
-                                <th class="p-3">Mã máy HWID</th>
-                                <th class="p-3">Thời hạn</th>
-                                <th class="p-3">Hết hạn</th>
-                                <th class="p-3">Trạng thái</th>
-                                <th class="p-3 text-right">Hành động</th>
+                                <th class="py-3.5 px-4">Học Sinh & Thiết Bị</th>
+                                <th class="py-3.5 px-4">Mã Máy HWID</th>
+                                <th class="py-3.5 px-4">Thời Hạn</th>
+                                <th class="py-3.5 px-4">Hết Hạn</th>
+                                <th class="py-3.5 px-4">Trạng Thái</th>
+                                <th class="py-3.5 px-4 text-right">Hành Động</th>
                             </tr>
                         </thead>
-                        <tbody id="licenses-table" class="divide-y divide-slate-800/80 text-slate-300">
+                        <tbody id="licenses-table" class="divide-y divide-slate-800/60 text-slate-300">
                             <!-- Rows loaded via JS -->
                         </tbody>
                     </table>
@@ -1325,14 +1416,17 @@
             });
 
             const isEos = currentSystemMode === 'EOS';
-            const activeBorderClass = isEos ? "border-emerald-500" : "border-blue-500";
-            const activeTextClass = isEos ? "text-emerald-400" : "text-blue-400";
-
             const activeSubbarId = isEos ? "subtab-bar-eos" : "subtab-bar-seb";
             const subbarBtns = document.querySelectorAll(`#${activeSubbarId} button`);
+            
             subbarBtns.forEach(btn => {
-                btn.classList.remove("border-blue-500", "border-emerald-500", "text-blue-400", "text-emerald-400");
-                btn.classList.add("border-transparent", "text-slate-400");
+                btn.classList.remove("tab-active-pill", "border-blue-500", "border-emerald-500", "text-blue-400", "text-emerald-400", "text-white");
+                btn.classList.add("text-slate-400");
+                const badge = btn.querySelector("span[id^='badge-']");
+                if (badge) {
+                    badge.classList.remove("bg-white/20", "text-white");
+                    badge.classList.add("bg-slate-800", "text-slate-300");
+                }
             });
 
             const targetEl = document.getElementById(tabId);
@@ -1340,8 +1434,13 @@
 
             subbarBtns.forEach(btn => {
                 if (btn.getAttribute("onclick") && btn.getAttribute("onclick").includes(tabId)) {
-                    btn.classList.remove("border-transparent", "text-slate-400");
-                    btn.classList.add(activeBorderClass, activeTextClass);
+                    btn.classList.remove("text-slate-400");
+                    btn.classList.add("tab-active-pill", "text-white");
+                    const badge = btn.querySelector("span[id^='badge-']");
+                    if (badge) {
+                        badge.classList.remove("bg-slate-800", "text-slate-300");
+                        badge.classList.add("bg-white/20", "text-white");
+                    }
                 }
             });
 
@@ -1538,50 +1637,76 @@
 
                 list.forEach(item => {
                     const tr = document.createElement("tr");
-                    tr.className = "hover:bg-slate-900/40 transition";
+                    tr.className = "hover:bg-slate-800/40 transition group border-b border-slate-800/50";
                     
-                    let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold">Chờ duyệt</span>`;
+                    let statusBadge = `
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10">
+                            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> Chờ Duyệt
+                        </span>
+                    `;
                     if (item.status === "approved") {
-                        statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">Đã duyệt</span>`;
+                        statusBadge = `
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm shadow-emerald-500/10">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Đã Duyệt
+                            </span>
+                        `;
                     } else if (item.status === "rejected") {
-                        statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] sm:text-[11px] bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold">Từ chối</span>`;
+                        statusBadge = `
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 shadow-sm shadow-rose-500/10">
+                                <i class="fa-solid fa-ban text-[10px]"></i> Từ Chối
+                            </span>
+                        `;
                     }
 
                     const st = (item.system_type || '').toUpperCase();
-                    let osBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30"><i class="fa-brands fa-windows mr-1"></i>Windows</span>';
+                    let osBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30"><i class="fa-brands fa-windows text-sky-400"></i> Windows</span>';
                     if (st.includes('MAC')) {
-                        osBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30"><i class="fa-brands fa-apple mr-1"></i>macOS</span>';
+                        osBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30"><i class="fa-brands fa-apple text-rose-400"></i> macOS</span>';
                     } else if (st === 'EOS' || st === 'PEA') {
-                        osBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"><i class="fa-solid fa-graduation-cap mr-1"></i>EOS/PEA</span>';
+                        osBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"><i class="fa-solid fa-graduation-cap text-emerald-400"></i> EOS/PEA</span>';
                     }
 
                     const timeStr = item.created_at ? (item.created_at.includes(' ') ? item.created_at.split(' ')[1] : item.created_at) : '—';
+                    const avatarHtml = getStudentAvatarHtml(item.full_name, item.status === 'approved' ? 'active' : (item.status === 'rejected' ? 'locked' : 'pending'));
 
                     tr.innerHTML = `
-                        <td class="p-3">
-                            <span class="font-bold text-white block">${escapeHtml(item.full_name)}</span>
-                            <span class="text-[10px] text-slate-500 sm:hidden">${escapeHtml(item.email || '')}</span>
+                        <td class="py-3.5 px-4">
+                            <div class="flex items-center gap-3">
+                                ${avatarHtml}
+                                <div>
+                                    <span class="font-extrabold text-sm text-white block">${escapeHtml(item.full_name)}</span>
+                                    <span class="text-xs text-slate-400 sm:hidden block mt-0.5">${escapeHtml(item.email || '')}</span>
+                                </div>
+                            </div>
                         </td>
-                        <td class="p-3">${osBadge}</td>
-                        <td class="p-3 text-slate-400">${escapeHtml(item.email || '—')}</td>
-                        <td class="p-3 font-mono text-[11px] text-blue-300">${escapeHtml(item.ip_address || '—')}</td>
-                        <td class="p-3 text-slate-500 text-[11px] font-mono">${timeStr}</td>
-                        <td class="p-3">${statusBadge}</td>
-                        <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                        <td class="py-3.5 px-4">${osBadge}</td>
+                        <td class="py-3.5 px-4">
+                            <span class="inline-flex items-center gap-1 text-slate-300 text-xs font-medium">
+                                <i class="fa-regular fa-envelope text-slate-500"></i> ${escapeHtml(item.email || '—')}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-indigo-300 font-mono text-xs shadow-sm">
+                                <i class="fa-solid fa-globe text-slate-500 text-[10px]"></i> ${escapeHtml(item.ip_address || '—')}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4 text-slate-400 text-xs font-mono">${timeStr}</td>
+                        <td class="py-3.5 px-4">${statusBadge}</td>
+                        <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
                             ${item.status === 'pending' ? `
-                                <button onclick="approveDownload('${item.request_id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px] shadow transition" title="Duyệt cho tải">
-                                    <i class="fa-solid fa-check"></i> Duyệt
+                                <button onclick="approveDownload('${item.request_id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white font-bold text-xs shadow-md shadow-emerald-600/20 inline-flex items-center gap-1.5 transition" title="Duyệt cho tải">
+                                    <i class="fa-solid fa-check"></i> Duyệt Tải
                                 </button>
-                                <button onclick="rejectDownload('${item.request_id}')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-semibold text-[11px] transition" title="Từ chối">
-                                    <i class="fa-solid fa-xmark"></i>
+                                <button onclick="rejectDownload('${item.request_id}')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-300 rounded-xl text-xs font-semibold border border-slate-700 transition inline-flex items-center gap-1" title="Từ chối">
+                                    <i class="fa-solid fa-xmark"></i> Từ Chối
                                 </button>
                             ` : item.status === 'rejected' ? `
-                                <button onclick="approveDownload('${item.request_id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px] transition" title="Mở khóa duyệt lại cho học sinh">
+                                <button onclick="approveDownload('${item.request_id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white font-bold text-xs shadow-md shadow-emerald-600/20 inline-flex items-center gap-1.5 transition" title="Mở khóa duyệt lại cho học sinh">
                                     <i class="fa-solid fa-rotate-left"></i> Duyệt Lại
                                 </button>
                             ` : `
-                                <button onclick="rejectDownload('${item.request_id}')" class="px-2 py-1 bg-slate-800 hover:bg-rose-900/60 border border-slate-700 text-rose-300 rounded-lg text-[10px] transition" title="Khóa / Thu hồi quyền tải">
-                                    <i class="fa-solid fa-lock"></i> Khóa lại
+                                <button onclick="rejectDownload('${item.request_id}')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 border border-slate-700/80 rounded-xl text-xs font-semibold transition inline-flex items-center gap-1" title="Khóa / Thu hồi quyền tải">
+                                    <i class="fa-solid fa-lock"></i> Khóa Lại
                                 </button>
                             `}
                         </td>
@@ -1611,115 +1736,224 @@
             loadDashboardStats();
         }
 
+        let currentLicenseFilter = 'all';
+
+        function setLicenseFilter(type) {
+            currentLicenseFilter = type;
+            ['all', 'active', 'pending', 'locked'].forEach(f => {
+                const btn = document.getElementById(`lic-filter-${f}`);
+                if (btn) {
+                    if (f === type) {
+                        btn.className = "px-3 py-1.5 rounded-lg font-bold transition bg-purple-600 text-white shadow-sm";
+                    } else {
+                        btn.className = "px-3 py-1.5 rounded-lg font-semibold transition text-slate-400 hover:text-white";
+                    }
+                }
+            });
+            filterLicenseTable();
+        }
+
         async function loadLicenses() {
             try {
                 const sysTag = currentSystemMode || 'SEB';
                 const res = await fetch(`/api/admin/licenses?system_type=${sysTag}`);
                 if (res.status === 401) { window.location.href = "/login"; return; }
                 allLicenses = await res.json();
-                renderLicenseTable(allLicenses);
-            } catch (err) {}
+                
+                const headerBadge = document.getElementById("badge-total-lic-header");
+                if (headerBadge) headerBadge.innerText = `${allLicenses.length} máy`;
+                
+                filterLicenseTable();
+            } catch (err) {
+                console.error("loadLicenses error:", err);
+            }
         }
 
         function filterLicenseTable() {
-            const q = document.getElementById("search-hwid").value.toLowerCase();
-            const filtered = allLicenses.filter(l => 
-                (l.student_name && l.student_name.toLowerCase().includes(q)) ||
-                (l.hwid && l.hwid.toLowerCase().includes(q)) ||
-                (l.email && l.email.toLowerCase().includes(q))
-            );
+            const q = (document.getElementById("search-hwid")?.value || "").toLowerCase().trim();
+            const filtered = (allLicenses || []).filter(l => {
+                const matchFilter = (currentLicenseFilter === 'all') || (l.status === currentLicenseFilter);
+                if (!matchFilter) return false;
+                if (!q) return true;
+                return (
+                    (l.student_name && l.student_name.toLowerCase().includes(q)) ||
+                    (l.hwid && l.hwid.toLowerCase().includes(q)) ||
+                    (l.email && l.email.toLowerCase().includes(q)) ||
+                    (l.phone && l.phone.toLowerCase().includes(q)) ||
+                    (l.machine_name && l.machine_name.toLowerCase().includes(q)) ||
+                    (l.ip_address && l.ip_address.toLowerCase().includes(q))
+                );
+            });
             renderLicenseTable(filtered);
+        }
+
+        function getStudentAvatarHtml(name, status) {
+            name = (name || "Học sinh").trim();
+            const parts = name.split(/\s+/).filter(Boolean);
+            let initials = "HS";
+            if (parts.length >= 2) {
+                initials = (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
+            } else if (parts.length === 1) {
+                initials = parts[0].substring(0, 2).toUpperCase();
+            }
+
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            const gradients = [
+                "from-purple-600 to-indigo-600",
+                "from-blue-600 to-cyan-500",
+                "from-emerald-600 to-teal-500",
+                "from-rose-600 to-pink-500",
+                "from-amber-500 to-orange-600",
+                "from-violet-600 to-fuchsia-600"
+            ];
+            const grad = gradients[Math.abs(hash) % gradients.length];
+
+            let dotHtml = '';
+            if (status === 'active') {
+                dotHtml = '<span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900 shadow animate-pulse"></span>';
+            } else if (status === 'pending') {
+                dotHtml = '<span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-slate-900 shadow"></span>';
+            } else if (status === 'locked') {
+                dotHtml = '<span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 border-2 border-slate-900 shadow"></span>';
+            }
+
+            return `
+                <div class="relative shrink-0">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr ${grad} text-white flex items-center justify-center font-extrabold text-xs shadow-md border border-white/10 tracking-wider">
+                        ${initials}
+                    </div>
+                    ${dotHtml}
+                </div>
+            `;
         }
 
         function renderLicenseTable(list) {
             const tbody = document.getElementById("licenses-table");
             tbody.innerHTML = "";
 
-            if (list.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">Chưa có mã máy nào.</td></tr>`;
+            if (!list || list.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="p-12 text-center text-slate-500">
+                            <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-600 block"></i>
+                            Không có mã máy nào phù hợp với bộ lọc hiện tại.
+                        </td>
+                    </tr>
+                `;
                 return;
             }
 
             list.forEach(l => {
                 const tr = document.createElement("tr");
-                tr.className = "hover:bg-slate-900/40 transition";
+                tr.className = "hover:bg-slate-800/40 transition group border-b border-slate-800/50";
 
-                let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400">Chờ duyệt</span>`;
-                if (l.status === "active") statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400">Hoạt động</span>`;
-                else if (l.status === "locked") statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400">Đã khóa</span>`;
+                let statusBadge = `
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> Chờ Duyệt
+                    </span>
+                `;
+                if (l.status === "active") {
+                    statusBadge = `
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm shadow-emerald-500/10">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Hoạt Động
+                        </span>
+                    `;
+                } else if (l.status === "locked") {
+                    statusBadge = `
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 shadow-sm shadow-rose-500/10">
+                            <i class="fa-solid fa-lock text-[10px]"></i> Đã Khóa
+                        </span>
+                    `;
+                }
 
                 let contactBadges = '';
-                if (l.email) contactBadges += `<div class="text-[11px] text-sky-400 truncate max-w-[210px]" title="${escapeHtml(l.email)}"><i class="fa-solid fa-envelope mr-1 text-[10px]"></i>${escapeHtml(l.email)}</div>`;
-                if (l.phone) contactBadges += `<div class="text-[11px] text-amber-300 truncate max-w-[210px]" title="${escapeHtml(l.phone)}"><i class="fa-solid fa-phone mr-1 text-[10px]"></i>${escapeHtml(l.phone)}</div>`;
-                if (l.notes) contactBadges += `<div class="text-[10px] text-slate-400 italic truncate max-w-[210px]" title="${escapeHtml(l.notes)}">📝 ${escapeHtml(l.notes)}</div>`;
-                if (!contactBadges) contactBadges = `<div class="text-[10px] text-slate-500 italic">Chưa có Email/SĐT (Bấm Sửa TT)</div>`;
+                if (l.email) contactBadges += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[11px] font-medium truncate max-w-[200px]" title="${escapeHtml(l.email)}"><i class="fa-regular fa-envelope text-[10px]"></i>${escapeHtml(l.email)}</span>`;
+                if (l.phone) contactBadges += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[11px] font-medium font-mono"><i class="fa-solid fa-phone text-[10px]"></i>${escapeHtml(l.phone)}</span>`;
+                if (l.notes) contactBadges += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[11px] italic truncate max-w-[200px]" title="${escapeHtml(l.notes)}">📝 ${escapeHtml(l.notes)}</span>`;
 
-                let machineBadges = `<div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                    <span title="Tên máy"><i class="fa-solid fa-laptop text-slate-500"></i> ${escapeHtml(l.machine_name || 'PC')}</span>
-                    <span>•</span>
-                    <span class="text-blue-300 font-mono" title="Địa chỉ IP"><i class="fa-solid fa-globe text-slate-500"></i> ${escapeHtml(l.ip_address || '—')}</span>
-                </div>`;
+                let machineBadges = `
+                    <div class="flex items-center gap-2 mt-1.5 text-[11px] text-slate-400 flex-wrap">
+                        <span class="inline-flex items-center gap-1 text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60" title="Tên máy tính"><i class="fa-solid fa-laptop text-slate-400"></i> ${escapeHtml(l.machine_name || 'PC')}</span>
+                        <span class="inline-flex items-center gap-1 text-indigo-300 bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-800/40 font-mono" title="Địa chỉ IP"><i class="fa-solid fa-network-wired text-indigo-400"></i> ${escapeHtml(l.ip_address || '—')}</span>
+                    </div>
+                `;
+
+                const avatarHtml = getStudentAvatarHtml(l.student_name, l.status);
+                const shortHwid = l.hwid ? (l.hwid.substring(0, 14) + '...') : '—';
 
                 tr.innerHTML = `
-                    <td class="p-3">
-                        <div class="flex items-start gap-2.5">
-                            <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow">
-                                🧑‍🎓
-                            </div>
+                    <td class="py-3.5 px-4">
+                        <div class="flex items-start gap-3">
+                            ${avatarHtml}
                             <div class="min-w-0">
-                                <span class="font-bold text-white text-xs block">${escapeHtml(l.student_name || 'Học sinh')}</span>
-                                ${contactBadges}
+                                <span class="font-extrabold text-sm text-white group-hover:text-purple-300 transition block">${escapeHtml(l.student_name || 'Học sinh')}</span>
+                                <div class="flex items-center gap-1.5 flex-wrap mt-1">
+                                    ${contactBadges || '<span class="text-[10px] text-slate-500 italic">Chưa có Email/SĐT</span>'}
+                                </div>
                                 ${machineBadges}
                             </div>
                         </div>
                     </td>
-                    <td class="p-3 font-mono text-[11px] text-blue-300">
-                        ${l.hwid ? escapeHtml(l.hwid.substring(0, 16)) + '...' : '—'}
+                    <td class="py-3.5 px-4">
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 font-mono text-xs shadow-sm hover:border-purple-500/50 hover:bg-slate-850 transition cursor-pointer group/hwid" onclick="copyToClipboard('${escapeHtml(l.hwid || '')}')" title="Click để sao chép mã HWID">
+                            <i class="fa-solid fa-microchip text-purple-400 text-xs"></i>
+                            <span class="tracking-wide">${escapeHtml(shortHwid)}</span>
+                            <i class="fa-regular fa-copy text-[10px] text-slate-500 group-hover/hwid:text-purple-300 transition ml-1"></i>
+                        </div>
                     </td>
-                    <td class="p-3 text-slate-300 text-[11px] font-semibold">${escapeHtml(l.duration_type || '—')}</td>
-                    <td class="p-3 text-slate-300 text-[11px] font-mono">
-                        ${l.expires_at ? escapeHtml(l.expires_at) : '—'}
+                    <td class="py-3.5 px-4">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800/80 text-slate-200 border border-slate-700/60">
+                            <i class="fa-solid fa-hourglass-half text-amber-400 text-[10px]"></i> ${escapeHtml(l.duration_type || '—')}
+                        </span>
                     </td>
-                    <td class="p-3">${statusBadge}</td>
-                    <td class="p-3 text-right space-x-1 whitespace-nowrap">
-                        <button onclick="openStudentInfoModal('${escapeHtml(l.hwid)}')" class="px-2 py-1 bg-cyan-700/80 hover:bg-cyan-600 rounded-lg text-white font-semibold text-[11px]" title="Xem & Sửa Thông Tin Học Sinh (Email, SĐT, Ghi chú)">
-                            <i class="fa-solid fa-user-pen"></i> Sửa TT
+                    <td class="py-3.5 px-4">
+                        <div class="font-mono text-xs text-slate-300 flex items-center gap-1.5">
+                            <i class="fa-regular fa-calendar-check text-slate-400"></i>
+                            <span>${escapeHtml(l.expires_at || '—')}</span>
+                        </div>
+                    </td>
+                    <td class="py-3.5 px-4">${statusBadge}</td>
+                    <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                        <button onclick="openStudentInfoModal('${escapeHtml(l.hwid)}')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-white rounded-xl text-xs font-bold transition border border-slate-700/80 shadow-sm inline-flex items-center gap-1.5" title="Xem & Sửa Thông Tin Học Sinh (Email, SĐT, Ghi chú)">
+                            <i class="fa-solid fa-user-pen text-[10px]"></i> Sửa TT
                         </button>
+
                         ${l.status === 'pending' ? `
-                            <button onclick="quickApprove('${l.hwid}', '2h')" class="px-2 py-1 bg-amber-600 hover:bg-amber-500 rounded-lg text-white font-semibold text-[11px]" title="Cấp 2 Giờ (Cho 1 ca thi)">
-                                2 Giờ
+                            <button onclick="quickApprove('${l.hwid}', '2h')" class="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-xl text-white font-bold text-xs shadow-md shadow-amber-600/20 inline-flex items-center gap-1" title="Cấp 2 Giờ (Cho 1 ca thi)">
+                                <i class="fa-solid fa-bolt text-[10px]"></i> 2 Giờ
                             </button>
-                            <button onclick="quickApprove('${l.hwid}', '30d')" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-semibold text-[11px]" title="Cấp 30 Ngày">
+                            <button onclick="quickApprove('${l.hwid}', '30d')" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white font-bold text-xs shadow-md shadow-indigo-600/20" title="Cấp 30 Ngày">
                                 30N
                             </button>
-                            <button onclick="openApprovalModal('${l.hwid}', '${(l.student_name || 'Học sinh').replace(/'/g, "\\'")}')" class="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-semibold text-[11px]" title="Chọn ngày giờ cụ thể">
-                                <i class="fa-solid fa-calendar-days"></i> Chi tiết
+                            <button onclick="openApprovalModal('${l.hwid}', '${(l.student_name || 'Học sinh').replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-xl text-white font-bold text-xs shadow-md shadow-purple-600/20 inline-flex items-center gap-1" title="Chọn ngày giờ cụ thể">
+                                <i class="fa-solid fa-calendar-days text-[10px]"></i> Chi Tiết
                             </button>
                         ` : ''}
 
                         ${l.status === 'active' ? `
-                            <button onclick="openApprovalModal('${l.hwid}', '${(l.student_name || 'Học sinh').replace(/'/g, "\\'")}', '${l.expires_at || ''}')" class="px-2 py-1 bg-amber-600/90 hover:bg-amber-500 rounded-lg text-white font-semibold text-[11px]" title="Sửa hạn / Gia hạn thêm giờ thi">
-                                <i class="fa-solid fa-clock"></i> Sửa Hạn
+                            <button onclick="openApprovalModal('${l.hwid}', '${(l.student_name || 'Học sinh').replace(/'/g, "\\'")}', '${l.expires_at || ''}')" class="px-2.5 py-1.5 bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-slate-950 rounded-xl text-xs font-bold transition border border-amber-500/30 shadow-sm inline-flex items-center gap-1.5" title="Sửa hạn / Gia hạn thêm giờ thi">
+                                <i class="fa-regular fa-clock text-[10px]"></i> Sửa Hạn
                             </button>
-                            <button onclick="lockLicense('${l.hwid}')" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-semibold text-[11px]" title="Khóa máy học sinh (Phần mềm tự hủy)">
-                                <i class="fa-solid fa-lock"></i> Khóa
+                            <button onclick="lockLicense('${l.hwid}')" class="px-2.5 py-1.5 bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold transition border border-rose-500/30 shadow-sm inline-flex items-center gap-1.5" title="Khóa máy học sinh (Phần mềm tự hủy)">
+                                <i class="fa-solid fa-lock text-[10px]"></i> Khóa
                             </button>
                         ` : ''}
 
                         ${l.status === 'locked' ? `
-                            <button onclick="unlockLicense('${l.hwid}')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-semibold text-[11px]" title="Mở khóa máy">
-                                <i class="fa-solid fa-lock-open"></i> Mở
+                            <button onclick="unlockLicense('${l.hwid}')" class="px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-600 text-emerald-300 hover:text-white rounded-xl text-xs font-bold transition border border-emerald-500/30 shadow-sm inline-flex items-center gap-1.5" title="Mở khóa máy">
+                                <i class="fa-solid fa-lock-open text-[10px]"></i> Mở
                             </button>
                         ` : ''}
 
                         ${l.license_key ? `
-                            <button onclick="copyToClipboard('${l.license_key}')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 text-[11px]" title="Sao chép Key">
-                                <i class="fa-solid fa-copy"></i>
+                            <button onclick="copyToClipboard('${l.license_key}')" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 inline-flex items-center justify-center text-xs transition border border-slate-700/80 shadow-sm" title="Sao chép Key">
+                                <i class="fa-regular fa-copy"></i>
                             </button>
                         ` : ''}
 
-                        <button onclick="deleteLicense('${l.hwid}')" class="px-2 py-1 bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg text-[11px]" title="Xóa">
-                            <i class="fa-solid fa-trash"></i>
+                        <button onclick="deleteLicense('${l.hwid}')" class="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 inline-flex items-center justify-center text-xs transition border border-slate-700/80 shadow-sm" title="Xóa">
+                            <i class="fa-regular fa-trash-can"></i>
                         </button>
                     </td>
                 `;
