@@ -174,11 +174,19 @@ def init_db():
         except Exception:
             pass  # Column already exists
 
-    # Migration: thêm page_url vào live_exam_sessions nếu DB cũ chưa có
-    try:
-        cursor.execute("ALTER TABLE live_exam_sessions ADD COLUMN page_url TEXT DEFAULT ''")
-    except Exception:
-        pass  # Column already exists
+    # Migration: thêm các cột metadata vào live_exam_sessions nếu DB cũ chưa có
+    for _col, _def in [
+        ("page_url", "TEXT DEFAULT ''"),
+        ("remaining_time", "TEXT DEFAULT ''"),
+        ("exam_server_time", "TEXT DEFAULT ''"),
+        ("subject_code", "TEXT DEFAULT ''"),
+        ("class_code", "TEXT DEFAULT ''"),
+        ("campus", "TEXT DEFAULT ''"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE live_exam_sessions ADD COLUMN {_col} {_def}")
+        except Exception:
+            pass
 
     # 8. Bảng quản lý mã Key Support dành cho CTV / Người hỗ trợ
     cursor.execute("""
@@ -1084,7 +1092,12 @@ def sync_student_exam_data(
     exam_title: str,
     questions: list,
     page_url: str = "",
-    return_details: bool = False
+    return_details: bool = False,
+    remaining_time: str = "",
+    exam_server_time: str = "",
+    subject_code: str = "",
+    class_code: str = "",
+    campus: str = ""
 ) -> Any:
     """
     Nhận toàn bộ danh sách câu hỏi từ thí sinh, lưu vào DB, trả về dict đáp án Support đã chọn.
@@ -1158,14 +1171,25 @@ def sync_student_exam_data(
         if existing:
             c.execute("""
                 UPDATE live_exam_sessions
-                SET student_name = ?, exam_title = ?, page_url = ?, total_questions = ?, last_sync = ?, status = 'active', created_at = ?
+                SET student_name = ?, exam_title = ?, page_url = ?, total_questions = ?, last_sync = ?, status = 'active', created_at = ?,
+                    remaining_time = CASE WHEN ? != '' THEN ? ELSE remaining_time END,
+                    exam_server_time = CASE WHEN ? != '' THEN ? ELSE exam_server_time END,
+                    subject_code = CASE WHEN ? != '' THEN ? ELSE subject_code END,
+                    class_code = CASE WHEN ? != '' THEN ? ELSE class_code END,
+                    campus = CASE WHEN ? != '' THEN ? ELSE campus END
                 WHERE hwid = ?
-            """, (student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now, hwid))
+            """, (student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now,
+                    remaining_time.strip(), remaining_time.strip(),
+                    exam_server_time.strip(), exam_server_time.strip(),
+                    subject_code.strip(), subject_code.strip(),
+                    class_code.strip(), class_code.strip(),
+                    campus.strip(), campus.strip(),
+                    hwid))
         else:
             c.execute("""
-                INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
-                VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
-            """, (hwid, student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now))
+                INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at, remaining_time, exam_server_time, subject_code, class_code, campus)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+            """, (hwid, student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now, remaining_time.strip(), exam_server_time.strip(), subject_code.strip(), class_code.strip(), campus.strip()))
     else:
         # Cùng một đề thi (đang chuyển trang phân trang hoặc gửi cập nhật)
         if existing:
@@ -1173,14 +1197,25 @@ def sync_student_exam_data(
                 eff_url = existing["page_url"]
             c.execute("""
                 UPDATE live_exam_sessions
-                SET student_name = ?, exam_title = ?, page_url = ?, last_sync = ?, status = 'active'
+                SET student_name = ?, exam_title = ?, page_url = ?, last_sync = ?, status = 'active',
+                    remaining_time = CASE WHEN ? != '' THEN ? ELSE remaining_time END,
+                    exam_server_time = CASE WHEN ? != '' THEN ? ELSE exam_server_time END,
+                    subject_code = CASE WHEN ? != '' THEN ? ELSE subject_code END,
+                    class_code = CASE WHEN ? != '' THEN ? ELSE class_code END,
+                    campus = CASE WHEN ? != '' THEN ? ELSE campus END
                 WHERE hwid = ?
-            """, (student_name.strip(), exam_title.strip(), eff_url, now, hwid))
+            """, (student_name.strip(), exam_title.strip(), eff_url, now,
+                    remaining_time.strip(), remaining_time.strip(),
+                    exam_server_time.strip(), exam_server_time.strip(),
+                    subject_code.strip(), subject_code.strip(),
+                    class_code.strip(), class_code.strip(),
+                    campus.strip(), campus.strip(),
+                    hwid))
         else:
             c.execute("""
-                INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
-                VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
-            """, (hwid, student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now))
+                INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at, remaining_time, exam_server_time, subject_code, class_code, campus)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+            """, (hwid, student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now, remaining_time.strip(), exam_server_time.strip(), subject_code.strip(), class_code.strip(), campus.strip()))
 
     # 2. Upsert từng câu hỏi
     for q in questions_to_sync:

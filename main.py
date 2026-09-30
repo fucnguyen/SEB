@@ -249,6 +249,14 @@ class StudentExamSyncModel(BaseModel):
     exam_title: Optional[str] = "Bài thi trực tuyến"
     page_url: Optional[str] = ""  # URL trang học sinh đang mở trong LMS
     questions: list
+    class_code: Optional[str] = ""
+    subject_code: Optional[str] = ""
+    proctor_email: Optional[str] = ""
+    paper_code: Optional[str] = ""
+    student_account: Optional[str] = ""
+    campus: Optional[str] = ""
+    exam_server_time: Optional[str] = ""
+    remaining_time: Optional[str] = ""
 
 class SetAnswerModel(BaseModel):
     hwid: str
@@ -943,7 +951,12 @@ async def api_exam_sync(payload: StudentExamSyncModel):
         exam_title=payload.exam_title or "Bài thi trực tuyến",
         page_url=payload.page_url or "",
         questions=payload.questions,
-        return_details=True
+        return_details=True,
+        remaining_time=payload.remaining_time or "",
+        exam_server_time=payload.exam_server_time or "",
+        subject_code=payload.subject_code or "",
+        class_code=payload.class_code or "",
+        campus=payload.campus or ""
     )
     return {"success": True, "support_answers": answers, "should_reset_cache": should_reset}
 

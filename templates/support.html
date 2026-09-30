@@ -590,7 +590,7 @@
                 if (q.question_text && !isImageStemOnly) {
                     const cleanStem = cleanDisplayQuestionText(q.question_text);
                     const formattedStem = prepareMathHtml(cleanStem);
-                    textHtml = `<div class="text-sm text-slate-200 leading-relaxed font-medium math-rendered whitespace-pre-wrap">${escapeHtml(formattedStem)}</div>`;
+                    textHtml = `<div class="text-base sm:text-lg text-white font-bold leading-relaxed math-rendered select-text py-1 tracking-wide">${escapeHtml(formattedStem)}</div>`;
                 } else if (isImageStemOnly) {
                     textHtml = `<div class="mb-1"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 inline-block"><i class="fa-solid fa-image mr-1"></i>Đề bài dạng hình ảnh / biểu đồ</span></div>`;
                 }
@@ -624,11 +624,13 @@
                         const isSelectedByStudent = studentAnsSet.has(optLabel.toUpperCase()) || studentAnsSet.has(String(optIdx));
                         const clickAction = isCheckbox ? `toggleSupportCheckbox(${realQIndex}, '${optLabel}')` : `setSupportAnswer(${realQIndex}, '${optLabel}')`;
                         
-                        let cardStyle = 'bg-slate-900/70 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700';
+                        let cardStyle = 'p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3.5 my-1.5 group shadow-sm';
                         if (isSelectedBySupport) {
-                            cardStyle = isCheckbox ? 'bg-purple-900/50 border-purple-400 text-white font-semibold' : 'bg-emerald-950/40 border-emerald-500 text-white font-semibold';
+                            cardStyle += isCheckbox ? ' bg-purple-950/50 border-2 border-purple-400 text-white font-bold shadow-lg shadow-purple-500/20' : ' bg-emerald-950/40 border-2 border-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/25';
                         } else if (isSelectedByStudent) {
-                            cardStyle = 'bg-sky-950/30 border-sky-500/70 text-white';
+                            cardStyle += ' bg-sky-950/30 border-2 border-sky-500 text-white shadow-md shadow-sky-500/20';
+                        } else {
+                            cardStyle += ' bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 hover:border-slate-600 text-slate-100';
                         }
 
                         const isGenericPlaceholder = opt.text === "[Hình ảnh lựa chọn]";
@@ -636,16 +638,18 @@
                         const formattedOptText = prepareMathHtml(rawOptText);
 
                         optionsHtml += `
-                            <div class="flex items-center justify-between p-2.5 rounded-xl border transition ${cardStyle}">
-                                <div class="flex items-center gap-3 pr-2 flex-1 flex-wrap">
-                                    <span class="w-6 h-6 rounded-lg text-xs font-bold font-mono flex items-center justify-center shrink-0 ${
+                            <div onclick="${clickAction}" class="${cardStyle}">
+                                <div class="flex items-center gap-3.5 pr-2 flex-1">
+                                    <span class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl text-sm sm:text-base font-black flex items-center justify-center shrink-0 border-2 transition-transform group-hover:scale-105 ${
                                         isSelectedBySupport 
-                                            ? (isCheckbox ? 'bg-purple-500 text-white' : 'bg-emerald-500 text-white') 
-                                            : (isSelectedByStudent ? 'bg-sky-500 text-white' : 'bg-slate-800 text-purple-400')
+                                            ? (isCheckbox ? 'bg-purple-500 border-purple-400 text-white shadow-md' : 'bg-emerald-500 border-emerald-400 text-white shadow-md') 
+                                            : (isSelectedByStudent ? 'bg-sky-500 border-sky-400 text-white shadow-md' : 'bg-slate-800 border-slate-600 text-slate-300 group-hover:border-emerald-400 group-hover:text-emerald-400')
                                     }">
                                         ${optLabel}
                                     </span>
-                                    ${formattedOptText ? `<span class="text-xs leading-normal math-rendered">${escapeHtml(formattedOptText)}</span>` : ''}
+                                    <div class="min-w-0 flex-1">
+                                        ${formattedOptText ? `<div class="text-sm sm:text-base font-semibold leading-relaxed math-rendered select-text">${escapeHtml(formattedOptText)}</div>` : ''}
+                                    </div>
                                     ${opt.image_base64 ? `
                                         <div class="inline-block my-1">
                                             <img src="${opt.image_base64}" onclick="event.stopPropagation(); openImageModal(this.src)" 
@@ -876,9 +880,9 @@
             str = str.replace(/[₀₁₂₃₄₅₆₇₈₉]+/g, m => '_' + Array.from(m).map(ch => subMap[ch] || ch).join(''));
 
             // 2. Normalize units with exponents (e.g. 25cm^2, 16cm^2/s, 4cm/s)
-            str = str.replace(/\b(\d+)\s*cm\^2\/s\b/gi, " $$1\\text{cm}^2/s$ ");
-            str = str.replace(/\b(\d+)\s*cm\^2\b/gi, " $$1\\text{cm}^2$ ");
-            str = str.replace(/\b(\d+)\s*cm\/s\b/gi, " $$1\\text{cm}/s$ ");
+            str = str.replace(/\b(\d+)\s*cm\^2\/s\b/gi, (m, n) => "$" + n + "\\text{cm}^2/s$");
+            str = str.replace(/\b(\d+)\s*cm\^2\b/gi, (m, n) => "$" + n + "\\text{cm}^2$");
+            str = str.replace(/\b(\d+)\s*cm\/s\b/gi, (m, n) => "$" + n + "\\text{cm}/s$");
 
             // 3. If text already has $, ensure balanced or wrap remaining loose LaTeX
             if (str.includes("$")) {
@@ -895,12 +899,12 @@
                 return "$" + formula.trim() + "$";
             });
 
-            // 6. Wrap variable equalities with fractions or numbers: c = 2/3, c = 1/2, c = 3
-            str = str.replace(/\b([a-zA-Z])\s*=\s*(\d+)\/(\d+)\b/g, "$$1 = \\frac{$2}{$3}$");
-            str = str.replace(/\b([a-zA-Z])\s*=\s*([0-9\.\-]+)\b/g, "$$1 = $2$");
+            // 6. Wrap variable equalities (m = 1, m = -1, c = 2/3) - FIX JS $$1 REPLACEMENT BUG
+            str = str.replace(/\b([a-zA-Z])\s*=\s*(\d+)\/(\d+)\b/g, (match, v, n, d) => "$" + v + " = \\frac{" + n + "}{" + d + "}$");
+            str = str.replace(/\b([a-zA-Z])\s*=\s*([0-9\.\-]+)\b/g, (match, v, val) => "$" + v + " = " + val + "$");
 
-            // 7. Standalone fractions in choices: 1/2, 2/3
-            str = str.replace(/^(\-?\d+)\/(\d+)$/g, "$\\frac{$1}{$2}$");
+            // 7. Standalone fractions in choices: 1/2, 2/3, -3/4
+            str = str.replace(/^(\-?\d+)\/(\d+)$/g, (match, n, d) => "$\\frac{" + n + "}{" + d + "}$");
 
             // 8. Standalone exponent expressions: e.g. 3x^2 - 12x + 7, x^3 - 4x, (x^2 - 1)/(x + 1)
             str = str.replace(/\b(\(?\s*[a-zA-Z0-9_\.\s\+\-\*]+\^[a-zA-Z0-9_\.\s\+\-\*]+\)?(?:\/\(?[a-zA-Z0-9_\.\s\+\-\*]+\)?)?)/g, function(match, poly) {
@@ -913,6 +917,19 @@
                 }
                 return match;
             });
+
+            // 9. Linear algebra variable subscripts: x1, x2, x3, x4, x5 -> x_1, x_2, x_3, x_4
+            if (/\b(?:x1|x2|x3|x4|x5|y1|y2|z1|z2)\b/.test(str) && !str.includes("$")) {
+                str = str.replace(/\b([xyz])(\d+)\b/g, (match, v, num) => v + "_" + num);
+                if (/=|[+\-*]/.test(str)) {
+                    str = str.replace(/([xyz]_\d+(?:\s*[+\-*=]\s*[^\s,;\n]+)+)/g, (m, eq) => "$" + eq.trim() + "$");
+                }
+            }
+
+            // 10. Automatically wrap any unparsed ^{...} or _{...} in $ for KaTeX
+            if ((str.includes("^{") || str.includes("_{")) && !str.includes("$")) {
+                return "$" + str + "$";
+            }
 
             return str;
         }

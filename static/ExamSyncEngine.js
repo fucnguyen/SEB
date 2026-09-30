@@ -670,14 +670,38 @@
     }
 
     function getExamTitle() {
-        var titleElems = document.querySelectorAll("h1, h2, h3, h4, .title, [class*='title'], [class*='breadcrumb'], [class*='header-title']");
+        // Priority 1: Match real subject codes like [MAS291], [MAD101], [SWR302], MAS291_SP24
+        var bodyText = document.body ? (document.body.innerText || "") : "";
+        var mCode = bodyText.match(/\b([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\b/);
+        var subjectCodeFound = mCode ? mCode[1].trim() : "";
+
+        // Priority 2: Scan headers and breadcrumbs, filtering out generic portal footers
+        var titleElems = document.querySelectorAll("h1, h2, h3, h4, .title, [class*='title'], [class*='breadcrumb'], [class*='header-title'], #page-header");
         for (var i = 0; i < titleElems.length; i++) {
-            var t = getText(titleElems[i]);
-            if (t.length > 5 && (t.includes("Kiểm tra") || t.includes("Thi") || t.includes("Exam") || t.includes("ClassCode") || t.includes("Assignment"))) {
+            var t = getText(titleElems[i]).trim();
+            // Filter out generic portal noise
+            if (t.includes("Phiên bản") || t.includes("Quyền truy cập") || t.includes("Campus Exam") || t.includes("Safe Exam Browser") || t.includes("SEB Admin")) {
+                continue;
+            }
+            if (t.length >= 4 && (t.includes("Kiểm tra") || t.includes("Thi") || t.includes("Exam") || t.includes("ClassCode") || t.includes("Assignment") || t.includes("Quiz") || t.includes("Test"))) {
+                if (subjectCodeFound && !t.includes(subjectCodeFound)) {
+                    return "[" + subjectCodeFound + "] " + t;
+                }
                 return t;
             }
         }
-        return document.title || window.location.hostname;
+
+        // Priority 3: Document title cleaned
+        var docTitle = (document.title || "").replace(/\s*[-|]\s*Moodle.*$/i, "").trim();
+        if (docTitle && docTitle !== "Safe Exam Browser" && !docTitle.includes("Phiên bản")) {
+            if (subjectCodeFound && !docTitle.includes(subjectCodeFound)) {
+                return "[" + subjectCodeFound + "] " + docTitle;
+            }
+            return docTitle;
+        }
+
+        if (subjectCodeFound) return "[" + subjectCodeFound + "] Bài thi trắc nghiệm";
+        return "Bài thi trực tuyến";
     }
 
     // ─────────────────────────────────────────────────────────────────────────

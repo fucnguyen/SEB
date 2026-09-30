@@ -680,13 +680,20 @@
                 <div class="lg:col-span-8 glass-card rounded-2xl p-5 border border-slate-800 space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 pb-3 border-b border-slate-800">
                         <div>
-                            <div class="flex items-center gap-2">
-                                <h3 id="current-exam-student" class="font-black text-base text-white">Chưa chọn thí sinh</h3>
-                                <span id="exam-stats-badge" class="hidden px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-bold font-mono">
-                                    LIVE SYNC
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <h3 id="current-exam-student" class="font-black text-lg sm:text-xl text-white">Chưa chọn thí sinh</h3>
+                                <span id="current-exam-subject-badge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-black font-mono bg-purple-500/25 text-purple-300 border border-purple-500/40"></span>
+                                <span id="exam-stats-badge" class="hidden px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[11px] font-bold font-mono flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> LIVE SYNC
+                                </span>
+                                <span id="current-exam-timer-pill" class="hidden px-3 py-1 rounded-xl text-xs font-black font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 shadow-sm">
+                                    <i class="fa-solid fa-hourglass-half text-amber-400 animate-spin" style="animation-duration: 4s;"></i> <span id="current-exam-timer-text">--:--</span>
+                                </span>
+                                <span id="current-exam-time-pill" class="hidden px-2.5 py-1 rounded-xl text-xs font-mono bg-slate-800/90 text-slate-300 border border-slate-700 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-clock text-slate-400"></i> <span id="current-exam-time-text"></span>
                                 </span>
                             </div>
-                            <p id="current-exam-title" class="text-xs text-slate-400 mt-0.5">Chọn một thí sinh ở danh sách bên trái để xem đề và gán đáp án</p>
+                            <p id="current-exam-title" class="text-xs sm:text-sm text-slate-400 mt-1 font-medium">Chọn một thí sinh ở danh sách bên trái để xem đề và gán đáp án</p>
                         </div>
                         <div class="flex items-center gap-2 flex-wrap">
                             <button id="btn-generate-pea-src" onclick="triggerPeaSourceGen()" class="hidden px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-cyan-600/20" title="Tạo Source Code Mẫu (C/C++/Java/C#) Cho Bài Thi PEA Practical">
@@ -2288,6 +2295,27 @@
             renderAccessLogsTable(filtered);
         }
 
+        function getInitials(name) {
+            if (!name) return "H";
+            const parts = name.trim().split(/\s+/);
+            if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+
+        function getAvatarGradient(name) {
+            const gradients = [
+                "bg-gradient-to-tr from-purple-600 to-indigo-600",
+                "bg-gradient-to-tr from-blue-600 to-cyan-600",
+                "bg-gradient-to-tr from-emerald-600 to-teal-600",
+                "bg-gradient-to-tr from-amber-600 to-orange-600",
+                "bg-gradient-to-tr from-rose-600 to-pink-600",
+                "bg-gradient-to-tr from-violet-600 to-fuchsia-600"
+            ];
+            let hash = 0;
+            for (let i = 0; i < (name || "").length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            return gradients[Math.abs(hash) % gradients.length];
+        }
+
         function renderAccessLogsTable(list) {
             const countBadge = document.getElementById("logs-count-badge");
             if (countBadge) countBadge.innerText = `${list.length} sự kiện`;
@@ -2955,6 +2983,7 @@
                 const res = await fetch("/api/admin/exam-sessions");
                 if (res.status === 401) { window.location.href = "/login"; return; }
                 const sessions = await res.json();
+                cachedExamSessions = sessions;
 
                 // Update badge count
                 const badge = document.getElementById("badge-live-exams");
@@ -3012,10 +3041,51 @@
             currentExamName = name;
             currentExamVersion = ""; // Reset version so fresh questions are loaded immediately
 
+            // Find current session object
+            const s = (cachedExamSessions || []).find(x => x.hwid === hwid) || {};
+
             // Update header
-            document.getElementById("current-exam-student").innerText = name || "Thí sinh";
-            document.getElementById("current-exam-title").innerText = title || "Đang tải đề thi...";
+            document.getElementById("current-exam-student").innerText = name || s.student_name || "Thí sinh";
+            
+            let displayTitle = title || s.exam_title || "Đang tải đề thi...";
+            document.getElementById("current-exam-title").innerText = displayTitle;
             document.getElementById("exam-stats-badge").classList.remove("hidden");
+
+            // Subject badge
+            const subjBadge = document.getElementById("current-exam-subject-badge");
+            if (subjBadge) {
+                const subj = s.subject_code || (displayTitle.match(/\b([A-Z]{2,4}\d{2,4})\b/) || [])[1] || "";
+                if (subj) {
+                    subjBadge.innerText = subj;
+                    subjBadge.classList.remove("hidden");
+                } else {
+                    subjBadge.classList.add("hidden");
+                }
+            }
+
+            // Countdown timer pill
+            const timerPill = document.getElementById("current-exam-timer-pill");
+            const timerText = document.getElementById("current-exam-timer-text");
+            if (timerPill && timerText) {
+                if (s.remaining_time) {
+                    timerText.innerText = s.remaining_time;
+                    timerPill.classList.remove("hidden");
+                } else {
+                    timerPill.classList.add("hidden");
+                }
+            }
+
+            // Server time pill
+            const timePill = document.getElementById("current-exam-time-pill");
+            const timeText = document.getElementById("current-exam-time-text");
+            if (timePill && timeText) {
+                if (s.exam_server_time) {
+                    timeText.innerText = s.exam_server_time;
+                    timePill.classList.remove("hidden");
+                } else {
+                    timePill.classList.add("hidden");
+                }
+            }
 
             // Refresh session list to highlight
             loadExamSessions();
@@ -3251,9 +3321,9 @@
             str = str.replace(/[₀₁₂₃₄₅₆₇₈₉]+/g, m => '_' + Array.from(m).map(ch => subMap[ch] || ch).join(''));
 
             // 2. Normalize units with exponents (e.g. 25cm^2, 16cm^2/s, 4cm/s)
-            str = str.replace(/\b(\d+)\s*cm\^2\/s\b/gi, " $$1\\text{cm}^2/s$ ");
-            str = str.replace(/\b(\d+)\s*cm\^2\b/gi, " $$1\\text{cm}^2$ ");
-            str = str.replace(/\b(\d+)\s*cm\/s\b/gi, " $$1\\text{cm}/s$ ");
+            str = str.replace(/\b(\d+)\s*cm\^2\/s\b/gi, (m, n) => "$" + n + "\\text{cm}^2/s$");
+            str = str.replace(/\b(\d+)\s*cm\^2\b/gi, (m, n) => "$" + n + "\\text{cm}^2$");
+            str = str.replace(/\b(\d+)\s*cm\/s\b/gi, (m, n) => "$" + n + "\\text{cm}/s$");
 
             // 3. If text already has $, ensure balanced or wrap remaining loose LaTeX
             if (str.includes("$")) {
@@ -3270,12 +3340,12 @@
                 return "$" + formula.trim() + "$";
             });
 
-            // 6. Wrap variable equalities with fractions or numbers: c = 2/3, c = 1/2, c = 3
-            str = str.replace(/\b([a-zA-Z])\s*=\s*(\d+)\/(\d+)\b/g, "$$1 = \\frac{$2}{$3}$");
-            str = str.replace(/\b([a-zA-Z])\s*=\s*([0-9\.\-]+)\b/g, "$$1 = $2$");
+            // 6. Wrap variable equalities (m = 1, m = -1, c = 2/3) - FIX CRITICAL JS REPLACEMENT BUG WHERE $$1 WAS TREATED AS LITERAL $1
+            str = str.replace(/\b([a-zA-Z])\s*=\s*(\d+)\/(\d+)\b/g, (match, v, n, d) => "$" + v + " = \\frac{" + n + "}{" + d + "}$");
+            str = str.replace(/\b([a-zA-Z])\s*=\s*([0-9\.\-]+)\b/g, (match, v, val) => "$" + v + " = " + val + "$");
 
-            // 7. Standalone fractions in choices: 1/2, 2/3
-            str = str.replace(/^(\-?\d+)\/(\d+)$/g, "$\\frac{$1}{$2}$");
+            // 7. Standalone fractions in choices: 1/2, 2/3, -3/4
+            str = str.replace(/^(\-?\d+)\/(\d+)$/g, (match, n, d) => "$\\frac{" + n + "}{" + d + "}$");
 
             // 8. Standalone exponent expressions: e.g. 3x^2 - 12x + 7, x^3 - 4x, (x^2 - 1)/(x + 1)
             str = str.replace(/\b(\(?\s*[a-zA-Z0-9_\.\s\+\-\*]+\^[a-zA-Z0-9_\.\s\+\-\*]+\)?(?:\/\(?[a-zA-Z0-9_\.\s\+\-\*]+\)?)?)/g, function(match, poly) {
@@ -3288,6 +3358,20 @@
                 }
                 return match;
             });
+
+            // 9. Linear algebra variable subscripts: x1, x2, x3, x4, x5 -> x_1, x_2, x_3, x_4
+            if (/\b(?:x1|x2|x3|x4|x5|y1|y2|z1|z2)\b/.test(str) && !str.includes("$")) {
+                str = str.replace(/\b([xyz])(\d+)\b/g, (match, v, num) => v + "_" + num);
+                // Wrap in $ if contains algebra operations
+                if (/=|[+\-*]/.test(str)) {
+                    str = str.replace(/([xyz]_\d+(?:\s*[+\-*=]\s*[^\s,;\n]+)+)/g, (m, eq) => "$" + eq.trim() + "$");
+                }
+            }
+
+            // 10. Automatically wrap any unparsed ^{...} or _{...} in $ for KaTeX
+            if ((str.includes("^{") || str.includes("_{")) && !str.includes("$")) {
+                return "$" + str + "$";
+            }
 
             return str;
         }
@@ -3428,31 +3512,45 @@
                         const rawOptText = (!isGenericPlaceholder && optObj.text) ? optObj.text : "";
                         const formattedOptText = prepareMathHtml(rawOptText);
                         
-                        let rowClass = "flex items-center gap-2 py-1 px-1.5 rounded-lg flex-wrap transition";
+                        let rowClass = "p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-3.5 group my-1.5 shadow-sm";
                         if (isChosen) {
-                            rowClass += " bg-emerald-950/20";
+                            rowClass += " bg-emerald-950/40 border-2 border-emerald-500 shadow-lg shadow-emerald-500/25";
                         } else if (isStudentChosen) {
-                            rowClass += " bg-sky-950/20 border border-sky-500/40";
+                            rowClass += " bg-sky-950/30 border-2 border-sky-500 shadow-md shadow-sky-500/20";
+                        } else {
+                            rowClass += " bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 hover:border-slate-600";
                         }
 
+                        const circleCls = isChosen
+                            ? "bg-emerald-500 border-2 border-emerald-400 text-white shadow-md shadow-emerald-500/40 scale-105"
+                            : (isStudentChosen
+                                ? "bg-sky-500 border-2 border-sky-400 text-white shadow-md shadow-sky-500/40"
+                                : "bg-slate-800 border-2 border-slate-600 text-slate-300 group-hover:border-emerald-400 group-hover:text-emerald-400");
+
                         optionsHtml += `
-                            <div class="${rowClass}">
-                                <span class="shrink-0 w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center border ${
-                                    isChosen ? "bg-emerald-500 border-emerald-400 text-white" : (isStudentChosen ? "bg-sky-500 border-sky-400 text-white" : "bg-slate-800 border-slate-600 text-slate-400")
-                                }">${escapeHtml(lbl)}</span>
-                                ${formattedOptText ? `<span class="text-xs text-slate-200 leading-relaxed font-medium math-rendered">${escapeHtml(formattedOptText)}</span>` : ""}
-                                ${optImgHtml}
-                                ${isStudentChosen ? `
-                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 ml-auto mr-1 flex items-center gap-1 shrink-0 font-mono">
-                                        <i class="fa-solid fa-user-pen text-[9px]"></i> Thí sinh đang chọn
-                                    </span>` : ""}
+                            <div onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${rowClass}">
+                                <span class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl font-black text-sm sm:text-base flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${circleCls}">
+                                    ${escapeHtml(lbl)}
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    ${formattedOptText ? `<div class="text-sm sm:text-base text-slate-100 font-semibold leading-relaxed math-rendered select-text">${escapeHtml(formattedOptText)}</div>` : ''}
+                                    ${optImgHtml}
+                                </div>
+                                ${isChosen ? `
+                                    <span class="px-3 py-1 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 ml-auto shrink-0 flex items-center gap-1.5 font-mono shadow-sm">
+                                        <i class="fa-solid fa-check text-emerald-400"></i> ĐÁP ÁN
+                                    </span>` : (isStudentChosen ? `
+                                    <span class="px-2.5 py-1 rounded-xl text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 ml-auto shrink-0 flex items-center gap-1 font-mono">
+                                        <i class="fa-solid fa-user-pen text-sky-400"></i> Thí sinh chọn
+                                    </span>` : '')
+                                }
                             </div>`;
                     });
                 }
 
                 // ── Answer action area ────────────────────────────────
                 let answerAreaHtml = "";
-                const btnBase = "px-3 py-1.5 rounded-xl text-xs font-black transition active:scale-95 border-2";
+                const btnBase = "px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-sm sm:text-base font-black transition active:scale-95 border-2 min-w-[50px] shadow-sm";
 
                 if (qtype === "radio") {
                     const btnAnswers = opts.map((opt, oi) => {
@@ -3537,33 +3635,40 @@
                 const qNum = (q.question_index !== undefined ? q.question_index + 1 : idx + 1);
                 const card = document.createElement("div");
                 card.id = `q-card-${idx}`;
-                card.className = `glass-card rounded-xl p-4 border ${chosenAns ? "border-emerald-500/40 bg-emerald-950/10" : "border-slate-800"} space-y-2 transition-all duration-300`;
+                card.className = `glass-card rounded-2xl p-5 sm:p-6 border-2 ${chosenAns ? "border-emerald-500/50 bg-emerald-950/15 shadow-emerald-950/30" : "border-slate-800 bg-slate-900/80"} space-y-4 transition-all duration-300 shadow-xl mb-6`;
                 const cleanStem = cleanDisplayQuestionText(q.question_text);
                 const formattedStem = prepareMathHtml(cleanStem);
 
                 card.innerHTML = `
-                    <div class="flex justify-between items-start gap-2 flex-wrap">
-                        <div class="flex items-center gap-2 shrink-0">
-                            <span class="font-bold text-xs text-slate-300">Câu ${qNum}</span>
+                    <div class="flex justify-between items-center gap-3 flex-wrap pb-3.5 border-b border-slate-800/80">
+                        <div class="flex items-center gap-2.5">
+                            <span class="px-3.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-sm rounded-xl shadow-md shadow-blue-500/30 flex items-center gap-1.5">
+                                Câu ${qNum}
+                            </span>
                             ${typeBadge}
+                            <span class="text-xs text-slate-400 font-semibold hidden sm:inline">• ${opts.length} lựa chọn</span>
                         </div>
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            ${curAns ? `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 border border-sky-500/40 text-sky-400 flex items-center gap-1 font-mono"><i class="fa-solid fa-user-pen text-[9px]"></i> Thí sinh: ${escapeHtml(curAns)}</span>` : ""}
+                        <div class="flex items-center gap-2 flex-wrap">
+                            ${curAns ? `<span class="shrink-0 px-3 py-1 rounded-xl text-xs font-black bg-sky-500/20 border border-sky-400/40 text-sky-300 flex items-center gap-1.5 font-mono shadow-sm"><i class="fa-solid fa-user-pen text-sky-400"></i> Thí sinh: <strong class="text-white">${escapeHtml(curAns)}</strong></span>` : ""}
                             ${chosenBadge}
-                            <button onclick="downloadQuestionAsImage(${idx}, false)" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition border border-slate-700 shadow-sm" title="Tải ảnh đề thi sạch (chuẩn thi HD)">
+                            <button onclick="downloadQuestionAsImage(${idx}, false)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border border-slate-700 shadow-sm" title="Tải ảnh đề thi sạch (chuẩn thi HD)">
                                 <i class="fa-solid fa-camera text-sky-400"></i> Ảnh Đề
                             </button>
                             ${chosenAns ? `
-                            <button onclick="downloadQuestionAsImage(${idx}, true)" class="px-2 py-0.5 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition border border-emerald-600/40 shadow-sm" title="Tải ảnh đề kèm đáp án hỗ trợ">
+                            <button onclick="downloadQuestionAsImage(${idx}, true)" class="px-3 py-1 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border border-emerald-600/50 shadow-sm" title="Tải ảnh đề kèm đáp án hỗ trợ">
                                 <i class="fa-solid fa-check text-emerald-400"></i> Kèm Đáp Án
                             </button>` : ""}
                         </div>
                     </div>
-                    <div class="text-xs text-white font-medium leading-relaxed math-rendered">${escapeHtml(formattedStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : "(Đang tải...)"))}</div>
+                    <!-- Question stem with large, crystal-clear 18px font (Viper standard) -->
+                    <div class="text-base sm:text-lg text-white font-bold leading-relaxed math-rendered select-text py-1 tracking-wide">
+                        ${escapeHtml(formattedStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : "(Đang tải...)"))}
+                    </div>
                     ${imgHtml}
-                    <div class="space-y-0.5">${optionsHtml}</div>
+                    <!-- VIPER-style spacious Option Cards -->
+                    <div class="space-y-3 pt-1">${optionsHtml}</div>
                     ${curAnsHtml}
-                    <div class="pt-2 border-t border-slate-800">${answerAreaHtml}</div>
+                    <div class="pt-3 border-t border-slate-800/80">${answerAreaHtml}</div>
                 `;
                 container.appendChild(card);
             });
@@ -3630,7 +3735,7 @@
                             const bgCls = hasAns 
                                 ? "bg-emerald-600 hover:bg-emerald-500 border-emerald-400 text-white font-black shadow-sm" 
                                 : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 font-semibold";
-                            mHtml += `<button onclick="scrollToQuestionCard(${idx})" class="w-7 h-7 rounded-lg text-[11px] flex items-center justify-center border transition active:scale-95 ${bgCls}">${qNum}</button>`;
+                            mHtml += `<button onclick="scrollToQuestionCard(${idx})" class="w-8 h-8 rounded-xl text-xs flex items-center justify-center border transition-all active:scale-95 ${bgCls}">${qNum}</button>`;
                         });
                         matrixEl.innerHTML = mHtml;
                     } else {
