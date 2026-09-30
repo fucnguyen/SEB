@@ -1050,28 +1050,29 @@ def check_is_new_exam(
         if m_old and m_new and m_old.group(0) != m_new.group(0):
             return True
 
-    # 3. Kiểm tra khoảng cách thời gian sync (> 20 phút) + Câu 1 (index 0) đổi nội dung
-    last_sync = existing["last_sync"]
-    if last_sync and new_questions:
+    # 3. Kiem tra xuyen suot: neu co cau hoi nao bi trung index ma noi dung khac nhau -> De moi
+    if new_questions:
         try:
-            from datetime import datetime
-            t_last = datetime.strptime(last_sync, "%Y-%m-%d %H:%M:%S")
-            diff_mins = (now_vn() - t_last).total_seconds() / 60.0
-            if diff_mins > 20.0:
-                q0_new = None
-                for q in new_questions:
-                    idx = int(q.get("question_index") if q.get("question_index") is not None else q.get("index", 0))
-                    if idx == 0:
-                        q0_new = (q.get("question_text") or "").strip().lower()
-                        break
-                if q0_new and len(q0_new) > 10:
-                    c.execute("SELECT question_text FROM live_exam_questions WHERE hwid = ? AND question_index = 0", (hwid,))
-                    row0 = c.fetchone()
-                    if row0 and row0["question_text"]:
-                        q0_old = row0["question_text"].strip().lower()
-                        if q0_new[:60] != q0_old[:60]:
+            c.execute("SELECT question_index, question_text FROM live_exam_questions WHERE hwid = ?", (hwid,))
+            old_qs = {int(r["question_index"]): (r["question_text"] or "").strip().lower() for r in c.fetchall()}
+            
+            for q in new_questions:
+                idx = int(q.get("question_index") if q.get("question_index") is not None else q.get("index", 0))
+                q_text_new = (q.get("question_text") or "").strip().lower()
+                
+                if len(q_text_new) < 15:
+                    continue
+                    
+                if idx in old_qs:
+                    q_text_old = old_qs[idx]
+                    if len(q_text_old) >= 15:
+                        import difflib
+                        ratio = difflib.SequenceMatcher(None, q_text_new[:100], q_text_old[:100]).ratio()
+                        if ratio < 0.6: # Khac nhau tren 40% o 100 ky tu dau tien -> De moi
                             return True
         except Exception:
+            pass
+
             pass
 
     return False
