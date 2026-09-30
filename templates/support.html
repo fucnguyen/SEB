@@ -125,6 +125,9 @@
                     <button id="btn-copy-answers" onclick="copyFormattedAnswers()" class="hidden px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold items-center gap-1.5 transition border border-slate-700">
                         <i class="fa-regular fa-copy"></i> Copy Đáp Án
                     </button>
+                    <button id="btn-reset-exam" onclick="triggerSupportResetSession()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Lưu trữ đề cũ vào kho ZIP và xóa trắng câu hỏi để sẵn sàng cho thí sinh làm ĐỀ MỚI TINH KHÔI">
+                        <i class="fa-solid fa-arrows-rotate"></i> Bắt Đầu Đề Mới (Reset)
+                    </button>
                     <button onclick="loadCurrentQuestions(true)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-purple-600/20">
                         <i class="fa-solid fa-arrows-rotate"></i> Làm Mới Đề
                     </button>
@@ -325,6 +328,9 @@
             document.getElementById("active-exam-shift").innerText = item.exam_shift || '—';
             document.getElementById("active-exam-hwid").innerText = item.hwid;
 
+            const btnReset = document.getElementById("btn-reset-exam");
+            if (btnReset) btnReset.classList.remove("hidden");
+
             const badge = document.getElementById("active-exam-status-badge");
             badge.classList.remove("hidden");
             if (item.is_online) {
@@ -336,6 +342,33 @@
             } else {
                 badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30";
                 badge.innerText = "🟡 Chờ thí sinh mở bài";
+            }
+        }
+
+        async function triggerSupportResetSession() {
+            if (!currentSelectedHWID) {
+                showToast("Vui lòng chọn 1 thí sinh trước!");
+                return;
+            }
+            const item = allAssignedSessions.find(s => s.hwid === currentSelectedHWID);
+            const studentName = item ? item.student_name : "Thí sinh";
+            if (!confirm(`Xác nhận lưu trữ đề cũ của thí sinh "${studentName}" và XÓA TRẮNG câu hỏi để chuẩn bị cho ĐỀ THI MỚI?\n\nĐề cũ sẽ được tự động đóng gói file ZIP an toàn, giúp đề mới không bị dồn câu hỏi!`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/support/reset-session/${encodeURIComponent(currentSelectedHWID)}`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    showToast("Đã reset ca thi thành công! Đang chờ đề mới...");
+                    currentExamVersion = "";
+                    cachedQuestions = [];
+                    await loadCurrentQuestions(true);
+                    await loadAssignedExams();
+                } else {
+                    alert("Lỗi: " + (data.detail || data.message || "Không thể reset"));
+                }
+            } catch(e) {
+                alert("Lỗi kết nối: " + e.message);
             }
         }
 

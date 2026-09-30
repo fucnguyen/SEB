@@ -533,6 +533,9 @@
                             <button id="btn-archive-session" onclick="triggerArchiveSession()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Đóng gói đề thi, ảnh và đáp án thành file ZIP và dọn dẹp khỏi bộ nhớ máy chủ">
                                 <i class="fa-solid fa-box-archive"></i> Lưu Source ZIP & Dọn Dẹp
                             </button>
+                            <button id="btn-reset-session" onclick="triggerResetSession()" class="hidden px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-rose-600/20" title="Lưu trữ đề cũ và xóa trắng câu hỏi để sẵn sàng cho thí sinh làm đề mới tinh khôi (chống dồn đề)">
+                                <i class="fa-solid fa-arrows-rotate"></i> Bắt Đầu Đề Mới (Reset)
+                            </button>
                             <button onclick="openArchivedSourcesModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700" title="Xem danh sách các đề thi đã đóng gói thành file ZIP">
                                 <i class="fa-solid fa-folder-open"></i> Kho Source Đề ZIP
                             </button>
@@ -2577,6 +2580,31 @@
             } catch(e) { alert("Lỗi kết nối: " + e.message); }
         }
 
+        async function triggerResetSession() {
+            if (!currentExamHWID) {
+                alert("Vui lòng chọn 1 ca thi trước!");
+                return;
+            }
+            const studentName = document.getElementById("current-exam-student").innerText || "Thí sinh";
+            if (!confirm(`Xác nhận lưu trữ đề hiện tại của thí sinh "${studentName}" và XÓA TRẮNG câu hỏi để sẵn sàng cho ĐỀ THI MỚI?\n\nThao tác này đảm bảo đề mới không bị dồn/ghép đè câu hỏi từ đề cũ!`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/admin/reset-session/${encodeURIComponent(currentExamHWID)}`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ ${data.message}\nĐã lưu trữ đề cũ vào kho ZIP và làm sạch câu hỏi. Khi học sinh vào đề mới, toàn bộ câu hỏi mới sẽ được nạp tinh khôi!`);
+                    currentExamVersion = "";
+                    loadExamSessions();
+                    loadExamQuestions();
+                } else {
+                    alert("Lỗi: " + (data.detail || data.message || "Không thể reset"));
+                }
+            } catch(e) {
+                alert("Lỗi kết nối: " + e.message);
+            }
+        }
+
         async function openArchivedSourcesModal() {
             const modal = document.getElementById("modal-archived-sources");
             if (!modal) return;
@@ -2668,9 +2696,16 @@
                 const btnZip = document.getElementById("btn-export-zip");
                 const btnPrint = document.getElementById("btn-print-exam");
                 const btnArchive = document.getElementById("btn-archive-session");
+                const btnReset = document.getElementById("btn-reset-session");
                 const btnPea = document.getElementById("btn-generate-pea-src");
                 const btnPeaZip = document.getElementById("btn-download-pea-template");
                 const btnCopy = document.getElementById("btn-copy-formatted-ans");
+
+                if (currentExamHWID) {
+                    if (btnReset) btnReset.classList.remove("hidden");
+                } else {
+                    if (btnReset) btnReset.classList.add("hidden");
+                }
 
                 if (cachedCurrentQuestions.length > 0) {
                     if (btnZip) btnZip.classList.remove("hidden");

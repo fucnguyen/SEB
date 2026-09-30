@@ -583,6 +583,13 @@ async def api_log_session(payload: SessionLogModel, request: Request):
 
     log_entry = database.log_access_event(hwid, name, mach, client_ip, evt, details)
 
+    # Đánh dấu ca thi kết thúc khi học sinh thoát hoặc nộp bài để đề thi tiếp theo được nạp mới hoàn toàn
+    if evt in ("EXIT_NORMAL", "EXIT_LOCKED", "EXIT_DELETED", "EXIT_EXPIRED"):
+        try:
+            database.update_live_exam_session_status(hwid, "finished")
+        except Exception:
+            pass
+
     # Gửi thông báo tức thì lên Telegram cho Admin nắm được
     try:
         evt_labels = {
@@ -919,24 +926,31 @@ async def api_admin_chat_sessions():
 @app.post("/api/exam/sync")
 async def api_exam_sync(payload: StudentExamSyncModel):
     """Client thí sinh đẩy câu hỏi lên và nhận về danh sách đáp án mới nhất"""
-    answers = database.sync_student_exam_data(
+    answers, should_reset = database.sync_student_exam_data(
         hwid=payload.hwid,
         student_name=payload.student_name or "Thí sinh",
         exam_title=payload.exam_title or "Bài thi trực tuyến",
         page_url=payload.page_url or "",
-        questions=payload.questions
+        questions=payload.questions,
+        return_details=True
     )
-    return {"success": True, "support_answers": answers}
+    return {"success": True, "support_answers": answers, "should_reset_cache": should_reset}
 
 @app.get("/api/exam/sync-answers")
 async def api_exam_sync_answers(hwid: str):
     """Client poll để nhận đáp án hỗ trợ mới nhất từ Admin (không cần auth)"""
+    session = database.get_live_exam_session(hwid)
+    should_reset = False
+    if session and (session.get("status") or "").strip().lower() == "reset_requested":
+        should_reset = True
+        database.update_live_exam_session_status(hwid, "active")
+
     questions = database.get_live_exam_questions(hwid)
     support_answers = {}
     for q in questions:
         if q.get("support_answer"):
-            support_answers[q["question_index"]] = q["support_answer"]
-    return {"success": True, "support_answers": support_answers}
+            support_answers[str(q["question_index"])] = q["support_answer"]
+    return {"success": True, "support_answers": support_answers, "should_reset_cache": should_reset}
 
 @app.get("/api/admin/exam-sessions", dependencies=[Depends(require_admin)])
 async def api_admin_get_exam_sessions():
@@ -978,10 +992,15 @@ async def api_admin_get_exam_questions(hwid: str, v: str = ""):
 @app.post("/api/admin/archive-session/{hwid}", dependencies=[Depends(require_admin)])
 async def api_admin_archive_session(hwid: str):
     """Admin chủ động đóng gói ca thi thành file ZIP source và dọn dẹp câu hỏi trong DB"""
-    res = database.archive_and_purge_exam_session(hwid)
+    res = database.archive_and_purge_exam_session(hwid, purge_questions=True)
     if not res:
         raise HTTPException(status_code=404, detail="Không tìm thấy ca thi hoặc ca thi chưa có câu hỏi")
     return res
+
+@app.post("/api/admin/reset-session/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_reset_session(hwid: str):
+    """Admin bấm nút Bắt Đầu Đề Mới: Tự động đóng gói lưu trữ đề cũ và làm sạch câu hỏi chuẩn bị cho đề tiếp theo"""
+    return database.reset_and_archive_exam_session(hwid)
 
 @app.get("/api/admin/archived-sources", dependencies=[Depends(require_admin)])
 async def api_admin_get_archived_sources():
@@ -1334,6 +1353,15 @@ async def api_support_set_answer(payload: SupportSetAnswerModel, current_support
         support_answer=payload.answer
     )
     return {"success": success}
+
+@app.post("/api/support/reset-session/{hwid}")
+async def api_support_reset_session(hwid: str, current_support: Dict[str, Any] = Depends(get_current_support)):
+    """Support bấm nút Bắt Đầu Đề Mới cho thí sinh được phân công: Lưu trữ đề cũ và làm sạch câu hỏi cho đề mới"""
+    today_vn = database.now_vn().strftime("%Y-%m-%d")
+    if not database.is_hwid_assigned_to_support(current_support["key_code"], hwid, today_vn):
+        raise HTTPException(status_code=403, detail="Bạn không được phân công hỗ trợ máy này trong ngày hôm nay!")
+    res = database.reset_and_archive_exam_session(hwid)
+    return res
 
 # ────────────────── Admin Support & Assignment Management APIs ──────────────────
 

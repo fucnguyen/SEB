@@ -838,12 +838,92 @@ def clean_exam_stem_text(t: str) -> str:
     t = re.sub(r'\s+', ' ', t)
     return t.strip()
 
-def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questions: list, page_url: str = "") -> Dict[str, str]:
+def check_is_new_exam(
+    existing: Optional[sqlite3.Row],
+    new_title: str,
+    new_page_url: str,
+    new_questions: List[Dict[str, Any]],
+    c: sqlite3.Cursor,
+    hwid: str
+) -> bool:
+    """
+    Xác định chính xác liệu thí sinh có đang chuyển sang một ĐỀ THI MỚI / LƯỢT THI MỚI hay không.
+    Điều kiện nhận diện:
+    1. Trạng thái ca thi cũ trong DB đã 'finished', 'archived' hoặc 'reset_requested'.
+    2. Tên bài thi (exam_title) thay đổi sang môn/đề khác (loại trừ các tiêu đề chung chung).
+    3. Tham số attempt/quiz/cmid/testcode trong URL thay đổi.
+    4. Khoảng cách thời gian sync > 20 phút VÀ nội dung Câu 1 (index 0) khác hoàn toàn câu cũ.
+    """
+    if not existing:
+        return False
+
+    status = (existing["status"] or "").strip().lower()
+    if status in ("finished", "archived", "reset_requested"):
+        return True
+
+    # 1. So sánh tên bài thi chuẩn hóa (bỏ qua các tên generic)
+    old_title = (existing["exam_title"] or "").strip().lower()
+    norm_new = (new_title or "").strip().lower()
+    generic_titles = {
+        "", "bài thi trực tuyến", "bai thi truc tuyen", "kiểm tra", "kiem tra",
+        "exam", "test", "thi", "online exam", "fpt exam", "moodle", "quiz", "unknown"
+    }
+    if norm_new and old_title and norm_new != old_title:
+        if norm_new not in generic_titles and old_title not in generic_titles:
+            return True
+
+    # 2. Kiểm tra tham số attempt / quiz / cmid / testcode trong URL
+    old_url = (existing["page_url"] or "").strip().lower()
+    new_url = (new_page_url or "").strip().lower()
+    if old_url and new_url and old_url != new_url:
+        import re
+        pat = r'(?:attempt|quiz|cmid|examid|paperid|testcode|id)=(\d+|[a-zA-Z0-9_\-]+)'
+        m_old = re.search(pat, old_url)
+        m_new = re.search(pat, new_url)
+        if m_old and m_new and m_old.group(0) != m_new.group(0):
+            return True
+
+    # 3. Kiểm tra khoảng cách thời gian sync (> 20 phút) + Câu 1 (index 0) đổi nội dung
+    last_sync = existing["last_sync"]
+    if last_sync and new_questions:
+        try:
+            from datetime import datetime
+            t_last = datetime.strptime(last_sync, "%Y-%m-%d %H:%M:%S")
+            diff_mins = (now_vn() - t_last).total_seconds() / 60.0
+            if diff_mins > 20.0:
+                q0_new = None
+                for q in new_questions:
+                    idx = int(q.get("question_index") if q.get("question_index") is not None else q.get("index", 0))
+                    if idx == 0:
+                        q0_new = (q.get("question_text") or "").strip().lower()
+                        break
+                if q0_new and len(q0_new) > 10:
+                    c.execute("SELECT question_text FROM live_exam_questions WHERE hwid = ? AND question_index = 0", (hwid,))
+                    row0 = c.fetchone()
+                    if row0 and row0["question_text"]:
+                        q0_old = row0["question_text"].strip().lower()
+                        if q0_new[:60] != q0_old[:60]:
+                            return True
+        except Exception:
+            pass
+
+    return False
+
+
+def sync_student_exam_data(
+    hwid: str,
+    student_name: str,
+    exam_title: str,
+    questions: list,
+    page_url: str = "",
+    return_details: bool = False
+) -> Any:
     """
     Nhận toàn bộ danh sách câu hỏi từ thí sinh, lưu vào DB, trả về dict đáp án Support đã chọn.
-    Mỗi question object từ client có:
-      question_index, question_text, question_type, options (list of {label,text,image_base64}),
-      image_base64 (stem), current_answer
+    Tự động phát hiện khi thí sinh sang ĐỀ MỚI:
+      - Đóng gói ZIP lưu trữ đề cũ vào data/exam_archives
+      - XÓA SẠCH câu hỏi cũ trong DB để không bị dồn ghép câu hỏi
+      - Khởi tạo ca thi mới tinh khôi
     """
     import json
     now  = now_vn().strftime("%Y-%m-%d %H:%M:%S")
@@ -880,42 +960,61 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
         c.execute("SELECT question_index, support_answer FROM live_exam_questions WHERE hwid = ? AND support_answer != ''", (hwid,))
         answers = {str(r["question_index"]): r["support_answer"] for r in c.fetchall()}
         conn.close()
+        if return_details:
+            return answers, False
         return answers
 
     questions_to_sync = valid_questions if valid_questions else questions
 
-    # 1. Upsert session
-    try:
-        c.execute("SELECT id, status, page_url, total_questions, created_at FROM live_exam_sessions WHERE hwid = ?", (hwid,))
-        existing = c.fetchone()
-        if existing:
-            eff_url = (page_url or "").strip()[:500]
-            if is_lobby_url and existing["page_url"] and not existing["page_url"].lower().endswith("/exam/index"):
-                eff_url = existing["page_url"]
+    # 1. Kiểm tra session hiện có và xác định xem có phải ĐỀ MỚI không
+    c.execute("SELECT id, status, exam_title, page_url, total_questions, created_at, last_sync FROM live_exam_sessions WHERE hwid = ?", (hwid,))
+    existing = c.fetchone()
 
-            new_total = max(existing["total_questions"] or 0, len(questions_to_sync))
+    is_new = check_is_new_exam(existing, exam_title, page_url, questions_to_sync, c, hwid)
+    should_reset_cache = is_new or (existing and (existing["status"] or "").strip().lower() == "reset_requested")
+
+    eff_url = (page_url or "").strip()[:500]
+
+    if is_new:
+        # Nếu là đề mới và DB còn dữ liệu cũ -> Tự động đóng gói ZIP lưu trữ đề cũ trước
+        if has_existing_questions and existing:
+            try:
+                archive_and_purge_exam_session(hwid, purge_questions=True, conn_override=conn)
+            except Exception:
+                pass
+
+        # XÓA SẠCH toàn bộ câu hỏi cũ trong DB để không bị dồn câu hỏi của đề cũ vào đề mới
+        c.execute("DELETE FROM live_exam_questions WHERE hwid = ?", (hwid,))
+
+        # Khởi tạo session mới tinh khôi
+        if existing:
             c.execute("""
                 UPDATE live_exam_sessions
-                SET student_name = ?, exam_title = ?, page_url = ?, total_questions = ?, last_sync = ?, status = 'active',
-                    created_at = CASE WHEN status = 'archived' THEN ? ELSE created_at END
+                SET student_name = ?, exam_title = ?, page_url = ?, total_questions = ?, last_sync = ?, status = 'active', created_at = ?
                 WHERE hwid = ?
-            """, (student_name.strip(), exam_title.strip(), eff_url, new_total, now, now, hwid))
+            """, (student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now, hwid))
         else:
             c.execute("""
                 INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
                 VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
-            """, (hwid, student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions_to_sync), now, now))
-    except sqlite3.OperationalError:
-        try:
-            c.execute("ALTER TABLE live_exam_sessions ADD COLUMN page_url TEXT DEFAULT ''")
-        except Exception:
-            pass
-        c.execute("""
-            INSERT OR REPLACE INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
-            VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
-        """, (hwid, student_name.strip(), exam_title.strip(), (page_url or "").strip()[:500], len(questions_to_sync), now, now))
+            """, (hwid, student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now))
+    else:
+        # Cùng một đề thi (đang chuyển trang phân trang hoặc gửi cập nhật)
+        if existing:
+            if is_lobby_url and existing["page_url"] and not existing["page_url"].lower().endswith("/exam/index"):
+                eff_url = existing["page_url"]
+            c.execute("""
+                UPDATE live_exam_sessions
+                SET student_name = ?, exam_title = ?, page_url = ?, last_sync = ?, status = 'active'
+                WHERE hwid = ?
+            """, (student_name.strip(), exam_title.strip(), eff_url, now, hwid))
+        else:
+            c.execute("""
+                INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+            """, (hwid, student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now))
 
-    # 2. Upsert each question
+    # 2. Upsert từng câu hỏi
     for q in questions_to_sync:
         q_idx   = int(q.get("question_index") if q.get("question_index") is not None else q.get("index", 0))
         q_text  = clean_exam_stem_text(q.get("question_text") or "")[:1500]
@@ -997,13 +1096,13 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
                 VALUES (?, ?, ?, ?, ?, ?, ?, '', ?)
             """, (hwid, q_idx, q_text, q_type, imgs_json, opts_json, cur_ans, now))
 
-    # Update cumulative total question count
+    # Cập nhật chính xác số lượng câu hỏi hiện có trong DB cho ca thi này
     c.execute("SELECT COUNT(*) as cnt FROM live_exam_questions WHERE hwid = ?", (hwid,))
     cnt_row = c.fetchone()
     if cnt_row:
         c.execute("UPDATE live_exam_sessions SET total_questions = ? WHERE hwid = ?", (cnt_row["cnt"], hwid))
 
-    # 3. Return support answers already set for this student
+    # 3. Trả về đáp án support đã set cho thí sinh này
     c.execute("""
         SELECT question_index, support_answer
         FROM live_exam_questions
@@ -1013,6 +1112,9 @@ def sync_student_exam_data(hwid: str, student_name: str, exam_title: str, questi
 
     conn.commit()
     conn.close()
+
+    if return_details:
+        return answers, should_reset_cache
     return answers
 
 
@@ -1096,21 +1198,26 @@ def get_exam_questions_version(hwid: str) -> str:
     return f"{row['cnt']}_{row['last_mod']}"
 
 
-def archive_and_purge_exam_session(hwid: str) -> Optional[Dict[str, Any]]:
+def archive_and_purge_exam_session(hwid: str, purge_questions: bool = False, conn_override: sqlite3.Connection = None) -> Optional[Dict[str, Any]]:
     """
-    Đóng gói toàn bộ đề thi, ảnh và đáp án thành file ZIP chuẩn làm source đề,
-    sau đó xóa sạch dữ liệu câu hỏi tạm trong DB để giải phóng dung lượng & RAM máy chủ.
+    Đóng gói toàn bộ đề thi, ảnh và đáp án thành file ZIP chuẩn làm source đề.
+    Nếu purge_questions=True: xóa sạch câu hỏi trong live_exam_questions để giải phóng hoàn toàn và sẵn sàng cho đề mới.
     """
     import os, json, zipfile, base64, re
     hwid = hwid.strip()
-    conn = get_connection()
+    should_close = False
+    if conn_override:
+        conn = conn_override
+    else:
+        conn = get_connection()
+        should_close = True
     c = conn.cursor()
 
     # 1. Lấy thông tin session
     c.execute("SELECT * FROM live_exam_sessions WHERE hwid = ?", (hwid,))
     s_row = c.fetchone()
     if not s_row:
-        conn.close()
+        if should_close: conn.close()
         return None
     session = dict(s_row)
 
@@ -1119,7 +1226,7 @@ def archive_and_purge_exam_session(hwid: str) -> Optional[Dict[str, Any]]:
     if not questions:
         c.execute("UPDATE live_exam_sessions SET status = 'archived' WHERE hwid = ?", (hwid,))
         conn.commit()
-        conn.close()
+        if should_close: conn.close()
         return None
 
     # 3. Tạo file ZIP lưu trữ source
@@ -1220,10 +1327,16 @@ def archive_and_purge_exam_session(hwid: str) -> Optional[Dict[str, Any]]:
     except Exception:
         pass
 
-    # 5. Cập nhật trạng thái session sang archived nhưng GIỮ NGUYÊN câu hỏi để Admin luôn xem lại được
-    c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = ? WHERE hwid = ?", (len(questions), hwid))
+    # 5. Cập nhật trạng thái session
+    if purge_questions:
+        c.execute("DELETE FROM live_exam_questions WHERE hwid = ?", (hwid,))
+        c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = 0 WHERE hwid = ?", (hwid,))
+    else:
+        c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = ? WHERE hwid = ?", (len(questions), hwid))
+
     conn.commit()
-    conn.close()
+    if should_close:
+        conn.close()
 
     return {
         "success": True,
@@ -1233,6 +1346,51 @@ def archive_and_purge_exam_session(hwid: str) -> Optional[Dict[str, Any]]:
         "size_bytes": file_size,
         "total_questions": len(questions)
     }
+
+
+def reset_and_archive_exam_session(hwid: str) -> Dict[str, Any]:
+    """
+    Chủ động lưu trữ ca thi cũ thành ZIP và xóa sạch live_exam_questions để thí sinh nạp đề mới hoàn toàn.
+    Được gọi khi Admin hoặc Support bấm nút 'Bắt Đầu Đề Mới'.
+    """
+    hwid = hwid.strip()
+    archive_res = archive_and_purge_exam_session(hwid, purge_questions=True)
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM live_exam_questions WHERE hwid = ?", (hwid,))
+    c.execute("""
+        UPDATE live_exam_sessions
+        SET total_questions = 0, status = 'reset_requested', last_sync = ?
+        WHERE hwid = ?
+    """, (now_vn().strftime("%Y-%m-%d %H:%M:%S"), hwid))
+    conn.commit()
+    conn.close()
+    return {
+        "success": True,
+        "message": "Đã lưu trữ đề cũ và làm sạch dữ liệu thành công! Đề thi tiếp theo sẽ nạp mới 100%.",
+        "archive": archive_res
+    }
+
+
+def get_live_exam_session(hwid: str) -> Optional[Dict[str, Any]]:
+    """Lấy thông tin session hiện tại của 1 máy theo HWID."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM live_exam_sessions WHERE hwid = ?", (hwid.strip(),))
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_live_exam_session_status(hwid: str, status: str) -> bool:
+    """Cập nhật trạng thái session (e.g. active, finished, archived, reset_requested)."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE live_exam_sessions SET status = ? WHERE hwid = ?", (status.strip(), hwid.strip()))
+    affected = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
 
 
 def auto_archive_expired_sessions(max_age_hours: float = 2.0) -> int:
