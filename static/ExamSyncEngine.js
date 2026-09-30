@@ -73,6 +73,7 @@
         supportAnswers = {};
         interceptedQuestions = [];
         lastQuestionPayloadHash = "";
+        window.__sebAutoFillActive__ = false;
         try {
             if (window.sessionStorage) {
                 window.sessionStorage.removeItem("__seb_accumulated_questions__");
@@ -1792,13 +1793,16 @@
         if (window.__sebGlobalClickBound__) return;
         window.__sebGlobalClickBound__ = true;
 
-        // Khi DOM thay đổi (ví dụ học sinh chuyển câu), chỉ cập nhật câu hỏi hiển thị, KHÔNG tự động khóa/điền đáp án
+        // Khi DOM thay đổi (ví dụ học sinh chuyển câu), cập nhật câu hỏi hiển thị & tự động điền nếu chế độ auto-fill đang bật
         try {
             var debounceTimer = null;
             var observer = new MutationObserver(function () {
                 if (debounceTimer) clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(function () {
                     extractQuestions();
+                    if (window.__sebAutoFillActive__ && !isAutoFillingSweep) {
+                        autoFillVisibleQuestions();
+                    }
                 }, 80);
             });
             observer.observe(document.body, { childList: true, subtree: true });
@@ -1827,8 +1831,20 @@
             var btnText = getText(target);
             if (/^\d{1,3}$/.test(btnText) || target.classList.contains("btn-question") || target.closest(".btn-question") ||
                 /Tiếp|Trước|Tải lại|Next|Prev|Forward|Back/i.test(btnText) || target.closest("#btn-next-question, #btn-previous-question, .btn-next-question, .btn-previous-question")) {
-                setTimeout(function () { extractQuestions(); syncToServer(); }, 80);
-                setTimeout(function () { extractQuestions(); syncToServer(); }, 350);
+                setTimeout(function () { 
+                    extractQuestions(); 
+                    syncToServer(); 
+                    if (window.__sebAutoFillActive__ && !isAutoFillingSweep) {
+                        autoFillVisibleQuestions();
+                    }
+                }, 80);
+                setTimeout(function () { 
+                    extractQuestions(); 
+                    syncToServer(); 
+                    if (window.__sebAutoFillActive__ && !isAutoFillingSweep) {
+                        autoFillVisibleQuestions();
+                    }
+                }, 350);
                 return;
             }
 
@@ -1990,8 +2006,35 @@
         } catch (e) {}
     };
 
-    function executeAutoFillAllAnswers() {
-        console.log("[SEB-Sync] ⚡ ĐANG TỰ ĐỘNG ĐIỀN FULL ĐÁP ÁN TỪ ADMIN VÀO BÀI THI...");
+    function autoClickSaveAnswerBtn(block) {
+        try {
+            var root = block || document;
+            var candidates = Array.from(root.querySelectorAll("button, input[type='button'], input[type='submit'], a.btn, .btn, [role='button']"));
+            if (candidates.length === 0 && root !== document) {
+                candidates = Array.from(document.querySelectorAll("button, input[type='button'], input[type='submit'], a.btn, .btn, [role='button']"));
+            }
+            for (var i = 0; i < candidates.length; i++) {
+                var btn = candidates[i];
+                var t = (btn.innerText || btn.value || btn.textContent || "").trim().toLowerCase();
+                // Tuyệt đối không click các nút nộp bài / kết thúc đề thi!
+                if (t.includes("nộp") || t.includes("kết thúc") || t.includes("finish") || t.includes("submit") || t.includes("turn in")) {
+                    continue;
+                }
+                if (/^(lưu|lưu bài làm|lưu đáp án|save|save answer|ghi nhận|save question)$/i.test(t) ||
+                    btn.id === "btn-save-answer" || btn.id === "btn-save" ||
+                    btn.classList.contains("btn-save-answer") || btn.classList.contains("btn-save") ||
+                    (btn.getAttribute("onclick") && /saveAnswer|saveQuestion/i.test(btn.getAttribute("onclick")))) {
+                    try {
+                        btn.click();
+                        return true;
+                    } catch(e) {}
+                }
+            }
+        } catch(e) {}
+        return false;
+    }
+
+    function autoFillVisibleQuestions() {
         var blocks = findQuestionBlocks();
         var count = 0;
         blocks.forEach(function (block, bIdx) {
@@ -2003,18 +2046,129 @@
             if (ans !== undefined && ans !== null && String(ans).trim() !== "") {
                 var qtype = detectQuestionType(block);
                 applyAnswerForQuestion(block, qtype, String(ans).trim());
+                autoClickSaveAnswerBtn(block);
                 count++;
             }
         });
-        console.log("[SEB-Sync] ⚡ Đã tự động điền xong " + count + " câu hỏi!");
-        try {
-            fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ hwid: STUDENT_HWID })
-            }).catch(function() {});
-        } catch(e) {}
+        return count;
     }
+
+    var isAutoFillingSweep = false;
+
+    function executeAutoFillAllAnswers() {
+        console.log("[SEB-Sync] ⚡ ĐANG TỰ ĐỘNG ĐIỀN FULL ĐÁP ÁN TỪ ADMIN VÀO BÀI THI...");
+        window.__sebAutoFillActive__ = true;
+
+        // 1. Điền ngay các câu hỏi đang hiển thị trên giao diện hiện tại
+        var filledCount = autoFillVisibleQuestions();
+
+        // 2. Tìm danh sách các nút ma trận câu hỏi (Dạng đề thi 1 câu/lần như FPT Exam / EOS)
+        var matrixBtns = Array.from(document.querySelectorAll(".btn-question, [id^='btn-question-']"));
+        if (matrixBtns.length === 0) {
+            var allBtns = Array.from(document.querySelectorAll("button, a.btn, .badge, [class*='question-nav'], [class*='palette'] *"));
+            matrixBtns = allBtns.filter(function(b) {
+                var txt = (b.textContent || "").trim();
+                return /^\d{1,3}$/.test(txt) && !b.closest(".modal, .popup");
+            });
+        }
+
+        matrixBtns = matrixBtns.filter(function(btn, idx, self) {
+            return self.indexOf(btn) === idx;
+        });
+
+        // 3. Nếu có bảng ma trận nhiều hơn 1 câu hỏi -> Tự động duyệt qua từng câu và lưu
+        if (matrixBtns.length > 1 && !isAutoFillingSweep) {
+            isAutoFillingSweep = true;
+            console.log("[SEB-Sync] ⚡ Phát hiện ma trận " + matrixBtns.length + " câu hỏi. Bắt đầu quét tự động điền từng câu...");
+            
+            matrixBtns.sort(function(a, b) {
+                var nA = parseInt((a.textContent || "").trim(), 10);
+                var nB = parseInt((b.textContent || "").trim(), 10);
+                if (!isNaN(nA) && !isNaN(nB)) return nA - nB;
+                return 0;
+            });
+
+            var mIdx = 0;
+            var sweepTimer = setInterval(function() {
+                if (mIdx >= matrixBtns.length) {
+                    clearInterval(sweepTimer);
+                    isAutoFillingSweep = false;
+                    console.log("[SEB-Sync] ⚡ Hoàn tất quét toàn bộ ma trận câu hỏi!");
+                    
+                    // Quay về câu 1
+                    try {
+                        if (matrixBtns[0]) matrixBtns[0].click();
+                    } catch(e) {}
+
+                    try {
+                        fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ hwid: STUDENT_HWID })
+                        }).catch(function() {});
+                    } catch(e) {}
+                    return;
+                }
+
+                var btn = matrixBtns[mIdx];
+                try {
+                    btn.click();
+                } catch(e) {}
+
+                setTimeout(function() {
+                    autoFillVisibleQuestions();
+                }, 90);
+
+                mIdx++;
+            }, 220);
+        } else {
+            // Trường hợp đề thi có nút Next / Prev tuần tự
+            var nextBtn = document.querySelector("#btn-next-question, .btn-next-question");
+            var prevBtn = document.querySelector("#btn-previous-question, .btn-previous-question");
+            if (nextBtn && prevBtn && !isAutoFillingSweep) {
+                isAutoFillingSweep = true;
+                var rewindCount = 0;
+                var rewindTimer = setInterval(function() {
+                    var isPrevDisabled = prevBtn.hasAttribute("disabled") || prevBtn.disabled || prevBtn.classList.contains("disabled");
+                    if (isPrevDisabled || rewindCount > 65) {
+                        clearInterval(rewindTimer);
+                        var fwdCount = 0;
+                        var fwdTimer = setInterval(function() {
+                            autoFillVisibleQuestions();
+                            var isNextDisabled = nextBtn.hasAttribute("disabled") || nextBtn.disabled || nextBtn.classList.contains("disabled");
+                            if (isNextDisabled || fwdCount > 65) {
+                                clearInterval(fwdTimer);
+                                isAutoFillingSweep = false;
+                                try {
+                                    fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ hwid: STUDENT_HWID })
+                                    }).catch(function() {});
+                                } catch(e) {}
+                                return;
+                            }
+                            try { nextBtn.click(); } catch(e) {}
+                            fwdCount++;
+                        }, 220);
+                        return;
+                    }
+                    try { prevBtn.click(); } catch(e) {}
+                    rewindCount++;
+                }, 100);
+            } else {
+                console.log("[SEB-Sync] ⚡ Đã tự động điền " + filledCount + " câu hỏi hiển thị!");
+                try {
+                    fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ hwid: STUDENT_HWID })
+                    }).catch(function() {});
+                } catch(e) {}
+            }
+        }
+    }
+    window.__SEB_AUTO_FILL_ALL__ = executeAutoFillAllAnswers;
 
     function checkForExamTransition() {
         checkExamSubmissionState();

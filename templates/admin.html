@@ -809,6 +809,12 @@
                             <i class="fa-solid fa-bolt text-sm"></i>
                             <span>⚡ ĐIỀN FULL ĐÁP ÁN</span>
                         </button>
+                        <div class="flex items-center justify-center pt-1">
+                            <label class="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 font-semibold select-none hover:text-emerald-400 transition">
+                                <input type="checkbox" id="admin-auto-trigger-on-full" onchange="toggleAdminAutoTriggerOnFull(this.checked)" class="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer">
+                                <span>Tự động điền khi đủ 100%</span>
+                            </label>
+                        </div>
                         <p class="text-[10px] text-slate-400 text-center leading-relaxed">
                             Sau khi Support chọn hết đáp án, bấm nút này để <strong class="text-emerald-400">máy thí sinh tự động tick chọn toàn bộ</strong> bài thi!
                         </p>
@@ -1585,6 +1591,9 @@
             loadAccessLogs();
             loadSettings();
             loadSupportMgmtData();
+            const savedAdminAuto = localStorage.getItem("seb_admin_auto_trigger_full") === "1";
+            const adminCb = document.getElementById("admin-auto-trigger-on-full");
+            if (adminCb) adminCb.checked = savedAdminAuto;
             setInterval(loadDashboardStats, 5000);
         });
 
@@ -5201,6 +5210,18 @@
             const badgeAutoFill = document.getElementById("viper-answered-count-badge");
             if (badgeAutoFill) badgeAutoFill.innerText = `${answeredCount} / ${total} câu`;
 
+            const btnAutoFill = document.getElementById("btn-trigger-autofill");
+            if (btnAutoFill) {
+                if (total > 0 && answeredCount === total) {
+                    btnAutoFill.innerHTML = `<i class="fa-solid fa-bolt text-sm"></i> <span>⚡ ĐIỀN FULL (100% HOÀN TẤT!)</span>`;
+                    btnAutoFill.classList.add("ring-4", "ring-emerald-400", "animate-pulse");
+                } else {
+                    btnAutoFill.innerHTML = `<i class="fa-solid fa-bolt text-sm"></i> <span>⚡ ĐIỀN FULL (${answeredCount}/${total} CÂU)</span>`;
+                    btnAutoFill.classList.remove("ring-4", "ring-emerald-400", "animate-pulse");
+                }
+            }
+            checkAutoTriggerAdmin();
+
             // Big Answer Buttons Pad
             const pad = document.getElementById("viper-answer-buttons-pad");
             if (pad && q) {
@@ -5218,7 +5239,7 @@
                     const cls = isActive
                         ? "h-14 rounded-2xl font-black text-xl bg-emerald-500 border-2 border-emerald-400 text-white shadow-xl shadow-emerald-500/50 scale-105 transition-all cursor-pointer"
                         : "h-14 rounded-2xl font-black text-xl bg-slate-800 border-2 border-slate-700 text-slate-300 hover:bg-emerald-600/20 hover:border-emerald-500 hover:text-emerald-400 transition-all active:scale-95 cursor-pointer";
-                    padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cls}">[${lbl}]</button>`;
+                    padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}')" class="${cls}">[${lbl}]</button>`;
                 }
                 if (chosenAns) {
                     padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="col-span-4 py-2 bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 rounded-xl text-xs border border-slate-700 transition cursor-pointer" title="Xóa đáp án đã chọn">✕ Bỏ chọn</button>`;
@@ -5256,23 +5277,47 @@
             }
         }
 
+        let hasAutoTriggeredAdminForSession = false;
+
+        function toggleAdminAutoTriggerOnFull(checked) {
+            localStorage.setItem("seb_admin_auto_trigger_full", checked ? "1" : "0");
+            if (checked) {
+                showToast("Đã bật chế độ: Tự động điền máy thí sinh khi chọn đủ 100% đáp án");
+                checkAutoTriggerAdmin();
+            } else {
+                showToast("Đã tắt chế độ tự động điền khi đủ 100%");
+            }
+        }
+
+        function checkAutoTriggerAdmin() {
+            const isAuto = localStorage.getItem("seb_admin_auto_trigger_full") === "1";
+            if (!isAuto || hasAutoTriggeredAdminForSession || !currentExamHWID) return;
+            if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) return;
+            const answeredCount = cachedCurrentQuestions.filter(q => q.support_answer && q.support_answer.trim()).length;
+            if (answeredCount === cachedCurrentQuestions.length && cachedCurrentQuestions.length > 0) {
+                triggerAutoFillAllAnswers(true);
+            }
+        }
+
         // TỰ ĐỘNG ĐIỀN FULL ĐÁP ÁN VÀO MÁY THÍ SINH
-        async function triggerAutoFillAllAnswers() {
+        async function triggerAutoFillAllAnswers(isSilent = false) {
             if (!currentExamHWID) {
-                alert("Vui lòng chọn một ca thi của thí sinh ở cột bên trái trước!");
+                if (!isSilent) alert("Vui lòng chọn một ca thi của thí sinh ở cột bên trái trước!");
                 return;
             }
             if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) {
-                alert("Chưa có danh sách câu hỏi nào!");
+                if (!isSilent) alert("Chưa có danh sách câu hỏi nào!");
                 return;
             }
-            const answeredCount = cachedCurrentQuestions.filter(q => q.support_answer).length;
+            const answeredCount = cachedCurrentQuestions.filter(q => q.support_answer && q.support_answer.trim()).length;
             if (answeredCount === 0) {
-                alert("Chưa có câu hỏi nào được chọn đáp án hỗ trợ! Vui lòng chọn đáp án trước khi bấm điền full.");
+                if (!isSilent) alert("Chưa có câu hỏi nào được chọn đáp án hỗ trợ! Vui lòng chọn đáp án trước khi bấm điền full.");
                 return;
             }
-            if (!confirm(`Bạn có chắc chắn muốn máy thí sinh TỰ ĐỘNG ĐIỀN ${answeredCount} câu hỏi đã có đáp án hỗ trợ vào bài thi không?`)) {
-                return;
+            if (!isSilent) {
+                if (!confirm(`Bạn có chắc chắn muốn máy thí sinh TỰ ĐỘNG ĐIỀN ${answeredCount} câu hỏi đã có đáp án hỗ trợ vào bài thi không?`)) {
+                    return;
+                }
             }
 
             const btn = document.getElementById("btn-trigger-autofill");
@@ -5285,12 +5330,16 @@
                 const res = await fetch(`/api/admin/trigger-auto-fill/${encodeURIComponent(currentExamHWID)}`, { method: "POST" });
                 const data = await res.json();
                 if (data.success) {
-                    alert(`⚡ ĐÃ GỬI LỆNH THÀNH CÔNG!\n\nMáy thí sinh sẽ tự động tick chọn toàn bộ ${answeredCount} câu hỏi đã có đáp án trong 1-2 giây tới!`);
+                    hasAutoTriggeredAdminForSession = true;
+                    showToast(`⚡ ĐÃ GỬI LỆNH TỰ ĐỘNG ĐIỀN ${answeredCount} CÂU THÀNH CÔNG!`);
+                    if (!isSilent) {
+                        alert(`⚡ ĐÃ GỬI LỆNH THÀNH CÔNG!\n\nMáy thí sinh sẽ tự động tick chọn toàn bộ ${answeredCount} câu hỏi đã có đáp án trong 1-2 giây tới!`);
+                    }
                 } else {
-                    alert("Không thể gửi lệnh: " + (data.detail || "Lỗi không xác định"));
+                    if (!isSilent) alert("Không thể gửi lệnh: " + (data.detail || "Lỗi không xác định"));
                 }
             } catch (err) {
-                alert("Lỗi kết nối tới máy chủ khi gửi lệnh!");
+                if (!isSilent) alert("Lỗi kết nối tới máy chủ khi gửi lệnh!");
             } finally {
                 if (btn) {
                     btn.disabled = false;

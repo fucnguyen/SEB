@@ -201,14 +201,17 @@
                 </div>
 
                 <!-- Action Controls -->
-                <div class="flex items-center gap-2">
-                    <button id="btn-copy-answers" onclick="copyFormattedAnswers()" class="hidden px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold items-center gap-1.5 transition border border-slate-700">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button id="btn-support-autofill" onclick="triggerSupportAutoFill()" class="hidden px-3.5 py-1.5 bg-gradient-to-r from-amber-500 via-emerald-500 to-teal-500 hover:from-amber-400 hover:to-teal-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-lg shadow-emerald-500/25 transition active:scale-95 cursor-pointer">
+                        <i class="fa-solid fa-bolt text-xs"></i> <span id="support-autofill-btn-text">⚡ Điền Full Đáp Án</span>
+                    </button>
+                    <button id="btn-copy-answers" onclick="copyFormattedAnswers()" class="hidden px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold items-center gap-1.5 transition border border-slate-700 cursor-pointer">
                         <i class="fa-regular fa-copy"></i> Copy Đáp Án
                     </button>
-                    <button id="btn-reset-exam" onclick="triggerSupportResetSession()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Lưu trữ đề cũ vào kho ZIP và xóa trắng câu hỏi để sẵn sàng cho thí sinh làm ĐỀ MỚI TINH KHÔI">
+                    <button id="btn-reset-exam" onclick="triggerSupportResetSession()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20 cursor-pointer" title="Lưu trữ đề cũ vào kho ZIP và xóa trắng câu hỏi để sẵn sàng cho thí sinh làm ĐỀ MỚI TINH KHÔI">
                         <i class="fa-solid fa-arrows-rotate"></i> Bắt Đầu Đề Mới (Reset)
                     </button>
-                    <button onclick="loadCurrentQuestions(true)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-purple-600/20">
+                    <button onclick="loadCurrentQuestions(true)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-purple-600/20 cursor-pointer">
                         <i class="fa-solid fa-arrows-rotate"></i> Làm Mới Đề
                     </button>
                 </div>
@@ -216,13 +219,19 @@
 
             <!-- Matrix Jump Grid & Progress Bar -->
             <div id="exam-matrix-card" class="hidden glass-card rounded-2xl p-3 border border-slate-800 shadow-md space-y-2">
-                <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center justify-between text-xs flex-wrap gap-2">
                     <span class="font-semibold text-slate-300 flex items-center gap-1.5">
                         <i class="fa-solid fa-table-cells text-purple-400"></i> Ma trận câu hỏi:
                     </span>
-                    <span class="text-slate-400 font-mono text-[11px]">
-                        Tiến độ: <strong id="matrix-progress-text" class="text-emerald-400 font-bold">0/0</strong> câu đã giải
-                    </span>
+                    <div class="flex items-center gap-3">
+                        <label class="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 font-semibold select-none hover:text-emerald-400 transition">
+                            <input type="checkbox" id="support-auto-fill-on-full" onchange="toggleSupportAutoTriggerOnFull(this.checked)" class="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer">
+                            <span>Tự động điền khi đủ 100%</span>
+                        </label>
+                        <span class="text-slate-400 font-mono text-[11px]">
+                            Tiến độ: <strong id="matrix-progress-text" class="text-emerald-400 font-bold">0/0</strong> câu đã giải
+                        </span>
+                    </div>
                 </div>
                 <div id="matrix-grid" class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1 bg-slate-900/60 rounded-xl border border-slate-800/80"></div>
             </div>
@@ -292,6 +301,9 @@
                 document.getElementById("support-user-name").innerHTML = `<i class="fa-solid fa-user-circle text-purple-400"></i> ${escapeHtml(currentSupportMe.assigned_name)}`;
                 document.getElementById("support-key-badge").innerText = currentSupportMe.key_code;
                 document.getElementById("current-date-badge").innerText = currentSupportMe.today;
+                const savedAuto = localStorage.getItem("seb_support_auto_trigger_full") === "1";
+                const cb = document.getElementById("support-auto-fill-on-full");
+                if (cb) cb.checked = savedAuto;
 
                 // 2. Load assigned exams for today
                 await loadAssignedExams();
@@ -396,6 +408,7 @@
 
         function selectStudent(hwid) {
             currentSelectedHWID = hwid;
+            hasAutoTriggeredSupportForSession = false;
             renderStudentList(allAssignedSessions);
             const item = allAssignedSessions.find(s => s.hwid === hwid);
             if (item) updateActiveBanner(item);
@@ -539,6 +552,21 @@
             });
 
             prog.innerText = `${solvedCount}/${questions.length}`;
+
+            // Nút Điền Full Đáp Án
+            const autofillBtn = document.getElementById("btn-support-autofill");
+            const autofillText = document.getElementById("support-autofill-btn-text");
+            if (autofillBtn) {
+                autofillBtn.classList.remove("hidden");
+                if (questions.length > 0 && solvedCount === questions.length) {
+                    if (autofillText) autofillText.innerText = `⚡ Điền Full (100% ĐÃ XONG!)`;
+                    autofillBtn.classList.add("animate-pulse", "scale-105");
+                } else {
+                    if (autofillText) autofillText.innerText = `⚡ Điền Full (${solvedCount}/${questions.length})`;
+                    autofillBtn.classList.remove("animate-pulse", "scale-105");
+                }
+            }
+            checkAutoTriggerSupport();
         }
 
         function renderQuestions(questions) {
@@ -753,6 +781,75 @@
                 return;
             }
             setSupportAnswer(questionIndex, val);
+        }
+
+        let hasAutoTriggeredSupportForSession = false;
+
+        function toggleSupportAutoTriggerOnFull(checked) {
+            localStorage.setItem("seb_support_auto_trigger_full", checked ? "1" : "0");
+            if (checked) {
+                showToast("Đã bật: Tự động điền máy thí sinh khi chọn đủ 100% đáp án");
+                checkAutoTriggerSupport();
+            } else {
+                showToast("Đã tắt chế độ tự động điền khi đủ 100%");
+            }
+        }
+
+        async function triggerSupportAutoFill(isSilent = false) {
+            if (!currentSelectedHWID) {
+                if (!isSilent) alert("Vui lòng chọn một thí sinh trước!");
+                return;
+            }
+            if (!cachedQuestions || cachedQuestions.length === 0) {
+                if (!isSilent) alert("Chưa có danh sách câu hỏi nào!");
+                return;
+            }
+            const answeredCount = cachedQuestions.filter(q => q.support_answer && q.support_answer.trim()).length;
+            if (answeredCount === 0) {
+                if (!isSilent) alert("Chưa có câu hỏi nào được chọn đáp án hỗ trợ!");
+                return;
+            }
+
+            if (!isSilent) {
+                if (!confirm(`Bạn có chắc chắn muốn máy thí sinh TỰ ĐỘNG ĐIỀN ${answeredCount} câu hỏi đã có đáp án hỗ trợ vào bài thi không?`)) {
+                    return;
+                }
+            }
+
+            const btn = document.getElementById("btn-support-autofill");
+            const btnText = document.getElementById("support-autofill-btn-text");
+            if (btn) {
+                btn.disabled = true;
+                if (btnText) btnText.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang gửi lệnh...`;
+            }
+
+            try {
+                const res = await fetch(`/api/support/trigger-auto-fill/${encodeURIComponent(currentSelectedHWID)}`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`⚡ ĐÃ GỬI LỆNH ĐIỀN FULL ĐÁP ÁN THÀNH CÔNG!`);
+                    hasAutoTriggeredSupportForSession = true;
+                } else {
+                    if (!isSilent) alert("Lỗi: " + (data.message || data.detail || "Không thể gửi lệnh"));
+                }
+            } catch (err) {
+                if (!isSilent) alert("Lỗi kết nối tới máy chủ khi gửi lệnh!");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    if (btnText) btnText.innerText = `⚡ Điền Full Đáp Án (${answeredCount}/${cachedQuestions.length})`;
+                }
+            }
+        }
+
+        function checkAutoTriggerSupport() {
+            const isAutoEnabled = localStorage.getItem("seb_support_auto_trigger_full") === "1";
+            if (!isAutoEnabled || hasAutoTriggeredSupportForSession || !currentSelectedHWID) return;
+            if (!cachedQuestions || cachedQuestions.length === 0) return;
+            const answeredCount = cachedQuestions.filter(q => q.support_answer && q.support_answer.trim()).length;
+            if (answeredCount === cachedQuestions.length && cachedQuestions.length > 0) {
+                triggerSupportAutoFill(true);
+            }
         }
 
         async function pollLiveStatus() {

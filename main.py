@@ -1451,6 +1451,15 @@ async def api_support_reset_session(hwid: str, current_support: Dict[str, Any] =
     res = database.reset_and_archive_exam_session(hwid)
     return res
 
+@app.post("/api/support/trigger-auto-fill/{hwid}")
+async def api_support_trigger_auto_fill(hwid: str, current_support: Dict[str, Any] = Depends(get_current_support)):
+    """Support kích hoạt lệnh máy thí sinh tự động điền toàn bộ đáp án hỗ trợ vào bài thi"""
+    today_vn = database.now_vn().strftime("%Y-%m-%d")
+    if not database.is_hwid_assigned_to_support(current_support["key_code"], hwid, today_vn):
+        raise HTTPException(status_code=403, detail="Bạn không được phân công hỗ trợ máy này trong ngày hôm nay!")
+    database.trigger_auto_fill_for_session(hwid)
+    return {"success": True, "message": "Đã kích hoạt lệnh tự động điền đáp án cho thí sinh!"}
+
 # ────────────────── Admin Support & Assignment Management APIs ──────────────────
 
 @app.get("/api/admin/support-keys", dependencies=[Depends(require_admin)])
