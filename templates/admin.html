@@ -3657,7 +3657,7 @@
                                 : "bg-slate-800 border-2 border-slate-600 text-slate-300 group-hover:border-emerald-400 group-hover:text-emerald-400");
 
                         optionsHtml += `
-                            <div onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${rowClass}">
+                            <div onclick="${qtype === 'checkbox' ? `toggleCheckboxAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}', ${oi})` : `chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')`}" class="${rowClass}">
                                 <span class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl font-black text-sm sm:text-base flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${circleCls}">
                                     ${escapeHtml(lbl)}
                                 </span>
@@ -3708,7 +3708,7 @@
                         const cls = isActive
                             ? `${btnBase} bg-purple-500 border-purple-400 text-white shadow-lg shadow-purple-500/30`
                             : `${btnBase} bg-slate-800 border-slate-600 text-slate-300 hover:bg-purple-600/20 hover:border-purple-500/60 hover:text-purple-400`;
-                        return `<button onclick="toggleCheckboxAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cls}">[${escapeHtml(lbl)}]</button>`;
+                        return `<button onclick="toggleCheckboxAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}', ${oi})" class="${cls}">[${escapeHtml(lbl)}]</button>`;
                     }).join(" ");
                     answerAreaHtml = `
                         <div class="flex items-center gap-1.5 flex-wrap">
@@ -4175,8 +4175,8 @@
             } catch (err) {}
         }
 
-        async function toggleCheckboxAnswer(hwid, questionIndex, idxStr) {
-            // Read current chosen set, toggle idxStr
+        async function toggleCheckboxAnswer(hwid, questionIndex, optLabel, optIdx) {
+            // Read current chosen set, toggle optLabel/optIdx
             const res = await fetch(`/api/admin/exam-questions/${encodeURIComponent(hwid)}`);
             if (!res.ok) return;
             const questions = await res.json();
@@ -4184,11 +4184,15 @@
             if (!q) return;
 
             const current = q.support_answer || "";
-            const chosen  = new Set(current ? current.split(",").map(s => s.trim()) : []);
-            if (chosen.has(idxStr)) {
-                chosen.delete(idxStr);
+            const chosen  = new Set(current ? current.split(",").map(s => s.trim().toUpperCase()).filter(Boolean) : []);
+            const targetLbl = (optLabel !== undefined && optLabel !== null && String(optLabel).trim()) ? String(optLabel).trim().toUpperCase() : (ALPHA[optIdx] || String(optIdx));
+            const targetIdx = (optIdx !== undefined && optIdx !== null) ? String(optIdx) : "";
+
+            if (chosen.has(targetLbl) || (targetIdx && chosen.has(targetIdx))) {
+                chosen.delete(targetLbl);
+                if (targetIdx) chosen.delete(targetIdx);
             } else {
-                chosen.add(idxStr);
+                chosen.add(targetLbl);
             }
             const newAns = Array.from(chosen).sort().join(",");
             await chooseAnswer(hwid, questionIndex, newAns);

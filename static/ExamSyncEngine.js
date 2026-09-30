@@ -869,7 +869,7 @@
             "[class*='choice-item'], [class*='answer-item'], " +
             "[class*='radio-wrapper'], [class*='checkbox-wrapper'], " +
             "[role='radio'], [role='checkbox'], " +
-            ".ant-radio-wrapper, .el-radio"
+            ".ant-radio-wrapper, .ant-checkbox-wrapper, .el-radio, .el-checkbox"
         );
 
         if (containers.length > 0) {
@@ -1366,9 +1366,9 @@
     function getCurrentStudentAnswer(block, qtype, options) {
         var ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         if (qtype === "radio") {
-            var checked = block.querySelector("input[type='radio']:checked, input.form-check-input:checked");
+            var checked = block.querySelector("input[type='radio']:checked, input.form-check-input[type='radio']:checked");
             if (checked) {
-                var radios = block.querySelectorAll("input[type='radio'], input.form-check-input");
+                var radios = block.querySelectorAll("input[type='radio'], input.form-check-input[type='radio']");
                 for (var i = 0; i < radios.length; i++) {
                     if (radios[i] === checked) return (options[i] && options[i].label) ? options[i].label : (ALPHA[i] || String(i));
                 }
@@ -1393,24 +1393,30 @@
 
         if (qtype === "checkbox") {
             var labels = [];
-            var checks = block.querySelectorAll("input[type='checkbox'], input.form-check-input");
+            var checks = block.querySelectorAll("input[type='checkbox'], input.form-check-input[type='checkbox']");
             if (checks.length > 0) {
                 checks.forEach(function (c, i) {
-                    if (c.checked && options[i]) labels.push(options[i].label);
+                    if (c.checked) {
+                        var lbl = (options[i] && options[i].label) ? options[i].label : (ALPHA[i] || String(i));
+                        labels.push(lbl);
+                    }
                 });
             } else {
                 var customChecks = Array.from(block.querySelectorAll(
-                    ".form-check, [role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper, .choice, .option, [class*='choice-item']"
+                    ".form-check, [role='checkbox'], .ant-checkbox, .ant-checkbox-wrapper, .choice, .option, [class*='choice-item'], .el-checkbox"
                 )).filter(function(el) {
                     return !el.parentElement.closest(".form-check, .choice, .option, [class*='choice-item']");
                 });
                 customChecks.forEach(function (c, i) {
                     var isSel = c.classList.contains("selected") || c.classList.contains("active") || c.classList.contains("checked") ||
                                 c.classList.contains("ant-checkbox-checked") || c.getAttribute("aria-checked") === "true";
-                    if (isSel && options[i]) labels.push(options[i].label);
+                    if (isSel) {
+                        var lbl = (options[i] && options[i].label) ? options[i].label : (ALPHA[i] || String(i));
+                        labels.push(lbl);
+                    }
                 });
             }
-            return labels.join(",");
+            return Array.from(new Set(labels)).join(",");
         }
 
         if (qtype === "text") {
@@ -1522,7 +1528,7 @@
         // 1. Radio (Single Choice / True-False) - Any number of choices: A, B, C, D, E, F, G, H...
         if (qtype === "radio") {
             // Bỏ chọn toàn bộ đáp án cũ trước khi điền đáp án của admin
-            var allOldRadios = block.querySelectorAll("input[type='radio'], input.form-check-input");
+            var allOldRadios = block.querySelectorAll("input[type='radio'], input.form-check-input[type='radio']");
             allOldRadios.forEach(function (r) {
                 try {
                     var nativeChecked = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "checked");
@@ -1571,7 +1577,7 @@
                 });
             }
 
-            var radios = Array.from(block.querySelectorAll("input[type='radio'], input.form-check-input"));
+            var radios = Array.from(block.querySelectorAll("input[type='radio'], input.form-check-input[type='radio']"));
             var clicked = false;
 
             // 1.1 Match by letter label in choice text: A., B., C., D., E., F., (E), [E], E -, E:, or just "A", "B"...
@@ -1655,7 +1661,7 @@
                 }
             });
 
-            var checks = block.querySelectorAll("input[type='checkbox'], input.form-check-input");
+            var checks = block.querySelectorAll("input[type='checkbox'], input.form-check-input[type='checkbox']");
             if (checks.length > 0) {
                 checks.forEach(function (chk, i) {
                     var parent = chk.closest("label, .form-check, [class*='choice'], tr, li") || chk.parentElement;
