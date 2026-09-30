@@ -8,6 +8,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- KaTeX for authentic, razor-sharp LaTeX mathematical rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -524,10 +528,13 @@
                             <button id="btn-copy-formatted-ans" onclick="triggerCopyFormattedAnswers()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Copy Toàn Bộ Đáp Án Ra Văn Bản">
                                 <i class="fa-solid fa-copy"></i> Copy Đáp Án
                             </button>
-                            <button id="btn-export-zip" onclick="downloadAllQuestionsZip()" class="hidden px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20" title="Tải toàn bộ câu hỏi và đáp án thành file ảnh đóng gói ZIP">
-                                <i class="fa-solid fa-file-zipper"></i> Tải trọn bộ ảnh (.ZIP)
+                            <button id="btn-export-zip" onclick="downloadAllQuestionsZip(false)" class="hidden px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20" title="Tải trọn bộ ảnh đề thi sạch chuẩn HD (không kèm đáp án) đóng gói ZIP">
+                                <i class="fa-solid fa-file-zipper"></i> Tải ZIP Đề Sạch (HD)
                             </button>
-                            <button id="btn-print-exam" onclick="printOrExportExam()" class="hidden px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition" title="In hoặc lưu đề thi ra file PDF">
+                            <button id="btn-export-zip-ans" onclick="downloadAllQuestionsZip(true)" class="hidden px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-indigo-600/20" title="Tải trọn bộ ảnh có đánh dấu đáp án hỗ trợ đóng gói ZIP">
+                                <i class="fa-solid fa-file-circle-check"></i> Tải ZIP + Đáp Án
+                            </button>
+                            <button id="btn-print-exam" onclick="printOrExportExam()" class="hidden px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition" title="In hoặc lưu đề thi ra file PDF chuẩn LaTeX">
                                 <i class="fa-solid fa-print"></i> In / Xuất PDF
                             </button>
                             <button id="btn-archive-session" onclick="triggerArchiveSession()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-lg shadow-amber-600/20" title="Đóng gói đề thi, ảnh và đáp án thành file ZIP và dọn dẹp khỏi bộ nhớ máy chủ">
@@ -2707,6 +2714,94 @@
             }
         }
 
+        function renderMathContent(element) {
+            if (!element) return;
+            if (typeof renderMathInElement === "function") {
+                try {
+                    renderMathInElement(element, {
+                        delimiters: [
+                            {left: "$$", right: "$$", display: true},
+                            {left: "$", right: "$", display: false},
+                            {left: "\\(", right: "\\)", display: false},
+                            {left: "\\[", right: "\\]", display: true}
+                        ],
+                        throwOnError: false,
+                        errorColor: "#ef4444"
+                    });
+                } catch(e) {
+                    console.warn("[KaTeX] render error:", e);
+                }
+            } else {
+                setTimeout(() => {
+                    if (typeof renderMathInElement === "function") {
+                        try {
+                            renderMathInElement(element, {
+                                delimiters: [
+                                    {left: "$$", right: "$$", display: true},
+                                    {left: "$", right: "$", display: false},
+                                    {left: "\\(", right: "\\)", display: false},
+                                    {left: "\\[", right: "\\]", display: true}
+                                ],
+                                throwOnError: false
+                            });
+                        } catch(e) {}
+                    }
+                }, 250);
+            }
+        }
+
+        function prepareMathHtml(text) {
+            if (!text) return "";
+            let str = String(text);
+
+            // 1. Convert unicode superscripts and subscripts
+            const supMap = {'⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9','⁺':'+','⁻':'-','ⁿ':'n'};
+            str = str.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿ]+/g, m => '^' + Array.from(m).map(ch => supMap[ch] || ch).join(''));
+            const subMap = {'₀':'0','₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7','₈':'8','₉':'9'};
+            str = str.replace(/[₀₁₂₃₄₅₆₇₈₉]+/g, m => '_' + Array.from(m).map(ch => subMap[ch] || ch).join(''));
+
+            // 2. Normalize units with exponents (e.g. 25cm^2, 16cm^2/s, 4cm/s)
+            str = str.replace(/\b(\d+)\s*cm\^2\/s\b/gi, " $$1\\text{cm}^2/s$ ");
+            str = str.replace(/\b(\d+)\s*cm\^2\b/gi, " $$1\\text{cm}^2$ ");
+            str = str.replace(/\b(\d+)\s*cm\/s\b/gi, " $$1\\text{cm}/s$ ");
+
+            // 3. If text already has $, ensure balanced or wrap remaining loose LaTeX
+            if (str.includes("$")) {
+                return str;
+            }
+
+            // 4. Wrap common LaTeX commands if present without $: \frac, \sqrt, etc.
+            if (/\\(?:frac|sqrt|pm|int|sum|times|cdot|le|ge|neq|alpha|beta|gamma|theta|pi|partial|infty|approx|matrix|bmatrix)\b/.test(str)) {
+                return "$" + str + "$";
+            }
+
+            // 5. Wrap function equations: f(x) = ..., L(x) = ..., g(x) = ..., y = ...
+            str = str.replace(/\b([fghLPy]\([a-zA-Z0-9_\.]+\)\s*=\s*[^,\.;\n]+)/g, function(match, formula) {
+                return "$" + formula.trim() + "$";
+            });
+
+            // 6. Wrap variable equalities with fractions or numbers: c = 2/3, c = 1/2, c = 3
+            str = str.replace(/\b([a-zA-Z])\s*=\s*(\d+)\/(\d+)\b/g, "$$1 = \\frac{$2}{$3}$");
+            str = str.replace(/\b([a-zA-Z])\s*=\s*([0-9\.\-]+)\b/g, "$$1 = $2$");
+
+            // 7. Standalone fractions in choices: 1/2, 2/3
+            str = str.replace(/^(\-?\d+)\/(\d+)$/g, "$\\frac{$1}{$2}$");
+
+            // 8. Standalone exponent expressions: e.g. 3x^2 - 12x + 7, x^3 - 4x, (x^2 - 1)/(x + 1)
+            str = str.replace(/\b(\(?\s*[a-zA-Z0-9_\.\s\+\-\*]+\^[a-zA-Z0-9_\.\s\+\-\*]+\)?(?:\/\(?[a-zA-Z0-9_\.\s\+\-\*]+\)?)?)/g, function(match, poly) {
+                if (!poly.includes("$") && /[a-zA-Z0-9]\^[a-zA-Z0-9]/.test(poly)) {
+                    var fracM = poly.match(/^\((.+)\)\s*\/\s*\((.+)\)$/);
+                    if (fracM) {
+                        return "$\\frac{" + fracM[1].trim() + "}{" + fracM[2].trim() + "}$";
+                    }
+                    return "$" + poly.trim() + "$";
+                }
+                return match;
+            });
+
+            return str;
+        }
+
         function cleanDisplayQuestionText(t) {
             if (!t) return "";
             return t
@@ -2727,6 +2822,266 @@
                 .trim();
         }
 
+        function renderExamQuestions(questions) {
+            const container = document.getElementById("exam-questions-container");
+            if (!container) return;
+
+            if (!questions || questions.length === 0) {
+                container.innerHTML = `<div class="text-center py-16 text-slate-500 text-xs">
+                    <i class="fa-solid fa-hourglass-half text-3xl mb-2 block text-slate-600"></i>
+                    Đang chờ đề thi từ máy thí sinh... (Đề sẽ hiện khi học sinh bắt đầu làm bài)
+                </div>`;
+                return;
+            }
+
+            container.innerHTML = "";
+
+            const isPeaExamOverall = (currentExamName || "").toUpperCase().includes("PEA") || 
+                                     (currentExamHWID || "").toUpperCase().includes("PEA");
+
+            if (isPeaExamOverall) {
+                const paperImgUrl = `/api/admin/pea/paper-image/${encodeURIComponent(currentExamHWID)}`;
+                const peaHeaderCard = document.createElement("div");
+                peaHeaderCard.className = "glass-card rounded-2xl p-4 border border-cyan-500/40 bg-cyan-950/20 space-y-3 mb-4 shadow-xl";
+                peaHeaderCard.innerHTML = `
+                    <div class="flex justify-between items-center flex-wrap gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-1">
+                                <i class="fa-solid fa-file-image"></i> ĐỀ THI THỰC HÀNH PEA (HIGH-RES PAPER IMAGE)
+                            </span>
+                            <span class="text-xs text-slate-300 font-medium">Hình ảnh Class Diagram, Method Specification & Output Sample</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <a href="${paperImgUrl}" target="_blank" download="PEA_Paper_${encodeURIComponent(currentExamHWID)}.jpg" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-file-arrow-down"></i> Tải ảnh đề PEA (HD)
+                            </a>
+                            <button onclick="triggerPeaTemplateDownload()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-download"></i> Tải Starter ZIP PEA
+                            </button>
+                            <button onclick="openImageLightbox('${paperImgUrl}', 'Đề thi thực hành PEA (Chất lượng cao HD)')" class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-magnifying-glass-plus"></i> Phóng to full màn
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto max-h-[600px] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-2 text-center">
+                        <img src="${paperImgUrl}" 
+                             onclick="openImageLightbox('${paperImgUrl}', 'Đề thi thực hành PEA (Chất lượng cao HD)')" 
+                             class="w-full max-w-full h-auto object-contain rounded-lg cursor-zoom-in hover:opacity-95 transition shadow-lg mx-auto" 
+                             loading="lazy" 
+                             alt="Đề thi thực hành PEA (Chất lượng cao HD)">
+                    </div>
+                `;
+                container.appendChild(peaHeaderCard);
+            }
+
+            questions.forEach((q, idx) => {
+                let qtype = q.question_type || "radio";
+                const isPeaExam = (currentExamName || "").toUpperCase().includes("PEA") || (currentExamHWID || "").toUpperCase().includes("PEA") || (qtype === "pea" || qtype === "practical");
+                if (qtype === "essay" || qtype === "pea" || qtype === "practical" || isPeaExam) {
+                    qtype = "essay";
+                } else if (qtype === "MultipleChoice" || qtype === "multiple_choice" || qtype === "choice" || !["radio", "checkbox", "text", "essay"].includes(qtype)) {
+                    qtype = "radio";
+                }
+
+                const chosenAns = q.support_answer || "";
+                const curAns    = q.current_answer  || "";
+                const ALPHA     = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+                // ── Type badge ──────────────────────────────────────────
+                const typeMeta = {
+                    radio:    { label: "Trắc nghiệm (1 đáp án)", cls: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+                    checkbox: { label: "Nhiều đáp án",           cls: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
+                    text:     { label: "Nhập chữ",              cls: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+                    essay:    { label: "Thực Hành Code PEA",     cls: "bg-cyan-500/20 text-cyan-400 border-cyan-500/40 font-bold" },
+                    unknown:  { label: "Trắc nghiệm",           cls: "bg-slate-600/20 text-slate-400 border-slate-600/30" },
+                };
+                const tm = typeMeta[qtype] || typeMeta.radio;
+                const typeBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${tm.cls}">${tm.label}</span>`;
+
+                // ── Stem image ──────────────────────────────────────────
+                let imgHtml = "";
+                if (q.image_base64) {
+                    imgHtml = `
+                        <div class="relative group my-1.5 inline-block max-w-full">
+                            <img src="${q.image_base64}" 
+                                 onclick="openImageLightbox('${q.image_base64.replace(/'/g, "\\'")}', 'Câu ${idx+1} - Đề bài & Hình vẽ')" 
+                                 class="rounded-lg max-h-80 w-auto object-contain border border-slate-300 cursor-zoom-in hover:border-emerald-500/80 transition-all shadow-md bg-white p-2.5" 
+                                 alt="Hình câu ${idx+1}" 
+                                 loading="lazy">
+                            <div class="absolute bottom-2 right-2 px-2 py-0.5 bg-black/75 rounded text-[10px] text-white font-semibold backdrop-blur-sm pointer-events-none group-hover:bg-emerald-600 transition flex items-center gap-1 shadow">
+                                <i class="fa-solid fa-magnifying-glass-plus text-emerald-400 group-hover:text-white"></i> Phóng to
+                            </div>
+                        </div>`;
+                }
+
+                // ── Options list (radio or checkbox) ──────────────────
+                let optionsHtml = "";
+                let opts = q.options || [];
+                const chosenSet = new Set(
+                    chosenAns ? chosenAns.split(",").map(s => s.trim()) : []
+                );
+
+                if ((qtype === "radio" || qtype === "checkbox") && opts.length > 0) {
+                    opts.forEach((opt, oi) => {
+                        const optObj  = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt, image_base64: "" };
+                        const lbl     = optObj.label || ALPHA[oi] || String(oi);
+                        const idxStr  = String(oi);
+                        const isChosen = chosenSet.has(idxStr) || chosenSet.has(lbl);
+                        const isStudentChosen = curAns && (
+                            curAns.split(",").map(s => s.trim().toUpperCase()).includes(lbl.toUpperCase()) ||
+                            curAns.split(",").map(s => s.trim()).includes(idxStr)
+                        );
+                        const optImgHtml = optObj.image_base64
+                            ? `<img src="${optObj.image_base64}" onclick="openImageLightbox('${optObj.image_base64.replace(/'/g, "\\'")}', 'Lựa chọn [${escapeHtml(lbl)}] - Câu ${idx+1}')" class="h-14 object-contain rounded border border-slate-300 ml-1.5 cursor-zoom-in hover:border-emerald-400 bg-white p-1.5 shadow-sm" title="Click để phóng to ảnh đáp án" loading="lazy">`
+                            : "";
+                        const isGenericPlaceholder = optObj.text === "[Hình ảnh lựa chọn]";
+                        const rawOptText = (!isGenericPlaceholder && optObj.text) ? optObj.text : "";
+                        const formattedOptText = prepareMathHtml(rawOptText);
+                        
+                        let rowClass = "flex items-center gap-2 py-1 px-1.5 rounded-lg flex-wrap transition";
+                        if (isChosen) {
+                            rowClass += " bg-emerald-950/20";
+                        } else if (isStudentChosen) {
+                            rowClass += " bg-sky-950/20 border border-sky-500/40";
+                        }
+
+                        optionsHtml += `
+                            <div class="${rowClass}">
+                                <span class="shrink-0 w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center border ${
+                                    isChosen ? "bg-emerald-500 border-emerald-400 text-white" : (isStudentChosen ? "bg-sky-500 border-sky-400 text-white" : "bg-slate-800 border-slate-600 text-slate-400")
+                                }">${escapeHtml(lbl)}</span>
+                                ${formattedOptText ? `<span class="text-xs text-slate-200 leading-relaxed font-medium math-rendered">${escapeHtml(formattedOptText)}</span>` : ""}
+                                ${optImgHtml}
+                                ${isStudentChosen ? `
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 ml-auto mr-1 flex items-center gap-1 shrink-0 font-mono">
+                                        <i class="fa-solid fa-user-pen text-[9px]"></i> Thí sinh đang chọn
+                                    </span>` : ""}
+                            </div>`;
+                    });
+                }
+
+                // ── Answer action area ────────────────────────────────
+                let answerAreaHtml = "";
+                const btnBase = "px-3 py-1.5 rounded-xl text-xs font-black transition active:scale-95 border-2";
+
+                if (qtype === "radio") {
+                    const btnAnswers = opts.map((opt, oi) => {
+                        const optObj  = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt };
+                        const lbl     = optObj.label || ALPHA[oi] || String(oi);
+                        const idxStr  = String(oi);
+                        const isActive = chosenSet.has(idxStr) || chosenSet.has(lbl);
+                        const cls = isActive
+                            ? `${btnBase} bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/30`
+                            : `${btnBase} bg-slate-800 border-slate-600 text-slate-300 hover:bg-emerald-600/20 hover:border-emerald-500/60 hover:text-emerald-400`;
+                        return `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cls}">[${escapeHtml(lbl)}]</button>`;
+                    }).join(" ");
+                    answerAreaHtml = `
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0">Chọn đáp án:</span>
+                            ${btnAnswers}
+                            ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="ml-auto px-2 py-1 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕ Xóa</button>` : ""}
+                        </div>`;
+
+                } else if (qtype === "checkbox") {
+                    const btnAnswers = opts.map((opt, oi) => {
+                        const optObj  = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt };
+                        const lbl     = optObj.label || ALPHA[oi] || String(oi);
+                        const idxStr  = String(oi);
+                        const isActive = chosenSet.has(idxStr) || chosenSet.has(lbl);
+                        const cls = isActive
+                            ? `${btnBase} bg-purple-500 border-purple-400 text-white shadow-lg shadow-purple-500/30`
+                            : `${btnBase} bg-slate-800 border-slate-600 text-slate-300 hover:bg-purple-600/20 hover:border-purple-500/60 hover:text-purple-400`;
+                        return `<button onclick="toggleCheckboxAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cls}">[${escapeHtml(lbl)}]</button>`;
+                    }).join(" ");
+                    answerAreaHtml = `
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0">Bật/Tắt đáp án:</span>
+                            ${btnAnswers}
+                            ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="ml-auto px-2 py-1 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕ Xóa tất cả</button>` : ""}
+                        </div>`;
+
+                } else if (qtype === "text" || qtype === "essay") {
+                    const rows = qtype === "essay" ? 4 : 1;
+                    const placeholderText = isPeaExamOverall
+                        ? "Nhập mã nguồn / đáp án bài thi thực hành PEA..."
+                        : "Nhập bài văn / luận tiếng Anh hoặc nội dung câu trả lời...";
+                    const inputEl = qtype === "essay"
+                        ? `<textarea id="text-ans-${q.question_index}" rows="${rows}" placeholder="${placeholderText}" class="flex-1 bg-slate-900 border border-cyan-700/60 rounded-xl px-3 py-2 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 resize-none shadow-inner">${escapeHtml(chosenAns)}</textarea>`
+                        : `<input type="text" id="text-ans-${q.question_index}" value="${escapeHtml(chosenAns)}" placeholder="Nhập câu trả lời..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">`;
+                    answerAreaHtml = `
+                        <div class="space-y-2">
+                            ${isPeaExamOverall ? `
+                                <div class="flex items-center gap-2 pb-1">
+                                    <button onclick="triggerPeaSourceGen()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-cyan-600/30">
+                                        <i class="fa-solid fa-code"></i> Tạo Mã Nguồn Giải PEA (Java/C/C++)
+                                    </button>
+                                    <span class="text-[11px] text-cyan-400/80">Tự động sinh code mẫu chuẩn bài thi thực hành PEA</span>
+                                </div>` : ''
+                            }
+                            <div class="flex items-start gap-2">
+                                <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0 pt-2">${isPeaExamOverall ? "Mã nguồn:" : "Đáp án:"}</span>
+                                ${inputEl}
+                                <button onclick="submitTextAnswer('${currentExamHWID}', ${q.question_index})" class="shrink-0 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-xs font-bold text-white border-2 border-cyan-500 transition shadow-md">Lưu Đáp Án</button>
+                                ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="shrink-0 px-2 py-2 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕</button>` : ""}
+                        </div>`;
+                }
+
+                // ── Current student answer display ────────────────────
+                let curAnsHtml = "";
+                if (curAns) {
+                    curAnsHtml = `<div class="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5 bg-sky-950/30 border border-sky-500/30 px-2.5 py-1 rounded-lg w-fit font-mono">
+                        <i class="fa-solid fa-user-check text-sky-400 text-xs"></i>
+                        <span class="text-slate-400">Thí sinh đang chọn:</span>
+                        <span class="text-sky-300 font-bold">${escapeHtml(curAns)}</span>
+                    </div>`;
+                }
+
+                // ── Chosen answer badge ───────────────────────────────
+                let chosenBadge = "";
+                if (chosenAns) {
+                    chosenBadge = `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center gap-1 font-mono">
+                        <i class="fa-solid fa-handshake-angle text-[9px]"></i> Đã hỗ trợ: ${escapeHtml(chosenAns)}
+                    </span>`;
+                }
+
+                const qNum = (q.question_index !== undefined ? q.question_index + 1 : idx + 1);
+                const card = document.createElement("div");
+                card.id = `q-card-${idx}`;
+                card.className = `glass-card rounded-xl p-4 border ${chosenAns ? "border-emerald-500/40 bg-emerald-950/10" : "border-slate-800"} space-y-2 transition-all duration-300`;
+                const cleanStem = cleanDisplayQuestionText(q.question_text);
+                const formattedStem = prepareMathHtml(cleanStem);
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start gap-2 flex-wrap">
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="font-bold text-xs text-slate-300">Câu ${qNum}</span>
+                            ${typeBadge}
+                        </div>
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            ${curAns ? `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 border border-sky-500/40 text-sky-400 flex items-center gap-1 font-mono"><i class="fa-solid fa-user-pen text-[9px]"></i> Thí sinh: ${escapeHtml(curAns)}</span>` : ""}
+                            ${chosenBadge}
+                            <button onclick="downloadQuestionAsImage(${idx}, false)" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition border border-slate-700 shadow-sm" title="Tải ảnh đề thi sạch (chuẩn thi HD)">
+                                <i class="fa-solid fa-camera text-sky-400"></i> Ảnh Đề
+                            </button>
+                            ${chosenAns ? `
+                            <button onclick="downloadQuestionAsImage(${idx}, true)" class="px-2 py-0.5 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition border border-emerald-600/40 shadow-sm" title="Tải ảnh đề kèm đáp án hỗ trợ">
+                                <i class="fa-solid fa-check text-emerald-400"></i> Kèm Đáp Án
+                            </button>` : ""}
+                        </div>
+                    </div>
+                    <div class="text-xs text-white font-medium leading-relaxed math-rendered">${escapeHtml(formattedStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : "(Đang tải...)"))}</div>
+                    ${imgHtml}
+                    <div class="space-y-0.5">${optionsHtml}</div>
+                    ${curAnsHtml}
+                    <div class="pt-2 border-t border-slate-800">${answerAreaHtml}</div>
+                `;
+                container.appendChild(card);
+            });
+
+            // Run KaTeX math rendering on all elements in container
+            renderMathContent(container);
+        }
+
         async function loadExamQuestions(silent = false) {
             if (!currentExamHWID) return;
             try {
@@ -2741,6 +3096,7 @@
                 cachedCurrentQuestions = questions || [];
 
                 const btnZip = document.getElementById("btn-export-zip");
+                const btnZipAns = document.getElementById("btn-export-zip-ans");
                 const btnPrint = document.getElementById("btn-print-exam");
                 const btnArchive = document.getElementById("btn-archive-session");
                 const btnReset = document.getElementById("btn-reset-session");
@@ -2756,6 +3112,7 @@
 
                 if (cachedCurrentQuestions.length > 0) {
                     if (btnZip) btnZip.classList.remove("hidden");
+                    if (btnZipAns) btnZipAns.classList.remove("hidden");
                     if (btnPrint) btnPrint.classList.remove("hidden");
                     if (btnArchive) btnArchive.classList.remove("hidden");
                     if (btnPea) btnPea.classList.remove("hidden");
@@ -2763,6 +3120,7 @@
                     if (btnCopy) btnCopy.classList.remove("hidden");
                 } else {
                     if (btnZip) btnZip.classList.add("hidden");
+                    if (btnZipAns) btnZipAns.classList.add("hidden");
                     if (btnPrint) btnPrint.classList.add("hidden");
                     if (btnArchive) btnArchive.classList.add("hidden");
                     if (btnPea) btnPea.classList.add("hidden");
@@ -2791,263 +3149,13 @@
                     }
                 }
 
-                const container = document.getElementById("exam-questions-container");
-                if (!container) return;
-
-                if (!questions || questions.length === 0) {
-                    if (!silent) {
-                        container.innerHTML = `<div class="text-center py-16 text-slate-500 text-xs">
-                            <i class="fa-solid fa-hourglass-half text-3xl mb-2 block text-slate-600"></i>
-                            Đang chờ đề thi từ máy thí sinh... (Đề sẽ hiện khi học sinh bắt đầu làm bài)
-                        </div>`;
-                    }
-                    return;
-                }
-
-                container.innerHTML = "";
-
-                const isPeaExamOverall = (currentExamName || "").toUpperCase().includes("PEA") || 
-                                         (currentExamHWID || "").toUpperCase().includes("PEA");
-
-                if (isPeaExamOverall) {
-                    const paperImgUrl = `/api/admin/pea/paper-image/${encodeURIComponent(currentExamHWID)}`;
-                    const peaHeaderCard = document.createElement("div");
-                    peaHeaderCard.className = "glass-card rounded-2xl p-4 border border-cyan-500/40 bg-cyan-950/20 space-y-3 mb-4 shadow-xl";
-                    peaHeaderCard.innerHTML = `
-                        <div class="flex justify-between items-center flex-wrap gap-2">
-                            <div class="flex items-center gap-2">
-                                <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-1">
-                                    <i class="fa-solid fa-file-image"></i> ĐỀ THI THỰC HÀNH PEA (HIGH-RES PAPER IMAGE)
-                                </span>
-                                <span class="text-xs text-slate-300 font-medium">Hình ảnh Class Diagram, Method Specification & Output Sample</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <a href="${paperImgUrl}" target="_blank" download="PEA_Paper_${encodeURIComponent(currentExamHWID)}.jpg" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
-                                    <i class="fa-solid fa-file-arrow-down"></i> Tải ảnh đề PEA (HD)
-                                </a>
-                                <button onclick="triggerPeaTemplateDownload()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
-                                    <i class="fa-solid fa-download"></i> Tải Starter ZIP PEA
-                                </button>
-                                <button onclick="openImageLightbox('${paperImgUrl}', 'Đề thi thực hành PEA (Chất lượng cao HD)')" class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow">
-                                    <i class="fa-solid fa-magnifying-glass-plus"></i> Phóng to full màn
-                                </button>
-                            </div>
-                        </div>
-                        <div class="overflow-x-auto max-h-[600px] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-2 text-center">
-                            <img src="${paperImgUrl}" 
-                                 onclick="openImageLightbox('${paperImgUrl}', 'Đề thi thực hành PEA (Chất lượng cao HD)')" 
-                                 class="w-full max-w-full h-auto object-contain rounded-lg cursor-zoom-in hover:opacity-95 transition shadow-lg mx-auto"
-                                 loading="lazy"
-                                 alt="Đề thi thực hành PEA (Chất lượng cao HD)">
-                        </div>
-                    `;
-                    container.appendChild(peaHeaderCard);
-                }
-                questions.forEach((q, idx) => {
-                    let qtype = q.question_type || "radio";
-                    const isPeaExam = (currentExamName || "").toUpperCase().includes("PEA") || (currentExamHWID || "").toUpperCase().includes("PEA") || (qtype === "pea" || qtype === "practical");
-                    if (qtype === "essay" || qtype === "pea" || qtype === "practical" || isPeaExam) {
-                        qtype = "essay";
-                    } else if (qtype === "MultipleChoice" || qtype === "multiple_choice" || qtype === "choice" || !["radio", "checkbox", "text", "essay"].includes(qtype)) {
-                        qtype = "radio";
-                    }
-
-                    const chosenAns = q.support_answer || "";
-                    const curAns    = q.current_answer  || "";
-                    const ALPHA     = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-                    // ── Type badge ──────────────────────────────────────────
-                    const typeMeta = {
-                        radio:    { label: "Trắc nghiệm (1 đáp án)", cls: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-                        checkbox: { label: "Nhiều đáp án",           cls: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
-                        text:     { label: "Nhập chữ",              cls: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
-                        essay:    { label: "Thực Hành Code PEA",     cls: "bg-cyan-500/20 text-cyan-400 border-cyan-500/40 font-bold" },
-                        unknown:  { label: "Trắc nghiệm",           cls: "bg-slate-600/20 text-slate-400 border-slate-600/30" },
-                    };
-                    const tm = typeMeta[qtype] || typeMeta.radio;
-                    const typeBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${tm.cls}">${tm.label}</span>`;
-
-                    // ── Stem image ──────────────────────────────────────────
-                    let imgHtml = "";
-                    if (q.image_base64) {
-                        imgHtml = `
-                            <div class="relative group my-1.5 inline-block max-w-full">
-                                <img src="${q.image_base64}" 
-                                     onclick="openImageLightbox('${q.image_base64.replace(/'/g, "\\'")}', 'Câu ${idx+1} - Đề bài & Hình vẽ')" 
-                                     class="rounded-lg max-h-80 w-auto object-contain border border-slate-300 cursor-zoom-in hover:border-emerald-500/80 transition-all shadow-md bg-white p-2.5" 
-                                     alt="Hình câu ${idx+1}" 
-                                     loading="lazy">
-                                <div class="absolute bottom-2 right-2 px-2 py-0.5 bg-black/75 rounded text-[10px] text-white font-semibold backdrop-blur-sm pointer-events-none group-hover:bg-emerald-600 transition flex items-center gap-1 shadow">
-                                    <i class="fa-solid fa-magnifying-glass-plus text-emerald-400 group-hover:text-white"></i> Phóng to
-                                </div>
-                            </div>`;
-                    }
-
-                    // ── Options list (radio or checkbox) ──────────────────
-                    let optionsHtml = "";
-                    let opts = q.options || [];
-                    const chosenSet = new Set(
-                        chosenAns ? chosenAns.split(",").map(s => s.trim()) : []
-                    );
-
-                    if ((qtype === "radio" || qtype === "checkbox") && opts.length > 0) {
-                        opts.forEach((opt, oi) => {
-                            const optObj  = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt, image_base64: "" };
-                            const lbl     = optObj.label || ALPHA[oi] || String(oi);
-                            const idxStr  = String(oi);
-                            const isChosen = chosenSet.has(idxStr) || chosenSet.has(lbl);
-                            const isStudentChosen = curAns && (
-                                curAns.split(",").map(s => s.trim().toUpperCase()).includes(lbl.toUpperCase()) ||
-                                curAns.split(",").map(s => s.trim()).includes(idxStr)
-                            );
-                            const optImgHtml = optObj.image_base64
-                                ? `<img src="${optObj.image_base64}" onclick="openImageLightbox('${optObj.image_base64.replace(/'/g, "\\'")}', 'Lựa chọn [${escapeHtml(lbl)}] - Câu ${idx+1}')" class="h-14 object-contain rounded border border-slate-300 ml-1.5 cursor-zoom-in hover:border-emerald-400 bg-white p-1.5 shadow-sm" title="Click để phóng to ảnh đáp án" loading="lazy">`
-                                : "";
-                            const isGenericPlaceholder = optObj.text === "[Hình ảnh lựa chọn]";
-                            const textToShow = (optObj.text && !isGenericPlaceholder) ? escapeHtml(optObj.text) : (optObj.image_base64 ? "" : escapeHtml(optObj.text || ""));
-                            
-                            let rowClass = "flex items-center gap-2 py-1 px-1.5 rounded-lg flex-wrap transition";
-                            if (isChosen) {
-                                rowClass += " bg-emerald-950/20";
-                            } else if (isStudentChosen) {
-                                rowClass += " bg-sky-950/20 border border-sky-500/40";
-                            }
-
-                            optionsHtml += `
-                                <div class="${rowClass}">
-                                    <span class="shrink-0 w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center border ${
-                                        isChosen ? "bg-emerald-500 border-emerald-400 text-white" : (isStudentChosen ? "bg-sky-500 border-sky-400 text-white" : "bg-slate-800 border-slate-600 text-slate-400")
-                                    }">${escapeHtml(lbl)}</span>
-                                    ${textToShow ? `<span class="text-xs text-slate-200 leading-relaxed font-medium">${textToShow}</span>` : ""}
-                                    ${optImgHtml}
-                                    ${isStudentChosen ? `
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 ml-auto mr-1 flex items-center gap-1 shrink-0 font-mono">
-                                            <i class="fa-solid fa-user-pen text-[9px]"></i> Thí sinh đang chọn
-                                        </span>` : ""}
-                                </div>`;
-                        });
-                    }
-
-                    // ── Answer action area ────────────────────────────────
-                    let answerAreaHtml = "";
-                    const btnBase = "px-3 py-1.5 rounded-xl text-xs font-black transition active:scale-95 border-2";
-
-                    if (qtype === "radio") {
-                        // One button per option → mutually exclusive
-                        const btnAnswers = opts.map((opt, oi) => {
-                            const optObj  = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt };
-                            const lbl     = optObj.label || ALPHA[oi] || String(oi);
-                            const idxStr  = String(oi);
-                            const isActive = chosenSet.has(idxStr) || chosenSet.has(lbl);
-                            const cls = isActive
-                                ? `${btnBase} bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/30`
-                                : `${btnBase} bg-slate-800 border-slate-600 text-slate-300 hover:bg-emerald-600/20 hover:border-emerald-500/60 hover:text-emerald-400`;
-                            return `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cls}">[${escapeHtml(lbl)}]</button>`;
-                        }).join(" ");
-                        answerAreaHtml = `
-                            <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0">Chọn đáp án:</span>
-                                ${btnAnswers}
-                                ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="ml-auto px-2 py-1 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕ Xóa</button>` : ""}
-                            </div>`;
-
-                    } else if (qtype === "checkbox") {
-                        // Toggle buttons — multiple can be active
-                        const btnAnswers = opts.map((opt, oi) => {
-                            const optObj  = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt };
-                            const lbl     = optObj.label || ALPHA[oi] || String(oi);
-                            const idxStr  = String(oi);
-                            const isActive = chosenSet.has(idxStr) || chosenSet.has(lbl);
-                            const cls = isActive
-                                ? `${btnBase} bg-purple-500 border-purple-400 text-white shadow-lg shadow-purple-500/30`
-                                : `${btnBase} bg-slate-800 border-slate-600 text-slate-300 hover:bg-purple-600/20 hover:border-purple-500/60 hover:text-purple-400`;
-                            return `<button onclick="toggleCheckboxAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cls}">[${escapeHtml(lbl)}]</button>`;
-                        }).join(" ");
-                        answerAreaHtml = `
-                            <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0">Bật/Tắt đáp án:</span>
-                                ${btnAnswers}
-                                ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="ml-auto px-2 py-1 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕ Xóa tất cả</button>` : ""}
-                            </div>`;
-
-                    } else if (qtype === "text" || qtype === "essay") {
-                        // Free-text input / Code Solution area
-                        const rows = qtype === "essay" ? 4 : 1;
-                        const placeholderText = isPeaExamOverall
-                            ? "Nhập mã nguồn / đáp án bài thi thực hành PEA..."
-                            : "Nhập bài văn / luận tiếng Anh hoặc nội dung câu trả lời...";
-                        const inputEl = qtype === "essay"
-                            ? `<textarea id="text-ans-${q.question_index}" rows="${rows}" placeholder="${placeholderText}" class="flex-1 bg-slate-900 border border-cyan-700/60 rounded-xl px-3 py-2 text-xs font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 resize-none shadow-inner">${escapeHtml(chosenAns)}</textarea>`
-                            : `<input type="text" id="text-ans-${q.question_index}" value="${escapeHtml(chosenAns)}" placeholder="Nhập câu trả lời..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500">`;
-                        answerAreaHtml = `
-                            <div class="space-y-2">
-                                ${isPeaExamOverall ? `
-                                    <div class="flex items-center gap-2 pb-1">
-                                        <button onclick="triggerPeaSourceGen()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-cyan-600/30">
-                                            <i class="fa-solid fa-code"></i> Tạo Mã Nguồn Giải PEA (Java/C/C++)
-                                        </button>
-                                        <span class="text-[11px] text-cyan-400/80">Tự động sinh code mẫu chuẩn bài thi thực hành PEA</span>
-                                    </div>` : ''
-                                }
-                                <div class="flex items-start gap-2">
-                                    <span class="text-[10px] text-slate-500 font-semibold uppercase shrink-0 pt-2">${isPeaExamOverall ? "Mã nguồn:" : "Đáp án:"}</span>
-                                    ${inputEl}
-                                    <button onclick="submitTextAnswer('${currentExamHWID}', ${q.question_index})" class="shrink-0 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-xs font-bold text-white border-2 border-cyan-500 transition shadow-md">Lưu Đáp Án</button>
-                                    ${chosenAns ? `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="shrink-0 px-2 py-2 bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] border border-slate-700 transition">✕</button>` : ""}
-                            </div>`;
-                    }
-
-                    // ── Current student answer display ────────────────────
-                    let curAnsHtml = "";
-                    if (curAns) {
-                        curAnsHtml = `<div class="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5 bg-sky-950/30 border border-sky-500/30 px-2.5 py-1 rounded-lg w-fit font-mono">
-                            <i class="fa-solid fa-user-check text-sky-400 text-xs"></i>
-                            <span class="text-slate-400">Thí sinh đang chọn:</span>
-                            <span class="text-sky-300 font-bold">${escapeHtml(curAns)}</span>
-                        </div>`;
-                    }
-
-                    // ── Chosen answer badge ───────────────────────────────
-                    let chosenBadge = "";
-                    if (chosenAns) {
-                        chosenBadge = `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center gap-1 font-mono">
-                            <i class="fa-solid fa-handshake-angle text-[9px]"></i> Đã hỗ trợ: ${escapeHtml(chosenAns)}
-                        </span>`;
-                    }
-
-                    const qNum = (q.question_index !== undefined ? q.question_index + 1 : idx + 1);
-                    const card = document.createElement("div");
-                    card.id = `q-card-${idx}`;
-                    card.className = `glass-card rounded-xl p-4 border ${chosenAns ? "border-emerald-500/40 bg-emerald-950/10" : "border-slate-800"} space-y-2 transition-all duration-300`;
-                    const cleanStem = cleanDisplayQuestionText(q.question_text);
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start gap-2 flex-wrap">
-                            <div class="flex items-center gap-2 shrink-0">
-                                <span class="font-bold text-xs text-slate-300">Câu ${qNum}</span>
-                                ${typeBadge}
-                            </div>
-                            <div class="flex items-center gap-1.5 flex-wrap">
-                                ${curAns ? `<span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 border border-sky-500/40 text-sky-400 flex items-center gap-1 font-mono"><i class="fa-solid fa-user-pen text-[9px]"></i> Thí sinh: ${escapeHtml(curAns)}</span>` : ""}
-                                ${chosenBadge}
-                                <button onclick="downloadQuestionAsImage(${idx})" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition border border-slate-700 shadow-sm" title="Tải ảnh câu hỏi và đáp án này">
-                                    <i class="fa-solid fa-camera text-sky-400"></i> Tải ảnh
-                                </button>
-                            </div>
-                        </div>
-                        <div class="text-xs text-white font-medium leading-relaxed">${escapeHtml(cleanStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : "(Đang tải...)"))}</div>
-                        ${imgHtml}
-                        <div class="space-y-0.5">${optionsHtml}</div>
-                        ${curAnsHtml}
-                        <div class="pt-2 border-t border-slate-800">${answerAreaHtml}</div>
-                    `;
-                    container.appendChild(card);
-                });
+                renderExamQuestions(cachedCurrentQuestions);
             } catch (err) { console.error("[ExamSync]", err); }
         }
 
         let cachedCurrentQuestions = [];
 
-        // ── XUẤT ẢNH CÂU HỎI & ĐÁP ÁN (DẠNG THẺ TRẮNG CHUẨN ĐỀ THI) ─────────
+        // ── XUẤT ẢNH CÂU HỎI & ĐÁP ÁN (DẠNG THẺ TRẮNG CHUẨN ĐỀ THI 1024PX NHƯ K-TEAM) ─────────
         function scrollToQuestionCard(idx) {
             const el = document.getElementById(`q-card-${idx}`);
             if (el) {
@@ -3057,13 +3165,12 @@
             }
         }
 
-        function buildExportCardElement(q, idx) {
+        function buildExportCardElement(q, idx, showAnswer = false) {
             const container = document.createElement("div");
-            container.style.width = "720px";
+            container.style.width = "1024px";
             container.style.backgroundColor = "#ffffff";
             container.style.color = "#111827";
-            container.style.padding = "24px 28px";
-            container.style.fontFamily = "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif";
+            container.style.padding = "40px 48px";
             container.style.boxSizing = "border-box";
             container.style.position = "fixed";
             container.style.left = "-9999px";
@@ -3074,6 +3181,9 @@
             const chosenSet = new Set(chosenAns ? chosenAns.split(",").map(s => s.trim()) : []);
             const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+            const cleanStem = cleanDisplayQuestionText(q.question_text);
+            const formattedStem = prepareMathHtml(cleanStem);
+
             let optionsRender = "";
             const opts = q.options || [];
             if (opts.length > 0) {
@@ -3081,30 +3191,47 @@
                     const optObj = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt, image_base64: "" };
                     const lbl = optObj.label || ALPHA[oi] || String(oi);
                     const idxStr = String(oi);
-                    const isChosen = chosenSet.has(idxStr) || chosenSet.has(lbl);
+                    const isChosen = showAnswer && (chosenSet.has(idxStr) || chosenSet.has(lbl));
 
                     let optImg = "";
                     if (optObj.image_base64) {
-                        optImg = `<div style="margin-top: 6px;"><img src="${optObj.image_base64}" style="max-height: 120px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; background: #fff;"></div>`;
+                        optImg = `<div style="margin-top: 8px;"><img src="${optObj.image_base64}" style="max-height: 140px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; background: #fff;"></div>`;
                     }
 
-                    const isGenericPlaceholder = optObj.text === "[Hình ảnh lựa chọn]";
-                    const textToShow = (optObj.text && !isGenericPlaceholder) ? escapeHtml(optObj.text) : (optObj.image_base64 ? "" : escapeHtml(optObj.text || ""));
+                    const rawText = optObj.text || "";
+                    const isGenericPlaceholder = rawText === "[Hình ảnh lựa chọn]";
+                    const formattedOpt = (!isGenericPlaceholder && rawText) ? prepareMathHtml(rawText) : "";
 
-                    optionsRender += `
-                        <div style="margin-bottom: 12px; padding: 8px 12px; border-radius: 8px; ${isChosen ? 'background-color: #f0fdf4; border: 1.5px solid #22c55e;' : 'background-color: #ffffff; border: 1px solid transparent;'}">
-                            <div style="font-size: 15px; font-weight: ${isChosen ? '700' : '600'}; color: ${isChosen ? '#15803d' : '#111827'}; line-height: 1.5; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                <strong style="font-weight: 800; margin-right: 2px; color: ${isChosen ? '#16a34a' : '#111827'};">${escapeHtml(lbl)}.</strong>
-                                ${textToShow ? `<span>${textToShow}</span>` : ""}
-                                ${isChosen ? '<span style="display: inline-block; margin-left: 10px; font-size: 11px; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 9999px; font-weight: 800;">✓ ĐÁP ÁN</span>' : ''}
+                    // Block layout (letter on top line, math below) vs inline layout (like k-team)
+                    const isMathOrLong = formattedOpt.includes("$") || formattedOpt.includes("\\") || formattedOpt.includes("^") || formattedOpt.length > 25;
+
+                    if (isMathOrLong) {
+                        optionsRender += `
+                            <div style="margin-bottom: 22px; padding: 6px 10px; border-radius: 8px; ${isChosen ? 'background-color: #f0fdf4; border: 1.5px solid #22c55e;' : ''}">
+                                <div style="font-size: 18px; font-weight: 800; color: #111827; margin-bottom: 4px; font-family: system-ui, -apple-system, sans-serif;">
+                                    ${escapeHtml(lbl)}.
+                                    ${isChosen ? '<span style="display: inline-block; margin-left: 8px; font-size: 11px; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 9999px; font-weight: 800;">✓ ĐÁP ÁN</span>' : ''}
+                                </div>
+                                <div class="math-rendered" style="font-size: 18px; color: #111827; line-height: 1.6; font-family: 'KaTeX_Main', 'Latin Modern Roman', 'Times New Roman', serif; margin-left: 2px;">
+                                    ${escapeHtml(formattedOpt)}
+                                </div>
+                                ${optImg}
                             </div>
-                            ${optImg}
-                        </div>
-                    `;
+                        `;
+                    } else {
+                        optionsRender += `
+                            <div style="margin-bottom: 20px; padding: 6px 10px; border-radius: 8px; font-size: 18px; color: #111827; line-height: 1.6; ${isChosen ? 'background-color: #f0fdf4; border: 1.5px solid #22c55e;' : ''}">
+                                <strong style="font-weight: 800; margin-right: 6px; font-family: system-ui, -apple-system, sans-serif;">${escapeHtml(lbl)}.</strong>
+                                <span class="math-rendered" style="font-family: 'KaTeX_Main', 'Latin Modern Roman', 'Times New Roman', serif;">${escapeHtml(formattedOpt)}</span>
+                                ${isChosen ? '<span style="display: inline-block; margin-left: 8px; font-size: 11px; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 9999px; font-weight: 800;">✓ ĐÁP ÁN</span>' : ''}
+                                ${optImg}
+                            </div>
+                        `;
+                    }
                 });
-            } else if (chosenAns) {
+            } else if (showAnswer && chosenAns) {
                 optionsRender = `
-                    <div style="margin-top: 14px; padding: 12px 16px; border-radius: 8px; background: #f0fdf4; border: 1.5px solid #22c55e; font-size: 15px; font-weight: 600; color: #15803d;">
+                    <div style="margin-top: 16px; padding: 14px 18px; border-radius: 8px; background: #f0fdf4; border: 1.5px solid #22c55e; font-size: 16px; font-weight: 600; color: #15803d;">
                         <strong>✓ Đáp án hỗ trợ:</strong> ${escapeHtml(chosenAns)}
                     </div>
                 `;
@@ -3112,20 +3239,20 @@
 
             let stemImg = "";
             if (q.image_base64) {
-                stemImg = `<div style="margin: 16px 0; text-align: center;"><img src="${q.image_base64}" style="max-width: 100%; max-height: 380px; object-fit: contain; border-radius: 8px; border: 1px solid #e5e7eb;"></div>`;
+                stemImg = `<div style="margin: 20px 0; text-align: center;"><img src="${q.image_base64}" style="max-width: 100%; max-height: 480px; object-fit: contain; border-radius: 8px; border: 1px solid #e5e7eb;"></div>`;
             }
 
             container.innerHTML = `
-                <div style="font-size: 20px; font-weight: 800; color: #111827; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="font-size: 30px; font-weight: 800; color: #111827; margin-bottom: 22px; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: space-between;">
                     <span>Câu ${qNum}</span>
-                    ${chosenAns ? '<span style="font-size: 12px; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 4px 10px; border-radius: 9999px;">ĐÃ CHỌN ĐÁP ÁN: ' + escapeHtml(chosenAns) + '</span>' : ''}
+                    ${(showAnswer && chosenAns) ? '<span style="font-size: 13px; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 4px 12px; border-radius: 9999px; font-family: system-ui, sans-serif;">ĐÃ CHỌN ĐÁP ÁN: ' + escapeHtml(chosenAns) + '</span>' : ''}
                 </div>
-                <div style="border: 1px solid #d1d5db; border-radius: 10px; padding: 22px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
-                    <div style="font-size: 15px; font-weight: 500; color: #1f2937; line-height: 1.6; margin-bottom: 16px;">
-                        ${escapeHtml(cleanDisplayQuestionText(q.question_text) || "")}
+                <div style="border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 36px 40px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);">
+                    <div class="stem-content math-rendered" style="font-size: 18px; font-weight: 400; color: #111827; line-height: 1.8; margin-bottom: 24px; font-family: 'KaTeX_Main', 'Latin Modern Roman', 'Times New Roman', serif;">
+                        ${escapeHtml(formattedStem || "")}
                     </div>
                     ${stemImg}
-                    <div style="margin-top: 16px;">
+                    <div style="margin-top: 20px;">
                         ${optionsRender}
                     </div>
                 </div>
@@ -3133,29 +3260,41 @@
             return container;
         }
 
-        async function downloadQuestionAsImage(idx) {
+        async function downloadQuestionAsImage(idx, showAnswer = false) {
             const q = cachedCurrentQuestions[idx];
             if (!q) return;
 
-            const el = buildExportCardElement(q, idx);
+            const el = buildExportCardElement(q, idx, showAnswer);
             document.body.appendChild(el);
 
+            // Render KaTeX in the container
+            renderMathContent(el);
+
             try {
+                if (document.fonts) {
+                    await document.fonts.ready;
+                }
+
                 const imgs = el.querySelectorAll("img");
                 await Promise.all(Array.from(imgs).map(img => {
                     if (img.complete) return Promise.resolve();
                     return new Promise(res => { img.onload = res; img.onerror = res; });
                 }));
 
+                // Allow 60ms for KaTeX fonts and DOM to settle
+                await new Promise(r => setTimeout(r, 60));
+
                 const canvas = await html2canvas(el, {
-                    scale: 2,
+                    scale: 2.5,
                     useCORS: true,
                     backgroundColor: "#ffffff",
-                    logging: false
+                    logging: false,
+                    windowWidth: 1024
                 });
 
                 const link = document.createElement("a");
-                link.download = `Cau_${idx + 1}.png`;
+                const suffix = showAnswer ? "_DapAn" : "";
+                link.download = `Cau_${idx + 1}${suffix}.png`;
                 link.href = canvas.toDataURL("image/png");
                 link.click();
             } catch (err) {
@@ -3166,26 +3305,31 @@
             }
         }
 
-        async function downloadAllQuestionsZip() {
+        async function downloadAllQuestionsZip(showAnswer = false) {
             if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) {
                 alert("Không có câu hỏi nào để tải!");
                 return;
             }
 
-            const btn = document.getElementById("btn-export-zip");
-            const originalText = btn.innerHTML;
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xuất ảnh 0/${cachedCurrentQuestions.length}...`;
-            btn.disabled = true;
+            const btn = showAnswer ? document.getElementById("btn-export-zip-ans") : document.getElementById("btn-export-zip");
+            const originalText = btn ? btn.innerHTML : "";
+            if (btn) {
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xuất ảnh 0/${cachedCurrentQuestions.length}...`;
+                btn.disabled = true;
+            }
 
             const zip = new JSZip();
             const studentName = (document.getElementById("current-exam-student").innerText || "ThiSinh").replace(/[\\/:*?"<>|]/g, "_");
 
             try {
                 for (let i = 0; i < cachedCurrentQuestions.length; i++) {
-                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xuất ảnh ${i+1}/${cachedCurrentQuestions.length}...`;
+                    if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xuất ảnh ${i+1}/${cachedCurrentQuestions.length}...`;
                     const q = cachedCurrentQuestions[i];
-                    const el = buildExportCardElement(q, i);
+                    const el = buildExportCardElement(q, i, showAnswer);
                     document.body.appendChild(el);
+
+                    renderMathContent(el);
+                    if (document.fonts) await document.fonts.ready;
 
                     const imgs = el.querySelectorAll("img");
                     await Promise.all(Array.from(imgs).map(img => {
@@ -3193,32 +3337,39 @@
                         return new Promise(res => { img.onload = res; img.onerror = res; });
                     }));
 
+                    await new Promise(r => setTimeout(r, 50));
+
                     const canvas = await html2canvas(el, {
-                        scale: 2,
+                        scale: 2.5,
                         useCORS: true,
                         backgroundColor: "#ffffff",
-                        logging: false
+                        logging: false,
+                        windowWidth: 1024
                     });
 
                     const base64Data = canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, "");
-                    const fileName = `Cau_${String(i + 1).padStart(2, '0')}.png`;
+                    const suffix = showAnswer ? "_DapAn" : "";
+                    const fileName = `Cau_${String(i + 1).padStart(2, '0')}${suffix}.png`;
                     zip.file(fileName, base64Data, { base64: true });
 
                     if (el.parentNode) el.parentNode.removeChild(el);
                 }
 
-                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang nén file ZIP...`;
+                if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang nén file ZIP...`;
                 const content = await zip.generateAsync({ type: "blob" });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(content);
-                link.download = `DeThi_${studentName}_${currentExamHWID || "export"}.zip`;
+                const zipSuffix = showAnswer ? "_CoDapAn" : "_DeSach_HD";
+                link.download = `DeThi_${studentName}_${currentExamHWID || "export"}${zipSuffix}.zip`;
                 link.click();
             } catch (err) {
                 console.error("Export all images failed:", err);
                 alert("Lỗi khi tải bộ ảnh: " + err.message);
             } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
+                if (btn) {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
             }
         }
 
@@ -3231,30 +3382,33 @@
             const studentName = document.getElementById("current-exam-student").innerText || "";
             const examTitle = document.getElementById("current-exam-title").innerText || "";
 
-            let html = `<!DOCTYPE html><html><head><title>Đề thi - ${studentName}</title>
+            let html = `<!DOCTYPE html><html><head><title>Đề thi - ${escapeHtml(studentName)}</title>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"><\/script>
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"><\/script>
             <style>
-                body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; padding: 30px; color: #111827; background: #fff; }
-                .q-block { margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #d1d5db; border-radius: 10px; padding: 20px; }
-                .q-title { font-size: 18px; font-weight: 800; margin-bottom: 12px; color: #111827; }
-                .q-text { font-size: 15px; line-height: 1.6; margin-bottom: 14px; }
-                .opt { margin-bottom: 8px; padding: 8px 12px; border-radius: 6px; font-size: 14px; }
+                body { font-family: 'KaTeX_Main', 'Latin Modern Roman', 'Times New Roman', serif; padding: 30px; color: #111827; background: #fff; }
+                .q-block { margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #d1d5db; border-radius: 10px; padding: 24px; }
+                .q-title { font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #111827; font-family: system-ui, sans-serif; }
+                .q-text { font-size: 16px; line-height: 1.8; margin-bottom: 16px; }
+                .opt { margin-bottom: 10px; padding: 8px 12px; border-radius: 6px; font-size: 16px; }
                 .opt.chosen { background: #f0fdf4; border: 1.5px solid #22c55e; font-weight: 700; color: #15803d; }
-                img { max-width: 100%; max-height: 350px; object-fit: contain; }
+                img { max-width: 100%; max-height: 380px; object-fit: contain; }
                 @media print { button { display: none; } body { padding: 0; } }
             </style></head><body>
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 24px;">
                 <div>
-                    <h1 style="font-size: 22px; font-weight: 800; margin: 0;">ĐỀ THI TRỰC TUYẾN</h1>
+                    <h1 style="font-size: 22px; font-weight: 800; margin: 0; font-family: system-ui, sans-serif;">ĐỀ THI TRỰC TUYẾN</h1>
                     <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">${escapeHtml(examTitle)}</p>
                 </div>
                 <div style="text-align: right;">
-                    <div style="font-weight: 700; font-size: 15px;">Thí sinh: ${escapeHtml(studentName)}</div>
+                    <div style="font-weight: 700; font-size: 15px; font-family: system-ui, sans-serif;">Thí sinh: ${escapeHtml(studentName)}</div>
                     <button onclick="window.print()" style="margin-top: 6px; padding: 6px 16px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">In hoặc Lưu PDF</button>
                 </div>
             </div>`;
 
             cachedCurrentQuestions.forEach((q, idx) => {
-                const el = buildExportCardElement(q, idx);
+                const el = buildExportCardElement(q, idx, true);
                 el.style.position = "static";
                 el.style.width = "100%";
                 el.style.padding = "0";
@@ -3262,7 +3416,23 @@
                 html += el.outerHTML;
             });
 
-            html += `</body></html>`;
+            html += `
+            <script>
+                window.addEventListener("DOMContentLoaded", function() {
+                    if (typeof renderMathInElement === "function") {
+                        renderMathInElement(document.body, {
+                            delimiters: [
+                                {left: "$$", right: "$$", display: true},
+                                {left: "$", right: "$", display: false},
+                                {left: "\\\\(", right: "\\\\)", display: false},
+                                {left: "\\\\[", right: "\\\\]", display: true}
+                            ],
+                            throwOnError: false
+                        });
+                    }
+                });
+            <\/script>
+            </body></html>`;
             printWindow.document.write(html);
             printWindow.document.close();
         }

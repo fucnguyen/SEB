@@ -364,16 +364,100 @@
         } catch (e) {}
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // MATH SERIALIZER (Preserves KaTeX, MathJax, MathML, <sup>, <sub>, and LaTeX)
+    // ─────────────────────────────────────────────────────────────────────────
+    function serializeDomWithMath(el) {
+        if (!el) return "";
+        try {
+            var clone = el.cloneNode(true);
+
+            // 1. Process KaTeX math containers (.katex)
+            var katexEls = clone.querySelectorAll(".katex, [class*='katex']");
+            for (var k = 0; k < katexEls.length; k++) {
+                var kEl = katexEls[k];
+                if (!kEl.parentNode) continue;
+                var ann = kEl.querySelector("annotation[encoding*='tex'], annotation[encoding*='latex'], [data-latex]");
+                var texVal = ann ? (ann.textContent || ann.getAttribute("data-latex") || "").trim() : "";
+                if (texVal) {
+                    var tn = document.createTextNode(" $" + texVal + "$ ");
+                    kEl.parentNode.replaceChild(tn, kEl);
+                }
+            }
+
+            // 2. Process MathJax math containers (script[type*='math/tex'], mjx-container, .MathJax)
+            var mjxScripts = clone.querySelectorAll("script[type*='math/tex']");
+            for (var ms = 0; ms < mjxScripts.length; ms++) {
+                var sc = mjxScripts[ms];
+                if (!sc.parentNode) continue;
+                var sVal = (sc.textContent || "").trim();
+                if (sVal) {
+                    var sTn = document.createTextNode(" $" + sVal + "$ ");
+                    sc.parentNode.replaceChild(sTn, sc);
+                }
+            }
+            var mjxEls = clone.querySelectorAll("mjx-container, [data-latex], .MathJax");
+            for (var m = 0; m < mjxEls.length; m++) {
+                var mEl = mjxEls[m];
+                if (!mEl.parentNode) continue;
+                var mAnn = mEl.querySelector("annotation[encoding*='tex']");
+                var mVal = mAnn ? mAnn.textContent.trim() : (mEl.getAttribute("data-latex") || "").trim();
+                if (mVal) {
+                    var mTn = document.createTextNode(" $" + mVal + "$ ");
+                    mEl.parentNode.replaceChild(mTn, mEl);
+                }
+            }
+
+            // 3. Process MathML (<math>)
+            var mathEls = clone.querySelectorAll("math");
+            for (var mt = 0; mt < mathEls.length; mt++) {
+                var mathEl = mathEls[mt];
+                if (!mathEl.parentNode) continue;
+                var mathAnn = mathEl.querySelector("annotation[encoding*='tex']");
+                if (mathAnn && mathAnn.textContent.trim()) {
+                    mathEl.parentNode.replaceChild(document.createTextNode(" $" + mathAnn.textContent.trim() + "$ "), mathEl);
+                }
+            }
+
+            // 4. Process HTML superscripts <sup> and subscripts <sub>
+            var sups = clone.querySelectorAll("sup");
+            for (var sp = 0; sp < sups.length; sp++) {
+                var supEl = sups[sp];
+                if (!supEl.parentNode) continue;
+                var supTxt = (supEl.textContent || "").trim();
+                if (supTxt) {
+                    supEl.parentNode.replaceChild(document.createTextNode("^{" + supTxt + "}"), supEl);
+                }
+            }
+            var subs = clone.querySelectorAll("sub");
+            for (var sb = 0; sb < subs.length; sb++) {
+                var subEl = subs[sb];
+                if (!subEl.parentNode) continue;
+                var subTxt = (subEl.textContent || "").trim();
+                if (subTxt) {
+                    subEl.parentNode.replaceChild(document.createTextNode("_{" + subTxt + "}"), subEl);
+                }
+            }
+
+            // 5. Remove hidden styles & scripts
+            var noiseEls = clone.querySelectorAll("style, script, noscript, [aria-hidden='true'].katex-html");
+            for (var n = 0; n < noiseEls.length; n++) {
+                if (noiseEls[n].parentNode) noiseEls[n].parentNode.removeChild(noiseEls[n]);
+            }
+
+            var textResult = (clone.innerText || clone.textContent || "").trim();
+            // Clean extra spaces inside math delimiters
+            textResult = textResult.replace(/\$\s+/g, "$").replace(/\s+\$/g, "$").replace(/\s{2,}/g, " ");
+            return textResult.normalize ? textResult.normalize("NFC") : textResult;
+        } catch (e) {
+            var fallback = (el.innerText || el.textContent || "").trim();
+            return fallback.normalize ? fallback.normalize("NFC") : fallback;
+        }
+    }
+
     function getText(el) {
         if (!el) return "";
-        // Check for MathJax or KaTeX LaTeX annotations if present
-        var texEl = el.querySelector("annotation[encoding*='tex'], script[type*='math/tex'], [data-latex]");
-        var tex = texEl ? (texEl.textContent || texEl.getAttribute("data-latex") || "").trim() : "";
-        var val = (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ");
-        if (tex && (!val || val.length < tex.length)) {
-            val = tex;
-        }
-        return val.normalize ? val.normalize("NFC") : val;
+        return serializeDomWithMath(el);
     }
 
     function imgToBase64(imgEl) {
@@ -934,7 +1018,7 @@
         var fptStemEl = block.querySelector(".card-body.border-bottom");
         if (fptStemEl) {
             var stemClone = fptStemEl.cloneNode(true);
-            var noise1 = stemClone.querySelectorAll("style, script, .katex-mathml, annotation");
+            var noise1 = stemClone.querySelectorAll("style, script");
             for (var i = 0; i < noise1.length; i++) noise1[i].remove();
 
             var mathImgs = stemClone.querySelectorAll("img");
@@ -984,8 +1068,7 @@
                 "input, textarea, button, " +
                 ".form-check, .answer, .options, [class*='choice'], [class*='option'], " +
                 "[class*='radio'], [role='radio'], [role='checkbox'], " +
-                ".ant-radio-wrapper, .el-radio, " +
-                "label, .katex-mathml, annotation"
+                ".ant-radio-wrapper, .el-radio, label"
             );
             for (var k = 0; k < inputsInClone.length; k++) {
                 inputsInClone[k].remove();
