@@ -271,6 +271,10 @@ def create_download_request(request_id: str, full_name: str, email: str, note: s
     """, (request_id, full_name, email, note, ip_address, now, system_type))
     conn.commit()
     conn.close()
+    try:
+        sync_seed_file()
+    except Exception:
+        pass
     return get_download_request(request_id)
 
 def get_download_request(request_id: str) -> Optional[Dict[str, Any]]:
@@ -293,6 +297,11 @@ def approve_download_request(request_id: str, token: str, expires_at: str) -> bo
     affected = c.rowcount > 0
     conn.commit()
     conn.close()
+    if affected:
+        try:
+            sync_seed_file()
+        except Exception:
+            pass
     return affected
 
 def reject_download_request(request_id: str) -> bool:
@@ -302,6 +311,11 @@ def reject_download_request(request_id: str) -> bool:
     affected = c.rowcount > 0
     conn.commit()
     conn.close()
+    if affected:
+        try:
+            sync_seed_file()
+        except Exception:
+            pass
     return affected
 
 def list_download_requests(limit: int = 50, system_type: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -361,6 +375,10 @@ def create_or_update_activation_request(
 
     conn.commit()
     conn.close()
+    try:
+        sync_seed_file()
+    except Exception:
+        pass
     return get_license_by_hwid(hwid)
 
 def get_license_by_hwid(hwid: str) -> Optional[Dict[str, Any]]:
@@ -567,13 +585,37 @@ def log_access_event(
         "created_at": now
     }
 
-def list_access_logs(limit: int = 200, hwid: Optional[str] = None) -> List[Dict[str, Any]]:
+def list_access_logs(limit: int = 300, hwid: Optional[str] = None, target_date: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_connection()
     c = conn.cursor()
-    if hwid:
-        c.execute("SELECT * FROM access_logs WHERE hwid = ? ORDER BY id DESC LIMIT ?", (hwid.strip(), limit))
-    else:
-        c.execute("SELECT * FROM access_logs ORDER BY id DESC LIMIT ?", (limit,))
+    params = []
+    query = "SELECT * FROM access_logs WHERE 1=1"
+    if hwid and hwid.strip():
+        query += " AND hwid = ?"
+        params.append(hwid.strip())
+    if target_date and target_date.strip() and target_date.strip().lower() != "all":
+        d = target_date.strip()
+        query += " AND (created_at LIKE ? OR DATE(created_at) = ?)"
+        params.extend([f"{d}%", d])
+    query += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+    c.execute(query, tuple(params))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def list_access_log_dates() -> List[Dict[str, Any]]:
+    """Lấy danh sách các ngày có nhật ký kèm số sự kiện để hiển thị thanh lọc theo ngày"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT SUBSTR(created_at, 1, 10) as log_date, COUNT(*) as count 
+        FROM access_logs 
+        WHERE created_at IS NOT NULL AND created_at != ''
+        GROUP BY SUBSTR(created_at, 1, 10) 
+        ORDER BY log_date DESC 
+        LIMIT 60
+    """)
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
     return rows
@@ -687,8 +729,44 @@ def seed_initial_data(cursor):
                     dl.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
                     dl.get("approved_at", dl.get("created_at"))
                 ))
+        # 3. Nạp support keys
+        for sk in seed.get("support_keys", []):
+            kcode = sk.get("key_code", "").strip()
+            if not kcode:
+                continue
+            cursor.execute("SELECT id FROM support_keys WHERE key_code = ?", (kcode,))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO support_keys (key_code, assigned_name, email, phone, note, status, created_at, expires_at, last_login)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    kcode, sk.get("assigned_name", "CTV Support"), sk.get("email", ""),
+                    sk.get("phone", ""), sk.get("note", ""), sk.get("status", "active"),
+                    sk.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                    sk.get("expires_at", ""), sk.get("last_login", "")
+                ))
+
+        # 4. Nạp support assignments
+        for sa in seed.get("support_assignments", []):
+            skey = sa.get("support_key", "").strip()
+            hwid = sa.get("hwid", "").strip()
+            edate = sa.get("exam_date", "").strip()
+            if not skey or not hwid or not edate:
+                continue
+            cursor.execute("SELECT id FROM support_assignments WHERE support_key = ? AND hwid = ? AND exam_date = ?", (skey, hwid, edate))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO support_assignments (support_key, hwid, student_name, exam_date, exam_shift, subject, notes, created_at, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    skey, hwid, sa.get("student_name", ""), edate,
+                    sa.get("exam_shift", ""), sa.get("subject", ""), sa.get("notes", ""),
+                    sa.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                    sa.get("status", "active")
+                ))
+
         try:
-            print(f"[Seed] Successfully seeded {len(seed.get('licenses', []))} licenses and {len(seed.get('download_requests', []))} downloads.")
+            print(f"[Seed] Successfully seeded {len(seed.get('licenses', []))} licenses, {len(seed.get('download_requests', []))} downloads, and {len(seed.get('support_keys', []))} support keys.")
         except Exception:
             pass
     except Exception as e:
@@ -698,12 +776,14 @@ def seed_initial_data(cursor):
             pass
 
 def sync_seed_file():
-    """Tự động đồng bộ các license và yêu cầu tải mới nhất ra seed_data.json để lưu trữ lâu dài"""
+    """Tự động đồng bộ các license, yêu cầu tải và support keys mới nhất ra seed_data.json để lưu trữ lâu dài"""
     try:
         data = export_all_data()
         payload = {
             "licenses": data.get("licenses", []),
-            "download_requests": data.get("download_requests", [])
+            "download_requests": data.get("download_requests", []),
+            "support_keys": data.get("support_keys", []),
+            "support_assignments": data.get("support_assignments", [])
         }
         import json
         with open(SEED_FILE_PATH, "w", encoding="utf-8") as f:
@@ -712,7 +792,7 @@ def sync_seed_file():
         pass
 
 def export_all_data() -> Dict[str, Any]:
-    """Xuất toàn bộ cơ sở dữ liệu thành đối tượng Dict JSON để tải về máy tính"""
+    """Xuất toàn bộ cơ sở dữ liệu thành đối tượng Dict JSON để tải về máy tính hoặc sao lưu Cloud"""
     conn = get_connection()
     c = conn.cursor()
     
@@ -721,11 +801,17 @@ def export_all_data() -> Dict[str, Any]:
     
     c.execute("SELECT * FROM download_requests ORDER BY id ASC")
     download_requests = [dict(r) for r in c.fetchall()]
+
+    c.execute("SELECT * FROM support_keys ORDER BY id ASC")
+    support_keys = [dict(r) for r in c.fetchall()]
+
+    c.execute("SELECT * FROM support_assignments ORDER BY id ASC")
+    support_assignments = [dict(r) for r in c.fetchall()]
     
     c.execute("SELECT * FROM chat_messages ORDER BY id ASC")
     chat_messages = [dict(r) for r in c.fetchall()]
     
-    c.execute("SELECT * FROM access_logs ORDER BY id DESC LIMIT 500")
+    c.execute("SELECT * FROM access_logs ORDER BY id DESC LIMIT 1000")
     access_logs = [dict(r) for r in c.fetchall()]
     
     c.execute("SELECT key, value FROM settings")
@@ -736,6 +822,8 @@ def export_all_data() -> Dict[str, Any]:
         "exported_at": now_vn().strftime("%Y-%m-%d %H:%M:%S"),
         "licenses": licenses,
         "download_requests": download_requests,
+        "support_keys": support_keys,
+        "support_assignments": support_assignments,
         "chat_messages": chat_messages,
         "access_logs": access_logs,
         "settings": settings
@@ -745,7 +833,7 @@ def import_all_data(data: Dict[str, Any], overwrite: bool = False) -> Dict[str, 
     """Nạp dữ liệu từ file backup JSON vào cơ sở dữ liệu"""
     conn = get_connection()
     c = conn.cursor()
-    stats = {"licenses": 0, "download_requests": 0, "chat_messages": 0, "access_logs": 0}
+    stats = {"licenses": 0, "download_requests": 0, "support_keys": 0, "support_assignments": 0, "chat_messages": 0, "access_logs": 0}
     
     for lic in data.get("licenses", []):
         hwid = lic.get("hwid", "").strip()
@@ -803,11 +891,90 @@ def import_all_data(data: Dict[str, Any], overwrite: bool = False) -> Dict[str, 
                 dl.get("approved_at")
             ))
             stats["download_requests"] += 1
+
+    for sk in data.get("support_keys", []):
+        kcode = sk.get("key_code", "").strip()
+        if not kcode:
+            continue
+        c.execute("SELECT id FROM support_keys WHERE key_code = ?", (kcode,))
+        if not c.fetchone():
+            c.execute("""
+                INSERT INTO support_keys (key_code, assigned_name, email, phone, note, status, created_at, expires_at, last_login)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                kcode, sk.get("assigned_name", "CTV Support"), sk.get("email", ""),
+                sk.get("phone", ""), sk.get("note", ""), sk.get("status", "active"),
+                sk.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                sk.get("expires_at", ""), sk.get("last_login", "")
+            ))
+            stats["support_keys"] += 1
+
+    for sa in data.get("support_assignments", []):
+        skey = sa.get("support_key", "").strip()
+        hwid = sa.get("hwid", "").strip()
+        edate = sa.get("exam_date", "").strip()
+        if not skey or not hwid or not edate:
+            continue
+        c.execute("SELECT id FROM support_assignments WHERE support_key = ? AND hwid = ? AND exam_date = ?", (skey, hwid, edate))
+        if not c.fetchone():
+            c.execute("""
+                INSERT INTO support_assignments (support_key, hwid, student_name, exam_date, exam_shift, subject, notes, created_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                skey, hwid, sa.get("student_name", ""), edate,
+                sa.get("exam_shift", ""), sa.get("subject", ""), sa.get("notes", ""),
+                sa.get("created_at") or now_vn().strftime("%Y-%m-%d %H:%M:%S"),
+                sa.get("status", "active")
+            ))
+            stats["support_assignments"] += 1
             
     conn.commit()
     conn.close()
-    sync_seed_file()
+    try:
+        sync_seed_file()
+    except Exception:
+        pass
     return stats
+
+def send_backup_to_telegram() -> Dict[str, Any]:
+    """Tự động đóng gói toàn bộ database thành file JSON và gửi trực tiếp qua Telegram Bot về máy admin."""
+    import requests
+    bot_token = get_setting("telegram_bot_token") or "8902883418:AAF1rAAcEVx4gyI9gcJW5GrBjqB-PphSuf8"
+    chat_id = get_setting("telegram_chat_id") or "6396371761"
+    if not bot_token or not chat_id:
+        return {"success": False, "error": "Chưa cấu hình Telegram Bot Token hoặc Chat ID"}
+    
+    data = export_all_data()
+    now_str = now_vn().strftime("%Y-%m-%d_%H%M%S")
+    filename = f"seb_portal_cloud_backup_{now_str}.json"
+    
+    caption = (
+        f"📦 <b>[SAO LƯU DỮ LIỆU SEB CLOUD]</b>\n\n"
+        f"📅 <b>Thời gian:</b> {now_vn().strftime('%Y-%m-%d %H:%M:%S')} (GMT+7)\n"
+        f"🔑 <b>Bản quyền & Mã máy:</b> {len(data.get('licenses', []))} máy\n"
+        f"📥 <b>Yêu cầu tải:</b> {len(data.get('download_requests', []))} yêu cầu\n"
+        f"👨‍🏫 <b>Key Support CTV:</b> {len(data.get('support_keys', []))} keys\n"
+        f"📝 <b>Phân ca thi:</b> {len(data.get('support_assignments', []))} ca\n"
+        f"🛡️ <i>Tệp đính kèm chứa trọn vẹn CSDL, có thể tải về hoặc nạp khôi phục (Restore) bất cứ lúc nào!</i>"
+    )
+    
+    try:
+        content_bytes = json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
+        files = {
+            "document": (filename, content_bytes, "application/json")
+        }
+        res = requests.post(
+            f"https://api.telegram.org/bot{bot_token}/sendDocument",
+            data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+            files=files,
+            timeout=15
+        )
+        if res.status_code == 200:
+            return {"success": True, "filename": filename, "message": "Đã gửi bản sao lưu thành công qua Telegram!"}
+        else:
+            return {"success": False, "error": f"Telegram API lỗi HTTP {res.status_code}: {res.text}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 # ────────────────── Live Exam Sync & Support API ──────────────────
 

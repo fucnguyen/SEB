@@ -16,25 +16,8 @@
       "last_heartbeat": "2026-09-25 11:20:38",
       "created_at": "2026-09-25 11:20:27",
       "phone": "",
-      "notes": ""
-    },
-    {
-      "id": 2,
-      "request_id": "REQ_HOST_MACHINE",
-      "hwid": "4C4C4544-005A-4E10-8042-B4C04F305A32",
-      "student_name": "Nguyen Lam Phuc (Host Dev)",
-      "email": "p4112k5@gmail.com",
-      "machine_name": "DESKTOP-HOST",
-      "ip_address": "127.0.0.1",
-      "status": "active",
-      "duration_type": "365d",
-      "license_key": "RCDwcTWy/uXPoCUje3t/z7+rqmSklleAvJTOcwb5hLHC7mNCweU3ZVk21vNNARZExZEpW5ScglK3pRcqIPbOv9jzWogg9WwqVIse2VijJy4MKpQGdG8Zbkv2z8P5mu/f0tlXduxfFgpcwrUxTEXL2KFXJpMskt3AL/OY4B5aMcXom/Dj6baQb+Yvv/3zdaM1h/ECmOtiJMPjw8DeXpfKro+FZeUtA5a8LzRPSz9JOEqFfa9zpg2MtPESGcxa06KeGiSC0nfGlNZVF5VwV25sQXGkUxfF7erAgB5rF1Tw3kSrnL6Wqx8O72BbYl2uzwdemrIaMadnOKUoNei3wsmagypbcI/GpbZsx652/r34zllB4JRkSYfAT+w3+PYCAyLRby10lwnKVLXMedjsZSuHCIxPydCyKKY/JYGqkFu1Pe/vfW9Uy3txM3QiYtEXmvv17V914MXMfL0dcGhypos44Ak2sfgpiyubjxZKhL2DHf0PiUN55y28oepdgvsR2yUcIDFDi+7ezVbSwh6xsOUrmZwtffoX7xk1xBwq0Rpfkhs=",
-      "activated_at": "2026-09-27 11:00:52",
-      "expires_at": "2027-09-27 11:00:52",
-      "last_heartbeat": "2026-09-27 11:00:52",
-      "created_at": "2026-09-27 11:00:52",
-      "phone": "",
-      "notes": "Máy phát triển chính (Host)"
+      "notes": "",
+      "system_type": "SEB"
     },
     {
       "id": 3,
@@ -52,7 +35,8 @@
       "last_heartbeat": "2026-09-25 16:23:25",
       "created_at": "2026-09-10 07:50:52",
       "phone": "0912345678",
-      "notes": "Máy chính Quản trị / Học sinh Fuc"
+      "notes": "Máy chính Quản trị / Học sinh Fuc",
+      "system_type": "SEB"
     },
     {
       "id": 4,
@@ -70,7 +54,8 @@
       "last_heartbeat": "2026-09-08 23:16:19",
       "created_at": "2026-09-08 23:16:19",
       "phone": "",
-      "notes": "Học sinh Đặng Kiên - Khóa 2026"
+      "notes": "Học sinh Đặng Kiên - Khóa 2026",
+      "system_type": "SEB"
     },
     {
       "id": 5,
@@ -88,7 +73,8 @@
       "last_heartbeat": "2026-09-12 13:24:04",
       "created_at": "2026-09-12 13:24:04",
       "phone": "",
-      "notes": "Học sinh Đỗ Văn Đông"
+      "notes": "Học sinh Đỗ Văn Đông",
+      "system_type": "SEB"
     },
     {
       "id": 6,
@@ -106,7 +92,8 @@
       "last_heartbeat": "2026-09-17 08:36:56",
       "created_at": "2026-09-17 08:36:56",
       "phone": "",
-      "notes": "Học sinh Nguyễn Hùng Cháng"
+      "notes": "Học sinh Nguyễn Hùng Cháng",
+      "system_type": "SEB"
     },
     {
       "id": 7,
@@ -124,7 +111,8 @@
       "last_heartbeat": "2026-09-17 22:16:19",
       "created_at": "2026-09-17 22:16:19",
       "phone": "",
-      "notes": "Học sinh Hoàng Sếch"
+      "notes": "Học sinh Hoàng Sếch",
+      "system_type": "SEB"
     },
     {
       "id": 8,
@@ -142,7 +130,8 @@
       "last_heartbeat": "2026-09-15 10:29:17",
       "created_at": "2026-09-15 10:29:17",
       "phone": "0912345678",
-      "notes": "Laptop phụ của Phúc"
+      "notes": "Laptop phụ của Phúc",
+      "system_type": "SEB"
     },
     {
       "id": 9,
@@ -160,7 +149,8 @@
       "last_heartbeat": "2026-09-09 18:29:51",
       "created_at": "2026-09-09 18:29:51",
       "phone": "",
-      "notes": "Máy cũ thử nghiệm giai đoạn 1"
+      "notes": "Máy cũ thử nghiệm giai đoạn 1",
+      "system_type": "SEB"
     },
     {
       "id": 10,
@@ -178,7 +168,27 @@
       "last_heartbeat": "2026-09-11 09:39:58",
       "created_at": "2026-09-11 09:39:58",
       "phone": "",
-      "notes": "HWID thử nghiệm tính năng hết hạn"
+      "notes": "HWID thử nghiệm tính năng hết hạn",
+      "system_type": "SEB"
+    },
+    {
+      "id": 11,
+      "request_id": "REQ_HOST_MACHINE",
+      "hwid": "4C4C4544-005A-4E10-8042-B4C04F305A32",
+      "student_name": "Nguyen Lam Phuc (Host Dev)",
+      "email": "p4112k5@gmail.com",
+      "machine_name": "DESKTOP-HOST",
+      "ip_address": "127.0.0.1",
+      "status": "active",
+      "duration_type": "365d",
+      "license_key": "RCDwcTWy/uXPoCUje3t/z7+rqmSklleAvJTOcwb5hLHC7mNCweU3ZVk21vNNARZExZEpW5ScglK3pRcqIPbOv9jzWogg9WwqVIse2VijJy4MKpQGdG8Zbkv2z8P5mu/f0tlXduxfFgpcwrUxTEXL2KFXJpMskt3AL/OY4B5aMcXom/Dj6baQb+Yvv/3zdaM1h/ECmOtiJMPjw8DeXpfKro+FZeUtA5a8LzRPSz9JOEqFfa9zpg2MtPESGcxa06KeGiSC0nfGlNZVF5VwV25sQXGkUxfF7erAgB5rF1Tw3kSrnL6Wqx8O72BbYl2uzwdemrIaMadnOKUoNei3wsmagypbcI/GpbZsx652/r34zllB4JRkSYfAT+w3+PYCAyLRby10lwnKVLXMedjsZSuHCIxPydCyKKY/JYGqkFu1Pe/vfW9Uy3txM3QiYtEXmvv17V914MXMfL0dcGhypos44Ak2sfgpiyubjxZKhL2DHf0PiUN55y28oepdgvsR2yUcIDFDi+7ezVbSwh6xsOUrmZwtffoX7xk1xBwq0Rpfkhs=",
+      "activated_at": "2026-09-27 11:00:52",
+      "expires_at": "2027-09-27 11:00:52",
+      "last_heartbeat": "2026-09-27 11:00:52",
+      "created_at": "2026-09-27 11:00:52",
+      "phone": "",
+      "notes": "Máy phát triển chính (Host)",
+      "system_type": "SEB"
     }
   ],
   "download_requests": [
@@ -193,7 +203,8 @@
       "download_token": "token_123",
       "token_expires_at": "2026-09-25 12:00:00",
       "created_at": "2026-09-25 11:14:29",
-      "approved_at": "2026-09-25 11:14:29"
+      "approved_at": "2026-09-25 11:14:29",
+      "system_type": "SEB"
     },
     {
       "id": 2,
@@ -206,7 +217,8 @@
       "download_token": "e7155d75-6467-4faf-9428-0b87e4a015f6",
       "token_expires_at": "2026-09-25 11:55:22",
       "created_at": "2026-09-25 11:25:22",
-      "approved_at": "2026-09-25 11:25:22"
+      "approved_at": "2026-09-25 11:25:22",
+      "system_type": "SEB"
     },
     {
       "id": 3,
@@ -219,7 +231,36 @@
       "download_token": "fuc_token_permanent_2026",
       "token_expires_at": "2027-01-01 00:00:00",
       "created_at": "2026-09-25 14:05:20",
-      "approved_at": "2026-09-25 14:06:00"
+      "approved_at": "2026-09-25 14:06:00",
+      "system_type": "SEB"
+    },
+    {
+      "id": 6,
+      "request_id": "TEST_WIN_001",
+      "full_name": "Nguyen Van A",
+      "email": "a@test.com",
+      "note": "Test Win",
+      "ip_address": "1.1.1.1",
+      "status": "approved",
+      "download_token": "tok_win_123",
+      "token_expires_at": "2030-01-01 00:00:00",
+      "created_at": "2026-09-28 20:23:38",
+      "approved_at": "2026-09-28 20:23:38",
+      "system_type": "SEB"
+    },
+    {
+      "id": 7,
+      "request_id": "TEST_MAC_001",
+      "full_name": "Tran Thi B",
+      "email": "b@test.com",
+      "note": "Test Mac",
+      "ip_address": "2.2.2.2",
+      "status": "approved",
+      "download_token": "tok_mac_456",
+      "token_expires_at": "2030-01-01 00:00:00",
+      "created_at": "2026-09-28 20:23:40",
+      "approved_at": "2026-09-28 20:23:40",
+      "system_type": "MAC"
     }
   ]
 }

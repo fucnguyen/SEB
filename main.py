@@ -619,9 +619,19 @@ async def api_log_session(payload: SessionLogModel, request: Request):
 # ────────────────── Admin Management API ──────────────────
 
 @app.get("/api/admin/access-logs", dependencies=[Depends(require_admin)])
-async def api_admin_access_logs(limit: int = 150, hwid: Optional[str] = None):
-    logs = database.list_access_logs(limit=limit, hwid=hwid)
-    return {"logs": logs}
+async def api_admin_access_logs(limit: int = 300, hwid: Optional[str] = None, target_date: Optional[str] = None):
+    dates = database.list_access_log_dates()
+    logs = database.list_access_logs(limit=limit, hwid=hwid, target_date=target_date)
+    return {
+        "logs": logs,
+        "dates": dates,
+        "selected_date": target_date or ""
+    }
+
+@app.post("/api/admin/backup-telegram", dependencies=[Depends(require_admin)])
+async def api_admin_backup_telegram():
+    res = database.send_backup_to_telegram()
+    return res
 
 @app.post("/api/admin/clear-access-logs", dependencies=[Depends(require_admin)])
 async def api_admin_clear_access_logs():

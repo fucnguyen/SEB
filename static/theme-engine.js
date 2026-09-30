@@ -151,37 +151,110 @@
         root.style.setProperty("--app-font-family", fn.css);
         root.style.setProperty("--app-font-size", sc.val);
 
-        // Apply root font scale & family
-        document.body.style.fontFamily = fn.css;
-        document.body.style.fontSize = sc.val;
-
-        // Apply mode class
-        root.classList.remove("theme-mode-dark", "theme-mode-oled", "theme-mode-light", "dark", "light");
-        if (md === "light") {
-            root.classList.add("theme-mode-light", "light");
-            document.body.classList.remove("bg-slate-950", "text-slate-100");
-            document.body.classList.add("bg-slate-50", "text-slate-900");
-        } else if (md === "oled") {
-            root.classList.add("theme-mode-oled", "dark");
-            document.body.classList.remove("bg-slate-50", "text-slate-900");
-            document.body.classList.add("bg-black", "text-white");
-        } else {
-            root.classList.add("theme-mode-dark", "dark");
-            document.body.classList.remove("bg-slate-50", "text-slate-900", "bg-black");
-            document.body.classList.add("bg-slate-950", "text-slate-100");
+        // Inject / Update dynamic style tag in document.head
+        let styleTag = document.getElementById("seb-theme-dynamic-styles");
+        if (!styleTag) {
+            styleTag = document.createElement("style");
+            styleTag.id = "seb-theme-dynamic-styles";
+            (document.head || root).appendChild(styleTag);
         }
+        styleTag.innerHTML = `
+            :root {
+                --primary-accent: ${ac.primary} !important;
+                --primary-hover: ${ac.hover} !important;
+                --primary-gradient: ${ac.gradient} !important;
+                --primary-glow: ${ac.glow} !important;
+                --primary-badge-bg: ${ac.badgeBg} !important;
+                --primary-badge-text: ${ac.badgeText} !important;
+                --primary-badge-border: ${ac.badgeBorder} !important;
+                --primary-accent-subtle: ${ac.accentBgSubtle} !important;
+                --app-font-family: ${fn.css} !important;
+                --app-font-size: ${sc.val} !important;
+            }
+            body {
+                font-family: ${fn.css} !important;
+                font-size: ${sc.val} !important;
+            }
+            .tab-active-pill, .btn-primary, [data-theme-primary], #header-btn-create-key {
+                background: ${ac.gradient} !important;
+                color: #ffffff !important;
+                box-shadow: 0 4px 18px -2px ${ac.primary}66 !important;
+            }
+            .theme-accent-color, [data-theme-color] {
+                color: ${ac.primary} !important;
+            }
+            .theme-accent-border, [data-theme-border] {
+                border-color: ${ac.primary} !important;
+            }
+            .theme-badge-style {
+                background: ${ac.badgeBg} !important;
+                color: ${ac.badgeText} !important;
+                border-color: ${ac.badgeBorder} !important;
+            }
+            /* Override hardcoded purple classes to follow accent */
+            .bg-purple-600 {
+                background-color: ${ac.primary} !important;
+            }
+            .hover\\:bg-purple-500:hover {
+                background-color: ${ac.hover} !important;
+            }
+            .text-purple-400, .text-purple-300 {
+                color: ${ac.badgeText} !important;
+            }
+            .border-purple-500, .border-purple-500\\/30, .border-purple-500\\/40, .border-purple-700\\/60 {
+                border-color: ${ac.badgeBorder} !important;
+            }
+            .bg-purple-500\\/20, .bg-purple-500\\/15, .bg-purple-600\\/20, .bg-purple-950\\/80 {
+                background-color: ${ac.badgeBg} !important;
+            }
+            ::-webkit-scrollbar-thumb {
+                background: ${ac.primary}66 !important;
+            }
+            ::-webkit-scrollbar-thumb:hover {
+                background: ${ac.primary} !important;
+            }
+        `;
 
-        // Apply dynamic accent to custom elements with attribute data-theme-accent
-        document.querySelectorAll("[data-theme-bg]").forEach(el => {
-            el.style.background = ac.gradient;
-        });
-        document.querySelectorAll("[data-theme-color]").forEach(el => {
-            el.style.color = ac.primary;
-        });
+        // Apply to body if available
+        if (document.body) {
+            document.body.style.fontFamily = fn.css;
+            document.body.style.fontSize = sc.val;
+
+            // Apply mode class
+            root.classList.remove("theme-mode-dark", "theme-mode-oled", "theme-mode-light", "dark", "light");
+            if (md === "light") {
+                root.classList.add("theme-mode-light", "light");
+                document.body.classList.remove("bg-slate-950", "text-slate-100");
+                document.body.classList.add("bg-slate-50", "text-slate-900");
+            } else if (md === "oled") {
+                root.classList.add("theme-mode-oled", "dark");
+                document.body.classList.remove("bg-slate-50", "text-slate-900");
+                document.body.classList.add("bg-black", "text-white");
+            } else {
+                root.classList.add("theme-mode-dark", "dark");
+                document.body.classList.remove("bg-slate-50", "text-slate-900", "bg-black");
+                document.body.classList.add("bg-slate-950", "text-slate-100");
+            }
+
+            document.querySelectorAll("[data-theme-bg]").forEach(el => {
+                el.style.background = ac.gradient;
+            });
+            document.querySelectorAll("[data-theme-color]").forEach(el => {
+                el.style.color = ac.primary;
+            });
+        }
     }
 
     // Apply on earliest script execution
-    applyTheme(currentPrefs);
+    try {
+        applyTheme(currentPrefs);
+    } catch(e) {
+        console.warn("Initial applyTheme deferred:", e);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => applyTheme(currentPrefs));
+    }
 
     // Build the Appearance Modal
     function injectAppearanceModal() {

@@ -148,8 +148,11 @@
                 <button onclick="downloadBackupJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Sao lưu toàn bộ dữ liệu">
                     <i class="fa-solid fa-download text-[11px] text-emerald-400"></i> <span class="hidden sm:inline">Sao Lưu</span>
                 </button>
-                <button onclick="triggerRestoreJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Khôi phục dữ liệu">
+                <button onclick="triggerRestoreJson()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition text-slate-200 border border-slate-700" title="Khôi phục dữ liệu từ file JSON">
                     <i class="fa-solid fa-upload text-[11px] text-amber-400"></i> <span class="hidden sm:inline">Khôi Phục</span>
+                </button>
+                <button onclick="backupToTelegram()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition text-sky-300 border border-slate-700" title="Gửi bản sao lưu CSDL trực tiếp qua Telegram Bot">
+                    <i class="fa-brands fa-telegram text-[12px] text-sky-400"></i> <span class="hidden sm:inline">Lưu Telegram</span>
                 </button>
                 <input type="file" id="backup-file-input" accept=".json" class="hidden" onchange="handleRestoreFile(event)">
                 
@@ -768,10 +771,10 @@
                         <h2 class="text-sm font-bold text-white flex items-center gap-2">
                             <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i> Lịch Sử Đăng Nhập & Vào / Thoát Bài Thi
                         </h2>
-                        <p class="text-xs text-slate-400">Ghi nhận chi tiết từng lần vào thi, nộp bài, bị khóa hoặc tự hủy của học sinh</p>
+                        <p class="text-xs text-slate-400">Ghi nhận chi tiết từng lần vào thi, nộp bài, bị khóa hoặc tự hủy theo từng ngày</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button onclick="loadAccessLogs()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
+                        <button onclick="loadAccessLogs(currentLogDateFilter)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
                             <i class="fa-solid fa-rotate"></i> Làm mới
                         </button>
                         <button onclick="clearAccessLogs()" class="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/50 text-rose-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
@@ -780,23 +783,62 @@
                     </div>
                 </div>
 
+                <!-- Date Filter & Quick Search Toolbar -->
+                <div class="p-3.5 border-b border-slate-800/80 bg-slate-950/50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                    <!-- Left: Date Filter Segmented Buttons -->
+                    <div class="flex flex-wrap items-center gap-1.5" id="logs-date-pill-container">
+                        <button type="button" onclick="loadAccessLogs('all')" id="btn-log-date-all"
+                            class="log-date-pill px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-purple-600 text-white shadow-sm shadow-purple-600/30 tab-active-pill">
+                            <i class="fa-solid fa-calendar-days text-[11px]"></i> Tất Cả
+                        </button>
+                        <button type="button" onclick="loadAccessLogs('today')" id="btn-log-date-today"
+                            class="log-date-pill px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">
+                            <i class="fa-solid fa-sun text-amber-400 text-[11px]"></i> Hôm Nay
+                        </button>
+                        <button type="button" onclick="loadAccessLogs('yesterday')" id="btn-log-date-yesterday"
+                            class="log-date-pill px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">
+                            <i class="fa-solid fa-moon text-indigo-400 text-[11px]"></i> Hôm Qua
+                        </button>
+                        <!-- Dynamic date pills injected here by loadAccessLogs -->
+                        <div id="logs-dynamic-dates" class="flex flex-wrap items-center gap-1.5"></div>
+                    </div>
+
+                    <!-- Right: Custom Date Picker & Search -->
+                    <div class="flex items-center gap-2">
+                        <div class="relative flex items-center">
+                            <i class="fa-regular fa-calendar absolute left-2.5 text-xs text-slate-400 pointer-events-none"></i>
+                            <input type="date" id="logs-custom-date" onchange="loadAccessLogs(this.value)"
+                                class="pl-8 pr-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-purple-500 transition"
+                                title="Chọn ngày cụ thể để xem">
+                        </div>
+                        <div class="relative flex-1 sm:w-64">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500"></i>
+                            <input type="text" id="logs-search-input" oninput="filterAccessLogs()"
+                                placeholder="Tìm thí sinh, HWID, IP, sự kiện..."
+                                class="w-full pl-8 pr-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition">
+                        </div>
+                        <span id="logs-count-badge" class="px-2.5 py-1 bg-slate-800 text-purple-300 border border-purple-500/30 rounded-xl text-[11px] font-mono font-bold whitespace-nowrap">
+                            0 sự kiện
+                        </span>
+                    </div>
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-950/60 text-slate-400 font-semibold border-b border-slate-800">
-                                <th class="p-3">Thời Gian (GMT+7)</th>
-                                <th class="p-3">Học Sinh</th>
-                                <th class="p-3">Hành Động / Sự Kiện</th>
-                                <th class="p-3">Chi Tiết / Lý Do</th>
-                                <th class="p-3">Máy Tính</th>
-                                <th class="p-3">IP Mạng</th>
-                                <th class="p-3">Mã HWID</th>
+                            <tr class="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800">
+                                <th class="p-3.5 whitespace-nowrap">Thời Gian (GMT+7)</th>
+                                <th class="p-3.5 whitespace-nowrap">Thí Sinh / Học Sinh</th>
+                                <th class="p-3.5 whitespace-nowrap">Hành Động / Sự Kiện</th>
+                                <th class="p-3.5">Chi Tiết / Lý Do</th>
+                                <th class="p-3.5 whitespace-nowrap">IP Mạng</th>
+                                <th class="p-3.5 whitespace-nowrap">Mã Máy HWID</th>
                             </tr>
                         </thead>
                         <tbody id="logs-table-body" class="divide-y divide-slate-800/60">
                             <tr>
-                                <td colspan="7" class="p-6 text-center text-slate-500">
-                                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải dữ liệu nhật ký...
+                                <td colspan="6" class="p-8 text-center text-slate-500">
+                                    <i class="fa-solid fa-spinner fa-spin mr-2 text-purple-400"></i> Đang tải dữ liệu nhật ký...
                                 </td>
                             </tr>
                         </tbody>
@@ -2133,61 +2175,199 @@
             alert("Đã sao chép mã Key!");
         }
 
-        // Access Logs API
-        async function loadAccessLogs() {
-            try {
-                const res = await fetch("/api/admin/access-logs");
-                if (res.status === 401) { window.location.href = "/login"; return; }
-                const data = await res.json();
-                const list = data.logs || [];
-                const badge = document.getElementById("badge-logs");
-                if (badge) badge.innerText = list.length;
+        // ────────────────── Access Logs & Telegram Backup API ──────────────────
+        let cachedAccessLogs = [];
+        let currentLogDateFilter = 'all';
 
-                const tbody = document.getElementById("logs-table-body");
-                if (!tbody) return;
-                if (list.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">Chưa có nhật ký vào / thoát nào.</td></tr>`;
-                    return;
+        async function backupToTelegram() {
+            try {
+                showToast("Đang tạo và gửi bản sao lưu qua Telegram...", "info");
+                const res = await fetch("/api/admin/backup-telegram", { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message || "Đã gửi bản sao lưu thành công qua Telegram!", "success");
+                } else {
+                    showToast("Lỗi sao lưu Telegram: " + (data.error || "Không rõ nguyên nhân"), "error");
+                }
+            } catch (e) {
+                showToast("Lỗi gửi Telegram: " + e.message, "error");
+            }
+        }
+
+        async function loadAccessLogs(targetDate) {
+            if (targetDate !== undefined) {
+                currentLogDateFilter = targetDate;
+            }
+            try {
+                let url = "/api/admin/access-logs";
+                let queryDate = currentLogDateFilter;
+                
+                // Chuẩn hóa phím tắt 'today' và 'yesterday'
+                const now = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+                if (queryDate === 'today') {
+                    queryDate = todayStr;
+                } else if (queryDate === 'yesterday') {
+                    const y = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    queryDate = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
                 }
 
-                tbody.innerHTML = "";
-                list.forEach(item => {
-                    const tr = document.createElement("tr");
-                    tr.className = "hover:bg-slate-900/40 transition";
+                if (queryDate && queryDate !== 'all') {
+                    url += `?target_date=${encodeURIComponent(queryDate)}`;
+                }
 
-                    let evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-slate-500/20 text-slate-400 font-semibold">${item.event_type}</span>`;
-                    if (item.event_type === "START_EXAM") {
-                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-semibold"><i class="fa-solid fa-play mr-1"></i>Vào Bài Thi</span>`;
-                    } else if (item.event_type === "EXIT_NORMAL") {
-                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400 font-semibold"><i class="fa-solid fa-check mr-1"></i>Thoát / Nộp Bài</span>`;
-                    } else if (item.event_type === "EXIT_LOCKED") {
-                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400 font-semibold"><i class="fa-solid fa-lock mr-1"></i>Bị Khóa Từ Xa</span>`;
-                    } else if (item.event_type === "EXIT_DELETED") {
-                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-400 font-semibold"><i class="fa-solid fa-trash mr-1"></i>Bị Xóa Bản Quyền</span>`;
-                    } else if (item.event_type === "EXIT_EXPIRED") {
-                        evtBadge = `<span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400 font-semibold"><i class="fa-solid fa-hourglass-end mr-1"></i>Hết Giờ Thi</span>`;
-                    }
+                const res = await fetch(url);
+                if (res.status === 401) { window.location.href = "/login"; return; }
+                const data = await res.json();
+                
+                cachedAccessLogs = data.logs || [];
+                const dates = data.dates || [];
 
-                    tr.innerHTML = `
-                        <td class="p-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">${escapeHtml(item.created_at)}</td>
-                        <td class="p-3 font-bold text-white whitespace-nowrap">${escapeHtml(item.student_name)}</td>
-                        <td class="p-3 whitespace-nowrap">${evtBadge}</td>
-                        <td class="p-3 text-slate-300 text-[11px]">${escapeHtml(item.details || '—')}</td>
-                        <td class="p-3 text-slate-400 text-[11px] font-mono whitespace-nowrap">${escapeHtml(item.machine_name || '—')}</td>
-                        <td class="p-3 text-blue-300 text-[11px] font-mono whitespace-nowrap">${escapeHtml(item.ip_address || '—')}</td>
-                        <td class="p-3 text-slate-500 text-[10px] font-mono whitespace-nowrap">${item.hwid ? escapeHtml(item.hwid.substring(0, 14)) + '...' : '—'}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                const badge = document.getElementById("badge-logs");
+                if (badge) badge.innerText = cachedAccessLogs.length;
+
+                renderDateFilterPills(dates, currentLogDateFilter);
+                renderAccessLogsTable(cachedAccessLogs);
+
             } catch (err) {
-                console.error(err);
+                console.error("loadAccessLogs error:", err);
             }
+        }
+
+        function renderDateFilterPills(dates, selected) {
+            const btnAll = document.getElementById("btn-log-date-all");
+            const btnToday = document.getElementById("btn-log-date-today");
+            const btnYest = document.getElementById("btn-log-date-yesterday");
+
+            const activeClass = "log-date-pill px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-purple-600 text-white shadow-sm shadow-purple-600/30 tab-active-pill";
+            const inactiveClass = "log-date-pill px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700";
+
+            if (btnAll) btnAll.className = (selected === 'all') ? activeClass : inactiveClass;
+            if (btnToday) btnToday.className = (selected === 'today') ? activeClass : inactiveClass;
+            if (btnYest) btnYest.className = (selected === 'yesterday') ? activeClass : inactiveClass;
+
+            const container = document.getElementById("logs-dynamic-dates");
+            if (container && dates.length > 0) {
+                container.innerHTML = dates.slice(0, 5).map(d => {
+                    const isSel = selected === d.log_date;
+                    const cls = isSel ? activeClass : inactiveClass;
+                    return `
+                        <button type="button" onclick="loadAccessLogs('${d.log_date}')" class="${cls}">
+                            <i class="fa-regular fa-calendar-check text-[11px] text-purple-300"></i> ${d.log_date}
+                            <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20 font-mono">${d.count}</span>
+                        </button>
+                    `;
+                }).join("");
+            }
+        }
+
+        function filterAccessLogs() {
+            const q = (document.getElementById("logs-search-input")?.value || "").toLowerCase().trim();
+            if (!q) {
+                renderAccessLogsTable(cachedAccessLogs);
+                return;
+            }
+            const filtered = cachedAccessLogs.filter(item => {
+                return (item.student_name && item.student_name.toLowerCase().includes(q)) ||
+                       (item.hwid && item.hwid.toLowerCase().includes(q)) ||
+                       (item.machine_name && item.machine_name.toLowerCase().includes(q)) ||
+                       (item.ip_address && item.ip_address.toLowerCase().includes(q)) ||
+                       (item.event_type && item.event_type.toLowerCase().includes(q)) ||
+                       (item.details && item.details.toLowerCase().includes(q));
+            });
+            renderAccessLogsTable(filtered);
+        }
+
+        function renderAccessLogsTable(list) {
+            const countBadge = document.getElementById("logs-count-badge");
+            if (countBadge) countBadge.innerText = `${list.length} sự kiện`;
+
+            const tbody = document.getElementById("logs-table-body");
+            if (!tbody) return;
+
+            if (list.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="p-8 text-center text-slate-500 space-y-2">
+                            <i class="fa-solid fa-calendar-xmark text-3xl text-slate-600 block mb-1"></i>
+                            <div>Không có dữ liệu nhật ký nào cho ngày hoặc bộ lọc đã chọn.</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = "";
+            list.forEach(item => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-900/60 transition border-b border-slate-800/40";
+
+                let evtBadge = `<span class="px-2.5 py-1 rounded-lg text-[11px] bg-slate-800 text-slate-300 font-semibold border border-slate-700">${item.event_type}</span>`;
+                if (item.event_type === "START_EXAM") {
+                    evtBadge = `<span class="px-2.5 py-1 rounded-lg text-[11px] bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 w-fit"><i class="fa-solid fa-circle-play text-emerald-400"></i> Vào Bài Thi</span>`;
+                } else if (item.event_type === "EXIT_NORMAL") {
+                    evtBadge = `<span class="px-2.5 py-1 rounded-lg text-[11px] bg-blue-500/15 text-blue-400 font-bold border border-blue-500/30 flex items-center gap-1.5 w-fit"><i class="fa-solid fa-circle-check text-blue-400"></i> Nộp Bài / Thoát</span>`;
+                } else if (item.event_type === "EXIT_LOCKED") {
+                    evtBadge = `<span class="px-2.5 py-1 rounded-lg text-[11px] bg-amber-500/15 text-amber-400 font-bold border border-amber-500/30 flex items-center gap-1.5 w-fit"><i class="fa-solid fa-lock text-amber-400"></i> Bị Khóa Thi</span>`;
+                } else if (item.event_type === "EXIT_DELETED") {
+                    evtBadge = `<span class="px-2.5 py-1 rounded-lg text-[11px] bg-rose-500/15 text-rose-400 font-bold border border-rose-500/30 flex items-center gap-1.5 w-fit"><i class="fa-solid fa-trash-can text-rose-400"></i> Bị Xóa Bản Quyền</span>`;
+                } else if (item.event_type === "EXIT_EXPIRED") {
+                    evtBadge = `<span class="px-2.5 py-1 rounded-lg text-[11px] bg-purple-500/15 text-purple-400 font-bold border border-purple-500/30 flex items-center gap-1.5 w-fit"><i class="fa-solid fa-hourglass-end text-purple-400"></i> Hết Hạn Giờ Thi</span>`;
+                }
+
+                const initials = getInitials(item.student_name || 'H');
+                const avatarGrad = getAvatarGradient(item.student_name || 'H');
+
+                tr.innerHTML = `
+                    <td class="p-3.5 whitespace-nowrap">
+                        <div class="font-mono text-xs text-white font-bold">${escapeHtml(item.created_at || '—')}</div>
+                    </td>
+                    <td class="p-3.5 whitespace-nowrap">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md ${avatarGrad}">
+                                ${initials}
+                            </div>
+                            <div>
+                                <div class="font-bold text-white text-xs">${escapeHtml(item.student_name || 'Học sinh')}</div>
+                                <div class="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                                    <i class="fa-solid fa-desktop text-[9px] text-slate-500"></i> ${escapeHtml(item.machine_name || 'PC')}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="p-3.5 whitespace-nowrap">${evtBadge}</td>
+                    <td class="p-3.5 text-slate-300 text-xs max-w-xs">
+                        <div class="truncate" title="${escapeHtml(item.details || '')}">
+                            ${escapeHtml(item.details || '—')}
+                        </div>
+                    </td>
+                    <td class="p-3.5 whitespace-nowrap">
+                        <span class="px-2 py-0.5 rounded-lg bg-slate-800/80 text-blue-300 font-mono text-[11px] border border-slate-700">
+                            <i class="fa-solid fa-network-wired text-[9px] mr-1 text-slate-400"></i>${escapeHtml(item.ip_address || '—')}
+                        </span>
+                    </td>
+                    <td class="p-3.5 whitespace-nowrap">
+                        ${item.hwid ? `
+                            <button onclick="copyHwid('${escapeHtml(item.hwid)}')" 
+                                class="px-2.5 py-1 rounded-xl bg-slate-950/80 hover:bg-slate-800 text-slate-300 font-mono text-[10px] border border-slate-700/80 flex items-center gap-1.5 transition group" 
+                                title="Bấm để sao chép mã HWID">
+                                <i class="fa-solid fa-microchip text-[10px] text-purple-400"></i>
+                                <span>${escapeHtml(item.hwid.substring(0, 14))}...</span>
+                                <i class="fa-regular fa-clone text-[9px] text-slate-500 group-hover:text-white transition"></i>
+                            </button>
+                        ` : '—'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
         async function clearAccessLogs() {
             if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử vào/thoát này không?")) return;
             await fetch("/api/admin/clear-access-logs", { method: "POST" });
-            loadAccessLogs();
+            loadAccessLogs(currentLogDateFilter);
         }
 
         // System Mode Switcher (SEB vs EOS/PEA)
