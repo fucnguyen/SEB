@@ -3657,7 +3657,7 @@
                                 : "bg-slate-800 border-2 border-slate-600 text-slate-300 group-hover:border-emerald-400 group-hover:text-emerald-400");
 
                         optionsHtml += `
-                            <div onclick="${qtype === 'checkbox' ? `toggleCheckboxAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}', ${oi})` : `chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')`}" class="${rowClass}">
+                            <div onclick="${qtype === 'checkbox' ? `toggleCheckboxAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}', ${oi})` : `chooseAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}')`}" class="${rowClass}">
                                 <span class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl font-black text-sm sm:text-base flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${circleCls}">
                                     ${escapeHtml(lbl)}
                                 </span>
@@ -3690,7 +3690,7 @@
                         const cls = isActive
                             ? `${btnBase} bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/30`
                             : `${btnBase} bg-slate-800 border-slate-600 text-slate-300 hover:bg-emerald-600/20 hover:border-emerald-500/60 hover:text-emerald-400`;
-                        return `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cls}">[${escapeHtml(lbl)}]</button>`;
+                        return `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}')" class="${cls}">[${escapeHtml(lbl)}]</button>`;
                     }).join(" ");
                     answerAreaHtml = `
                         <div class="flex items-center gap-1.5 flex-wrap">

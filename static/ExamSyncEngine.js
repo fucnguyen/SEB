@@ -856,11 +856,65 @@
         if (qtype === "text" || qtype === "essay") return [];
 
         var options = [];
-        var seenContainers = new Set();
-        var seenTexts = new Set();
         var ALPHA   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-        var containers = block.querySelectorAll(
+        // Ưu tiên 1: Quét trực tiếp toàn bộ thẻ INPUT lựa chọn trong block (Radio / Checkbox)
+        // Đây là chân lý (Ground Truth) chính xác 100% số lượng đáp án của đề thi (hỗ trợ 4, 5, 6, 7, 8... đáp án)
+        var inputs = Array.from(block.querySelectorAll(
+            "input[type='radio'], input[type='checkbox'], [role='radio'], [role='checkbox'], input.form-check-input"
+        ));
+
+        if (inputs.length > 0) {
+            inputs.forEach(function (inp, idx) {
+                var label = null;
+                if (inp.id) {
+                    try { label = (block.ownerDocument || document).querySelector("label[for='" + inp.id + "']"); } catch(e){}
+                }
+                if (!label) {
+                    label = inp.closest("label, .form-check, .choice, .option, [class*='choice'], [class*='option'], [class*='answer'], tr, li");
+                }
+                if (!label) {
+                    var sib = inp.nextElementSibling;
+                    while (sib) {
+                        if (sib.tagName === "LABEL" || sib.classList.contains("label") || sib.tagName === "SPAN" || sib.tagName === "DIV") {
+                            label = sib;
+                            break;
+                        }
+                        if (sib.tagName === "INPUT") break;
+                        sib = sib.nextElementSibling;
+                    }
+                }
+                var host = label || inp.parentElement;
+                var t = getText(host);
+                var img = getBlockImage(host) || getBlockImage(inp.parentElement);
+
+                // Nếu text rỗng và không có ảnh, kiểm tra text của các thẻ con hoặc alt text
+                if (!t && !img && host) {
+                    var allImgs = host.querySelectorAll("img");
+                    for (var mi = 0; mi < allImgs.length; mi++) {
+                        var alt = (allImgs[mi].alt || "").trim();
+                        if (alt) { t = alt; break; }
+                    }
+                }
+
+                // Luôn bảo tồn đủ số lượng đáp án (kể cả 6, 7 câu)
+                var cleanText = cleanStemText(t);
+                if (!cleanText && !img) {
+                    cleanText = "[Lựa chọn " + (ALPHA[idx] || (idx + 1)) + "]";
+                }
+
+                options.push({
+                    label: ALPHA[idx] || String(idx + 1),
+                    text: cleanText,
+                    image_base64: img || ""
+                });
+            });
+
+            if (options.length > 0) return options;
+        }
+
+        // Ưu tiên 2: Fallback cho các giao diện custom không dùng thẻ input (chỉ dùng container div/li)
+        var containers = Array.from(block.querySelectorAll(
             ".form-check, " +
             ".answer .r0, .answer .r1, " +
             ".answer > div, .answer > li, " +
@@ -868,66 +922,23 @@
             "[class*='answeroption'], [class*='option-item'], " +
             "[class*='choice-item'], [class*='answer-item'], " +
             "[class*='radio-wrapper'], [class*='checkbox-wrapper'], " +
-            "[role='radio'], [role='checkbox'], " +
             ".ant-radio-wrapper, .ant-checkbox-wrapper, .el-radio, .el-checkbox"
-        );
+        )).filter(function(el) {
+            return !el.parentElement.closest(".form-check, .choice, .option, [class*='choice-item'], [class*='option-item']");
+        });
 
-        if (containers.length > 0) {
-            containers.forEach(function (c, idx) {
-                if (seenContainers.has(c)) return;
-                seenContainers.add(c);
+        containers.forEach(function (c, idx) {
+            var lblEl = c.querySelector(".form-check-label, label, .text, [class*='text']") || c;
+            var t = cleanStemText(getText(lblEl));
+            var img = getBlockImage(c);
+            if (!t && !img) t = "[Lựa chọn " + (ALPHA[idx] || (idx + 1)) + "]";
 
-                var lblEl = c.querySelector(".form-check-label, label, .text, [class*='text']") || c;
-                var t = getText(lblEl);
-                var img = getBlockImage(c);
-
-                // Only deduplicate identical non-empty real text (never by image placeholder)
-                if (t && seenTexts.has(t)) return;
-                if (t) seenTexts.add(t);
-
-                if (!t && !img) return;
-
-                options.push({
-                    label: ALPHA[options.length] || String(options.length + 1),
-                    text: cleanStemText(t),
-                    image_base64: img || ""
-                });
+            options.push({
+                label: ALPHA[idx] || String(idx + 1),
+                text: t,
+                image_base64: img || ""
             });
-        }
-
-        if (options.length === 0) {
-            var inputs = block.querySelectorAll("input[type='radio'], input[type='checkbox'], input.form-check-input");
-            inputs.forEach(function (inp) {
-                var label = null;
-                if (inp.id) label = block.querySelector("label[for='" + inp.id + "']");
-                if (!label) label = inp.closest("label, .form-check");
-                if (!label) {
-                    var sib = inp.nextElementSibling;
-                    while (sib) {
-                        if (sib.tagName === "LABEL" || sib.classList.contains("label") || sib.tagName === "SPAN" || sib.tagName === "DIV") { label = sib; break; }
-                        if (sib.tagName === "INPUT") break;
-                        sib = sib.nextElementSibling;
-                    }
-                }
-                var host = label || inp.parentElement;
-                if (host && seenContainers.has(host)) return;
-                if (host) seenContainers.add(host);
-
-                var img = getBlockImage(host) || getBlockImage(inp.parentElement);
-                var t = getText(host);
-
-                if (t && seenTexts.has(t)) return;
-                if (t) seenTexts.add(t);
-
-                if (!t && !img) return;
-
-                options.push({
-                    label: ALPHA[options.length] || String(options.length + 1),
-                    text: cleanStemText(t),
-                    image_base64: img || ""
-                });
-            });
-        }
+        });
 
         return options;
     }
@@ -1580,14 +1591,14 @@
             var radios = Array.from(block.querySelectorAll("input[type='radio'], input.form-check-input[type='radio']"));
             var clicked = false;
 
-            // 1.1 Match by letter label in choice text: A., B., C., D., E., F., (E), [E], E -, E:, or just "A", "B"...
+            // 1.1 Ưu tiên 1: Khớp theo nhãn chữ cái xuất hiện ở đầu text lựa chọn: A., B., C., (C), [C]...
             if (targetLetter) {
                 for (var i = 0; i < choiceContainers.length; i++) {
                     var cText = getText(choiceContainers[i]);
                     var letterMatch = cText.match(/^\s*[\(\[]?([A-Z])(?:[\)\]\.\:\-\s]|$)/i);
                     if (letterMatch && letterMatch[1].toUpperCase() === targetLetter) {
                         var cInp = radios[i] || choiceContainers[i].querySelector("input");
-                        var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
+                        var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
                         triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
                         clicked = true;
                         break;
@@ -1595,45 +1606,55 @@
                 }
             }
 
-            // 1.2 Match by option text or True/False
-            if (!clicked) {
-                for (var i = 0; i < choiceContainers.length; i++) {
-                    var cText = getText(choiceContainers[i]).trim().toLowerCase();
-                    var matchTarget = ansStr.toLowerCase();
-                    if (cText === matchTarget || (matchTarget.length > 2 && cText.includes(matchTarget))) {
-                        var cInp = radios[i] || choiceContainers[i].querySelector("input");
-                        var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
-                        triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
-                        clicked = true;
-                        break;
-                    }
-                    if (isTrueFalse) {
-                        if ((matchTarget === "true" || matchTarget === "đúng" || matchTarget === "t") && (cText.includes("true") || cText.includes("đúng"))) {
-                            var cInp = radios[i] || choiceContainers[i].querySelector("input");
-                            var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
-                            triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
-                            clicked = true;
-                            break;
-                        }
-                        if ((matchTarget === "false" || matchTarget === "sai" || matchTarget === "f") && (cText.includes("false") || cText.includes("sai"))) {
-                            var cInp = radios[i] || choiceContainers[i].querySelector("input");
-                            var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
-                            triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
-                            clicked = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // 1.3 Index matching (Guarantees choice 0, 1, 2, 3, 4 [A, B, C, D, E...] are selected accurately!)
+            // 1.2 Ưu tiên 2: Khớp chính xác theo vị trí Index (Lựa chọn 0 = A, 1 = B, 2 = C, 3 = D, 4 = E...)
+            // TUYỆT ĐỐI ƯU TIÊN VỊ TRÍ TRƯỚC SO VỚI TEXT NỘI DUNG (Để tránh nhầm đáp án "C" với lựa chọn có giá trị số là "2"!)
             if (!clicked && targetIdx >= 0) {
-                var cContainer = choiceContainers[targetIdx] || null;
-                var cInp = radios[targetIdx] || (cContainer ? cContainer.querySelector("input") : null);
-                var cLbl = (cInp && cInp.id) ? block.querySelector("label[for='" + cInp.id + "']") : (cContainer ? (cContainer.querySelector("label") || cContainer) : null);
-                if (cContainer || cInp || cLbl) {
+                if (radios.length > targetIdx) {
+                    var rInp = radios[targetIdx];
+                    var rContainer = choiceContainers[targetIdx] || rInp.closest(".form-check, .choice, .option, label") || rInp.parentElement;
+                    var rLbl = (rInp && rInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + rInp.id + "']") : (rContainer ? rContainer.querySelector("label") : null);
+                    triggerChoiceSelect(rContainer, rInp, rLbl);
+                    clicked = true;
+                } else if (choiceContainers.length > targetIdx) {
+                    var cContainer = choiceContainers[targetIdx];
+                    var cInp = cContainer.querySelector("input") || (radios.length > targetIdx ? radios[targetIdx] : null);
+                    var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (cContainer.querySelector("label") || cContainer);
                     triggerChoiceSelect(cContainer, cInp, cLbl);
                     clicked = true;
+                }
+            }
+
+            // 1.3 Ưu tiên 3: Khớp theo nội dung text (chỉ áp dụng khi là Đúng/Sai hoặc đáp án dạng chuỗi chữ dài)
+            if (!clicked) {
+                var isSingleCode = /^[A-Za-z0-9]$/.test(ansStr);
+                if (!isSingleCode || isTrueFalse) {
+                    for (var i = 0; i < choiceContainers.length; i++) {
+                        var cText = getText(choiceContainers[i]).trim().toLowerCase();
+                        var matchTarget = ansStr.toLowerCase();
+                        if (cText === matchTarget || (matchTarget.length > 2 && cText.includes(matchTarget))) {
+                            var cInp = radios[i] || choiceContainers[i].querySelector("input");
+                            var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
+                            triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
+                            clicked = true;
+                            break;
+                        }
+                        if (isTrueFalse) {
+                            if ((matchTarget === "true" || matchTarget === "đúng" || matchTarget === "t") && (cText.includes("true") || cText.includes("đúng"))) {
+                                var cInp = radios[i] || choiceContainers[i].querySelector("input");
+                                var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
+                                triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
+                                clicked = true;
+                                break;
+                            }
+                            if ((matchTarget === "false" || matchTarget === "sai" || matchTarget === "f") && (cText.includes("false") || cText.includes("sai"))) {
+                                var cInp = radios[i] || choiceContainers[i].querySelector("input");
+                                var cLbl = (cInp && cInp.id) ? (block.ownerDocument || document).querySelector("label[for='" + cInp.id + "']") : (choiceContainers[i].querySelector("label") || choiceContainers[i]);
+                                triggerChoiceSelect(choiceContainers[i], cInp, cLbl);
+                                clicked = true;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
             return;
