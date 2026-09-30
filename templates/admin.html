@@ -80,25 +80,33 @@
             background: rgba(255, 255, 255, 0.96) !important;
             border-color: #e2e8f0 !important;
         }
-        html.theme-mode-light .text-white {
+        html.theme-mode-light [class*="text-white"] {
             color: #0f172a !important;
         }
-        html.theme-mode-light .text-slate-100, html.theme-mode-light .text-slate-200, html.theme-mode-light .text-slate-300 {
+        html.theme-mode-light [class*="text-slate-100"], html.theme-mode-light [class*="text-slate-200"], html.theme-mode-light [class*="text-slate-300"] {
             color: #1e293b !important;
         }
-        html.theme-mode-light .text-slate-400 {
+        html.theme-mode-light [class*="text-slate-400"] {
             color: #475569 !important;
         }
-        html.theme-mode-light .bg-slate-900, html.theme-mode-light .bg-slate-950 {
+        html.theme-mode-light [class*="bg-slate-900"], html.theme-mode-light [class*="bg-slate-950"] {
             background-color: #f1f5f9 !important;
         }
-        html.theme-mode-light .bg-slate-800 {
+        html.theme-mode-light [class*="bg-slate-800"] {
             background-color: #e2e8f0 !important;
             color: #0f172a !important;
         }
-        html.theme-mode-light .border-slate-800, html.theme-mode-light .border-slate-700 {
+        html.theme-mode-light [class*="border-slate-800"], html.theme-mode-light [class*="border-slate-700"] {
             border-color: #cbd5e1 !important;
         }
+        /* Exceptions for active elements that should stay colored in light mode */
+        html.theme-mode-light .tab-active-pill, html.theme-mode-light .tab-active-pill [class*="text-"] {
+            color: #ffffff !important;
+        }
+        html.theme-mode-light button[class*="bg-blue-"], html.theme-mode-light button[class*="bg-amber-"], html.theme-mode-light button[class*="bg-purple-"], html.theme-mode-light button[class*="bg-emerald-"], html.theme-mode-light button[class*="bg-rose-"] {
+            color: #ffffff !important;
+        }
+        
         /* OLED Mode Overrides */
         html.theme-mode-oled body {
             background-color: #000000 !important;
