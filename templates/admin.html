@@ -14,13 +14,76 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Lexend:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme-engine.js"></script>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        :root {
+            --primary-accent: #8b5cf6;
+            --primary-hover: #7c3aed;
+            --primary-gradient: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            --primary-glow: 0 0 25px -4px rgba(139, 92, 246, 0.4);
+            --primary-badge-bg: rgba(139, 92, 246, 0.18);
+            --primary-badge-text: #c4b5fd;
+            --primary-badge-border: rgba(139, 92, 246, 0.35);
+            --primary-accent-subtle: rgba(139, 92, 246, 0.12);
+            --app-font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+            --app-font-size: 100%;
+        }
+        body { 
+            font-family: var(--app-font-family); 
+            font-size: var(--app-font-size);
+            transition: background-color 0.25s ease, color 0.25s ease;
+        }
         .glass-card {
-            background: rgba(15, 23, 42, 0.75);
-            backdrop-filter: blur(14px);
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.25s ease;
+        }
+        /* Light Theme Overrides */
+        html.theme-mode-light body {
+            background-color: #f8fafc !important;
+            color: #0f172a !important;
+        }
+        html.theme-mode-light .glass-card {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border-color: #e2e8f0 !important;
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05) !important;
+        }
+        html.theme-mode-light header {
+            background: rgba(255, 255, 255, 0.96) !important;
+            border-color: #e2e8f0 !important;
+        }
+        html.theme-mode-light .text-white {
+            color: #0f172a !important;
+        }
+        html.theme-mode-light .text-slate-100, html.theme-mode-light .text-slate-200, html.theme-mode-light .text-slate-300 {
+            color: #1e293b !important;
+        }
+        html.theme-mode-light .text-slate-400 {
+            color: #475569 !important;
+        }
+        html.theme-mode-light .bg-slate-900, html.theme-mode-light .bg-slate-950 {
+            background-color: #f1f5f9 !important;
+        }
+        html.theme-mode-light .bg-slate-800 {
+            background-color: #e2e8f0 !important;
+            color: #0f172a !important;
+        }
+        html.theme-mode-light .border-slate-800, html.theme-mode-light .border-slate-700 {
+            border-color: #cbd5e1 !important;
+        }
+        /* OLED Mode Overrides */
+        html.theme-mode-oled body {
+            background-color: #000000 !important;
+        }
+        html.theme-mode-oled .glass-card {
+            background: #000000 !important;
+            border-color: #27272a !important;
+        }
+        html.theme-mode-oled header {
+            background: #000000 !important;
+            border-color: #27272a !important;
         }
     </style>
 </head>
@@ -61,6 +124,11 @@
                 </button>
                 <input type="file" id="backup-file-input" accept=".json" class="hidden" onchange="handleRestoreFile(event)">
                 
+                <!-- Appearance Customizer Button -->
+                <button onclick="window.toggleAppearanceModal()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-purple-300 border border-purple-500/30 shadow-sm" title="Tùy biến giao diện: Màu sắc, Chế độ sáng/tối & Phông chữ">
+                    <i class="fa-solid fa-palette text-amber-400"></i> <span class="hidden sm:inline">Giao Diện</span>
+                </button>
+
                 <!-- Dynamic Header Key Generator Button -->
                 <button id="header-btn-create-key" onclick="openManualKeyModal(currentSystemMode)" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold flex items-center gap-1.5 transition text-white shadow-md shadow-blue-600/20">
                     <i class="fa-solid fa-key text-[11px]"></i> <span id="header-create-key-text">Tạo Key SEB</span>
