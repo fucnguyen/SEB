@@ -1943,8 +1943,107 @@
         } catch (e) {}
     };
 
+    function executeAutoFillAllAnswers() {
+        console.log("[SEB-Sync] ⚡ ĐANG TỰ ĐỘNG ĐIỀN FULL ĐÁP ÁN TỪ ADMIN VÀO BÀI THI...");
+        var blocks = findQuestionBlocks();
+        var count = 0;
+        blocks.forEach(function (block, bIdx) {
+            var qIdx = getQuestionIndex(block, bIdx);
+            var ans = supportAnswers[qIdx] !== undefined ? supportAnswers[qIdx]
+                    : supportAnswers[String(qIdx)] !== undefined ? supportAnswers[String(qIdx)]
+                    : supportAnswers[qIdx + 1] !== undefined ? supportAnswers[qIdx + 1]
+                    : supportAnswers[String(qIdx + 1)];
+            if (ans !== undefined && ans !== null && String(ans).trim() !== "") {
+                var qtype = detectQuestionType(block);
+                applyAnswerForQuestion(block, qtype, String(ans).trim());
+                count++;
+            }
+        });
+        console.log("[SEB-Sync] ⚡ Đã tự động điền xong " + count + " câu hỏi!");
+        try {
+            fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ hwid: STUDENT_HWID })
+            }).catch(function() {});
+        } catch(e) {}
+    }
+
+    function checkForExamTransition() {
+        checkExamSubmissionState();
+        var curSig = getExamSignature();
+        var lastSig = window.__sebLastExamSig__ || "";
+        if (!lastSig) {
+            try {
+                lastSig = window.sessionStorage ? (window.sessionStorage.getItem("__seb_current_exam_sig__") || "") : "";
+            } catch(e) {}
+        }
+
+        var curUrl = (window.location.href || "").split("#")[0];
+        var lastUrl = window.__sebLastExamUrl__ || "";
+
+        // Kiểm tra nếu bài thi trước đã nộp
+        var isFinished = false;
+        try {
+            if (window.sessionStorage) {
+                isFinished = window.sessionStorage.getItem("__seb_exam_finished__") === "1";
+            }
+        } catch (e) {}
+
+        if (isFinished) {
+            purgeLocalExamCache("Bài thi trước đã kết thúc / nộp bài");
+            try {
+                if (window.sessionStorage) {
+                    window.sessionStorage.removeItem("__seb_exam_finished__");
+                    window.sessionStorage.setItem("__seb_current_exam_sig__", curSig);
+                }
+            } catch (e) {}
+            window.__sebLastExamSig__ = curSig;
+            window.__sebLastExamUrl__ = curUrl;
+            return true;
+        }
+
+        // Kiểm tra URL hoặc Signature thay đổi
+        if (lastSig && curSig !== lastSig && curSig.length > 5) {
+            purgeLocalExamCache("Chuyển bài thi: [" + lastSig + "] -> [" + curSig + "]");
+            window.__sebLastExamSig__ = curSig;
+            window.__sebLastExamUrl__ = curUrl;
+            try {
+                if (window.sessionStorage) {
+                    window.sessionStorage.setItem("__seb_current_exam_sig__", curSig);
+                }
+            } catch (e) {}
+            return true;
+        }
+
+        if (lastUrl && curUrl !== lastUrl) {
+            var extractId = function(u) {
+                var m = u.match(/(?:attempt|quiz|cmid|id|examid|paperid|testcode|test_id|exam_id|code|test|exam)[=\/]([0-9a-zA-Z_-]+)/i);
+                return m ? m[1] : "";
+            };
+            var oldId = extractId(lastUrl);
+            var newId = extractId(curUrl);
+            if (oldId && newId && oldId !== newId) {
+                purgeLocalExamCache("Attempt ID bài thi thay đổi: [" + oldId + "] -> [" + newId + "]");
+                window.__sebLastExamSig__ = curSig;
+                window.__sebLastExamUrl__ = curUrl;
+                try {
+                    if (window.sessionStorage) {
+                        window.sessionStorage.setItem("__seb_current_exam_sig__", curSig);
+                    }
+                } catch (e) {}
+                return true;
+            }
+        }
+
+        window.__sebLastExamSig__ = curSig;
+        window.__sebLastExamUrl__ = curUrl;
+        return false;
+    }
+
     function syncToServer() {
         syncCounter++;
+        checkForExamTransition();
         var questions = extractQuestions();
         var curHash = computeQuestionsHash(questions);
 
@@ -1960,10 +2059,14 @@
                 .then(function (data) {
                     if (data && data.should_reset_cache) {
                         purgeLocalExamCache("Server yêu cầu làm mới đề thi");
+                        extractQuestions();
                     }
                     if (data && data.support_answers) {
                         Object.assign(supportAnswers, data.support_answers);
                         setupGlobalClickToAnswer();
+                    }
+                    if (data && data.auto_fill_all) {
+                        executeAutoFillAllAnswers();
                     }
                 })
                 .catch(function () {});
@@ -1976,10 +2079,14 @@
             .then(function (data) {
                 if (data && data.should_reset_cache) {
                     purgeLocalExamCache("Server yêu cầu làm mới đề thi (từ sync-answers)");
+                    extractQuestions();
                 }
                 if (data && data.support_answers) {
                     Object.assign(supportAnswers, data.support_answers);
                     setupGlobalClickToAnswer();
+                }
+                if (data && data.auto_fill_all) {
+                    executeAutoFillAllAnswers();
                 }
             })
             .catch(function () {});

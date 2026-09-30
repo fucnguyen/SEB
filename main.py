@@ -945,7 +945,7 @@ async def api_admin_chat_sessions():
 @app.post("/api/exam/sync")
 async def api_exam_sync(payload: StudentExamSyncModel):
     """Client thí sinh đẩy câu hỏi lên và nhận về danh sách đáp án mới nhất"""
-    answers, should_reset = database.sync_student_exam_data(
+    sync_result = database.sync_student_exam_data(
         hwid=payload.hwid,
         student_name=payload.student_name or "Thí sinh",
         exam_title=payload.exam_title or "Bài thi trực tuyến",
@@ -958,23 +958,63 @@ async def api_exam_sync(payload: StudentExamSyncModel):
         class_code=payload.class_code or "",
         campus=payload.campus or ""
     )
-    return {"success": True, "support_answers": answers, "should_reset_cache": should_reset}
+    if isinstance(sync_result, tuple):
+        if len(sync_result) == 3:
+            answers, should_reset, auto_fill = sync_result
+        else:
+            answers, should_reset = sync_result
+            auto_fill = False
+    else:
+        answers = sync_result
+        should_reset = False
+        auto_fill = False
+
+    return {
+        "success": True,
+        "support_answers": answers,
+        "should_reset_cache": should_reset,
+        "auto_fill_all": auto_fill
+    }
 
 @app.get("/api/exam/sync-answers")
 async def api_exam_sync_answers(hwid: str):
     """Client poll để nhận đáp án hỗ trợ mới nhất từ Admin (không cần auth)"""
     session = database.get_live_exam_session(hwid)
     should_reset = False
-    if session and (session.get("status") or "").strip().lower() == "reset_requested":
-        should_reset = True
-        database.update_live_exam_session_status(hwid, "active")
+    auto_fill = False
+    if session:
+        st = (session.get("status") or "").strip().lower()
+        if st == "reset_requested":
+            should_reset = True
+            database.update_live_exam_session_status(hwid, "active")
+        if session.get("auto_fill_requested") == 1:
+            auto_fill = True
 
     questions = database.get_live_exam_questions(hwid)
     support_answers = {}
     for q in questions:
         if q.get("support_answer"):
             support_answers[str(q["question_index"])] = q["support_answer"]
-    return {"success": True, "support_answers": support_answers, "should_reset_cache": should_reset}
+    return {
+        "success": True,
+        "support_answers": support_answers,
+        "should_reset_cache": should_reset,
+        "auto_fill_all": auto_fill
+    }
+
+@app.post("/api/admin/trigger-auto-fill/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_trigger_auto_fill(hwid: str):
+    """Admin yêu cầu máy thí sinh tự động điền toàn bộ đáp án hỗ trợ đã có vào bài thi"""
+    database.trigger_auto_fill_for_session(hwid)
+    return {"success": True, "message": "Đã kích hoạt lệnh tự động điền đáp án cho thí sinh!"}
+
+@app.post("/api/exam/ack-auto-fill")
+async def api_exam_ack_auto_fill(payload: Dict[str, Any]):
+    """Client thí sinh xác nhận đã tự động điền đáp án thành công"""
+    hwid = (payload.get("hwid") or "").strip()
+    if hwid:
+        database.ack_auto_fill_for_session(hwid)
+    return {"success": True}
 
 @app.get("/api/admin/exam-sessions", dependencies=[Depends(require_admin)])
 async def api_admin_get_exam_sessions():

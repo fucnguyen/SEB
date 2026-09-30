@@ -126,7 +126,7 @@
 
     <!-- Top Admin Bar -->
     <header class="border-b border-slate-800/80 bg-slate-950/85 sticky top-0 z-50 backdrop-blur-2xl shadow-lg">
-        <div class="max-w-[1580px] w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="max-w-[1920px] w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3 sm:space-x-4">
                 <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg border border-white/10" id="header-logo" style="background: var(--primary-gradient)">
                     <i class="fa-solid fa-crown text-base"></i>
@@ -192,7 +192,7 @@
     </header>
 
     <!-- Main Admin Container -->
-    <main class="max-w-[1580px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 space-y-6">
+    <main class="max-w-[1920px] w-full mx-auto px-2 sm:px-4 lg:px-6 py-5 flex-1 space-y-5">
 
         <!-- Top Stats Row (2 cols on mobile, 4 on desktop) -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -659,20 +659,43 @@
 
         <!-- TAB 6: Live Exam Support & Real-time Synchronizer -->
         <div id="tab-exam-support" class="hidden space-y-4">
-            <!-- View Mode Switcher: Chế độ VIPER (Từng câu) vs Chế độ Cuộn Toàn Bộ -->
-            <div class="flex items-center justify-between flex-wrap gap-2 px-1">
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <!-- View Mode Switcher & Controls Header -->
+            <div class="flex items-center justify-between flex-wrap gap-2.5 px-3 py-2 bg-slate-900/80 rounded-2xl border border-slate-800 shadow-sm">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-layer-group text-emerald-400"></i> Giao diện:
                     </span>
-                    <button id="btn-mode-viper" onclick="switchViperViewMode('viper')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
+                    <button id="btn-mode-viper" onclick="switchViperViewMode('viper')" class="px-3.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
                         <i class="fa-solid fa-eye"></i> Chuẩn VIPER (Từng Câu)
                     </button>
                     <button id="btn-mode-scroll" onclick="switchViperViewMode('scroll')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-slate-800 text-slate-300 hover:bg-slate-700">
                         <i class="fa-solid fa-list-ol"></i> Xem Toàn Bộ (Cuộn)
                     </button>
+
+                    <div class="h-5 w-px bg-slate-800 mx-1 hidden sm:block"></div>
+
+                    <!-- BỘ CHỈNH CỠ CHỮ CỰC TO ĐỂ CHỤP ẢNH NÉT -->
+                    <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-0.5">
+                        <span class="text-[11px] font-black text-amber-400 px-2 flex items-center gap-1">
+                            <i class="fa-solid fa-font"></i> Chữ:
+                        </span>
+                        <button onclick="setViperFontSize('base')" id="btn-font-base" class="px-2 py-0.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition">18px</button>
+                        <button onclick="setViperFontSize('lg')" id="btn-font-lg" class="px-2 py-0.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition">22px</button>
+                        <button onclick="setViperFontSize('xl')" id="btn-font-xl" class="px-2 py-0.5 rounded-lg text-xs font-bold bg-emerald-500 text-white shadow-sm transition">26px (To)</button>
+                        <button onclick="setViperFontSize('2xl')" id="btn-font-2xl" class="px-2 py-0.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition">32px (Cực đại)</button>
+                    </div>
+
+                    <!-- Nút Thu gọn / Mở rộng Cột trái để Phóng to Đề Toàn Màn Hình -->
+                    <button onclick="toggleViperFullscreen()" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5" title="Mở rộng khung xem câu hỏi tối đa cho màn hình to">
+                        <i class="fa-solid fa-arrows-left-right-to-line text-cyan-400"></i> <span id="toggle-col-text">Thu gọn cột trái</span>
+                    </button>
                 </div>
-                <div class="flex items-center gap-2">
+
+                <div class="flex items-center gap-2 flex-wrap">
+                    <!-- Nút Auto-Fill trên Header -->
+                    <button onclick="triggerAutoFillAllAnswers()" class="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md shadow-emerald-500/25 transition cursor-pointer">
+                        <i class="fa-solid fa-bolt text-xs"></i> ⚡ Điền Full Đáp Án
+                    </button>
                     <button onclick="openArchivedSourcesModal()" class="px-3 py-1.5 bg-amber-950/40 hover:bg-amber-900 border border-amber-600/50 text-amber-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm">
                         <i class="fa-solid fa-folder-open text-amber-400"></i> Kho Source Đề ZIP
                     </button>
@@ -682,11 +705,11 @@
                 </div>
             </div>
 
-            <!-- TRUE 3-COLUMN VIPER GRID (Left: Tools/Students | Center: Big Question | Right: Answer Matrix) -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <!-- EXPANSIVE 3-COLUMN VIPER LAYOUT -->
+            <div class="flex flex-col lg:flex-row gap-4 items-start w-full">
                 
-                <!-- Cột 1 (Trái - 3 cols): Danh sách thí sinh & Công cụ đề -->
-                <div class="lg:col-span-3 space-y-4">
+                <!-- Cột 1 (Trái - 280px): Danh sách thí sinh & Công cụ đề -->
+                <div id="viper-col-left" class="w-full lg:w-[270px] xl:w-[290px] shrink-0 space-y-3 transition-all duration-200">
                     <!-- Danh sách thí sinh đang kết nối -->
                     <div class="glass-card rounded-2xl p-4 border border-slate-800 space-y-3">
                         <div class="flex items-center justify-between pb-2 border-b border-slate-800">
@@ -730,26 +753,26 @@
                     </div>
                 </div>
 
-                <!-- Cột 2 (Giữa - 6 cols): Đấu trường câu hỏi VIPER (Font to 18px-20px, thẻ đáp án to) -->
-                <div class="lg:col-span-6 space-y-4">
-                    <div class="glass-card rounded-2xl p-5 sm:p-6 border border-slate-800 shadow-2xl space-y-4 min-h-[580px]">
+                <!-- Cột 2 (Giữa - Chiếm toàn bộ không gian còn lại): ĐẤU TRƯỜNG CÂU HỎI VIPER TO & NÉT -->
+                <div id="viper-col-center" class="flex-1 min-w-0 space-y-4 w-full">
+                    <div class="glass-card rounded-2xl p-5 sm:p-7 border border-slate-800 shadow-2xl space-y-4 min-h-[620px]">
                         <!-- Top Header Bar của bài thi -->
                         <div class="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-800/80 flex-wrap">
                             <div>
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    <h3 id="current-exam-student" class="font-black text-xl text-white">Chưa chọn thí sinh</h3>
-                                    <span id="current-exam-subject-badge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-black font-mono bg-purple-500/25 text-purple-300 border border-purple-500/40"></span>
-                                    <span id="exam-stats-badge" class="hidden px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[11px] font-bold font-mono flex items-center gap-1.5">
+                                <div class="flex items-center gap-2.5 flex-wrap">
+                                    <h3 id="current-exam-student" class="font-black text-2xl text-white">Chưa chọn thí sinh</h3>
+                                    <span id="current-exam-subject-badge" class="hidden px-3 py-1 rounded-xl text-xs font-black font-mono bg-purple-500/25 text-purple-300 border border-purple-500/40"></span>
+                                    <span id="exam-stats-badge" class="hidden px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold font-mono flex items-center gap-1.5">
                                         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> LIVE SYNC
                                     </span>
                                 </div>
-                                <p id="current-exam-title" class="text-xs text-slate-400 mt-1">Chọn thí sinh ở cột bên trái để tải đề</p>
+                                <p id="current-exam-title" class="text-xs sm:text-sm text-slate-400 mt-1">Chọn thí sinh ở cột bên trái để tải đề</p>
                             </div>
                             <div class="flex items-center gap-2 flex-wrap">
-                                <span id="current-exam-timer-pill" class="hidden px-3 py-1 rounded-xl text-xs font-black font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 shadow-sm">
+                                <span id="current-exam-timer-pill" class="hidden px-3.5 py-1.5 rounded-xl text-xs font-black font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 shadow-sm">
                                     <i class="fa-solid fa-hourglass-half text-amber-400 animate-spin" style="animation-duration: 4s;"></i> <span id="current-exam-timer-text">--:--</span>
                                 </span>
-                                <span id="current-exam-time-pill" class="hidden px-2.5 py-1 rounded-xl text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5">
+                                <span id="current-exam-time-pill" class="hidden px-3 py-1.5 rounded-xl text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5">
                                     <i class="fa-solid fa-clock text-slate-400"></i> <span id="current-exam-time-text"></span>
                                 </span>
                             </div>
@@ -758,39 +781,59 @@
                         <!-- VIPER Single Question Display Container -->
                         <div id="viper-single-question-container">
                             <div class="text-center py-24 text-slate-500 text-sm">
-                                <i class="fa-solid fa-file-circle-question text-4xl mb-3 block text-slate-600"></i>
+                                <i class="fa-solid fa-file-circle-question text-5xl mb-3 block text-slate-600"></i>
                                 Vui lòng chọn thí sinh từ danh sách bên trái để bắt đầu.
                             </div>
                         </div>
 
                         <!-- Khối cuộn toàn bộ câu hỏi (ẩn khi ở chế độ Viper) -->
-                        <div id="exam-questions-container" class="hidden space-y-4 max-h-[720px] overflow-y-auto pr-2">
+                        <div id="exam-questions-container" class="hidden space-y-4 max-h-[820px] overflow-y-auto pr-2">
                         </div>
                     </div>
                 </div>
 
-                <!-- Cột 3 (Phải - 3 cols): Khối Hành Động & Ma Trận VIPER -->
-                <div class="lg:col-span-3 space-y-4">
+                <!-- Cột 3 (Phải - 320px): Khối Hành Động, Nút Auto-Fill & Ma Trận VIPER -->
+                <div id="viper-col-right" class="w-full lg:w-[310px] xl:w-[330px] shrink-0 space-y-3">
+                    
+                    <!-- NÚT ĐIỀN FULL ĐÁP ÁN TỰ ĐỘNG CHỌN HẾT -->
+                    <div class="glass-card rounded-2xl p-4 border border-amber-500/50 bg-gradient-to-br from-amber-500/10 via-slate-900 to-emerald-500/10 shadow-xl space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-bolt-lightning animate-pulse text-amber-400"></i> Auto-Fill Đáp Án
+                            </span>
+                            <span id="viper-answered-count-badge" class="px-2 py-0.5 rounded-full text-[10px] font-black font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                0 câu
+                            </span>
+                        </div>
+                        <button id="btn-trigger-autofill" onclick="triggerAutoFillAllAnswers()" class="w-full py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-emerald-500 to-teal-500 hover:from-amber-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 transform active:scale-95 cursor-pointer">
+                            <i class="fa-solid fa-bolt text-sm"></i>
+                            <span>⚡ ĐIỀN FULL ĐÁP ÁN</span>
+                        </button>
+                        <p class="text-[10px] text-slate-400 text-center leading-relaxed">
+                            Sau khi Support chọn hết đáp án, bấm nút này để <strong class="text-emerald-400">máy thí sinh tự động tick chọn toàn bộ</strong> bài thi!
+                        </p>
+                    </div>
+
                     <!-- Hộp Gán Đáp Án Nhanh To Bự (VIPER Quick Answer Pad) -->
                     <div class="glass-card rounded-2xl p-5 border border-slate-800 shadow-xl space-y-4 sticky top-4">
                         <!-- Navigation Counter -->
                         <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
-                            <button onclick="navigateViperQuestion(-1)" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition border border-slate-700 active:scale-95" title="Câu trước (Phím ←)">
-                                <i class="fa-solid fa-chevron-left text-xs"></i>
+                            <button onclick="navigateViperQuestion(-1)" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition border border-slate-700 active:scale-95" title="Câu trước (Phím ←)">
+                                <i class="fa-solid fa-chevron-left text-sm"></i>
                             </button>
                             <div class="text-center">
-                                <div id="viper-question-counter" class="text-base font-black text-white font-mono">0 / 0</div>
+                                <div id="viper-question-counter" class="text-lg font-black text-white font-mono">0 / 0</div>
                                 <div class="text-[10px] text-slate-400 font-semibold uppercase">Tiến Độ Làm Bài</div>
                             </div>
-                            <button onclick="navigateViperQuestion(1)" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition border border-slate-700 active:scale-95" title="Câu sau (Phím →)">
-                                <i class="fa-solid fa-chevron-right text-xs"></i>
+                            <button onclick="navigateViperQuestion(1)" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition border border-slate-700 active:scale-95" title="Câu sau (Phím →)">
+                                <i class="fa-solid fa-chevron-right text-sm"></i>
                             </button>
                         </div>
 
                         <!-- Progress Bar -->
                         <div class="space-y-1">
-                            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                                <div id="viper-progress-fill" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                                <div id="viper-progress-fill" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
                             </div>
                             <div class="flex justify-between text-[10px] text-slate-500 font-mono">
                                 <span id="viper-answered-count">0 đã giải</span>
@@ -3111,6 +3154,12 @@
                     `;
                     list.appendChild(div);
                 });
+
+                // Tự động chọn ca thi đầu tiên nếu chưa chọn thí sinh nào
+                if (sessions.length > 0 && !currentExamHWID) {
+                    const firstActive = sessions.find(s => s.status === 'active') || sessions[0];
+                    selectExamStudent(firstActive.hwid, firstActive.student_name, firstActive.exam_title);
+                }
             } catch (err) {}
         }
 
@@ -4894,10 +4943,47 @@
 
     
         // ══════════════════════════════════════════════════════════════════════
-        // VIPER SINGLE-QUESTION ENGINE & NAVIGATION
+        // VIPER SINGLE-QUESTION ENGINE, CONTROLS & AUTO-FILL
         // ══════════════════════════════════════════════════════════════════════
         let currentViperQuestionIndex = 0;
         let viperViewMode = 'viper'; // 'viper' | 'scroll'
+        let currentViperFontSize = localStorage.getItem("viper_font_size") || "xl";
+
+        function setViperFontSize(size) {
+            currentViperFontSize = size;
+            localStorage.setItem("viper_font_size", size);
+            ['base', 'lg', 'xl', '2xl'].forEach(s => {
+                const btn = document.getElementById("btn-font-" + s);
+                if (btn) {
+                    if (s === size) {
+                        btn.className = "px-2 py-0.5 rounded-lg text-xs font-bold bg-emerald-500 text-white shadow-sm transition";
+                    } else {
+                        btn.className = "px-2 py-0.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white transition";
+                    }
+                }
+            });
+            renderViperQuestion(currentViperQuestionIndex);
+        }
+
+        function getViperFontClass() {
+            switch (currentViperFontSize) {
+                case "base": return "text-base sm:text-lg";
+                case "lg":   return "text-lg sm:text-xl";
+                case "2xl":  return "text-2xl sm:text-3xl leading-snug";
+                case "xl":
+                default:     return "text-xl sm:text-2xl leading-normal";
+            }
+        }
+
+        function toggleViperFullscreen() {
+            const colLeft = document.getElementById("viper-col-left");
+            const txt = document.getElementById("toggle-col-text");
+            if (!colLeft) return;
+            const isHidden = colLeft.classList.toggle("hidden");
+            if (txt) {
+                txt.innerText = isHidden ? "Hiện cột trái" : "Thu gọn cột trái";
+            }
+        }
 
         function switchViperViewMode(mode) {
             viperViewMode = mode;
@@ -4907,14 +4993,14 @@
             const scrollBox = document.getElementById("exam-questions-container");
 
             if (mode === 'viper') {
-                btnViper.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30";
+                btnViper.className = "px-3.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30";
                 btnScroll.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-slate-800 text-slate-300 hover:bg-slate-700";
                 if (viperBox) viperBox.classList.remove("hidden");
                 if (scrollBox) scrollBox.classList.add("hidden");
                 renderViperQuestion(currentViperQuestionIndex);
             } else {
                 btnViper.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-slate-800 text-slate-300 hover:bg-slate-700";
-                btnScroll.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30";
+                btnScroll.className = "px-3.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-emerald-500 text-white shadow-md shadow-emerald-500/30";
                 if (viperBox) viperBox.classList.add("hidden");
                 if (scrollBox) scrollBox.classList.remove("hidden");
             }
@@ -4937,7 +5023,7 @@
             if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-24 text-slate-500 text-sm">
-                        <i class="fa-solid fa-file-circle-question text-4xl mb-3 block text-slate-600"></i>
+                        <i class="fa-solid fa-file-circle-question text-5xl mb-3 block text-slate-600"></i>
                         Chưa có câu hỏi nào trong đề thi này.
                     </div>`;
                 updateViperRightSidebar();
@@ -4959,24 +5045,27 @@
 
             const cleanStem = cleanDisplayQuestionText(q.question_text);
             const formattedStem = prepareMathHtml(cleanStem);
+            const viperFontCls = getViperFontClass();
 
-            // Stem image
+            // Stem image (Expansive to 650px height for ultra-clear math graphs & circuits)
             let imgHtml = "";
             if (q.image_base64) {
                 imgHtml = `
-                    <div class="my-4 text-center">
+                    <div class="my-5 text-center">
                         <img src="${q.image_base64}" 
                              onclick="openImageLightbox('${q.image_base64.replace(/'/g, "\\'")}', 'Câu ${qNum} - Đề bài & Hình vẽ')" 
-                             class="rounded-2xl max-h-[380px] w-auto max-w-full object-contain border border-slate-300 cursor-zoom-in hover:border-emerald-500 transition-all shadow-xl bg-white p-3 inline-block" 
+                             class="rounded-2xl max-h-[650px] w-auto max-w-full object-contain border-2 border-slate-300 cursor-zoom-in hover:border-emerald-500 transition-all shadow-2xl bg-white p-3 inline-block" 
                              alt="Hình câu ${qNum}">
-                        <div class="text-xs text-slate-400 mt-1 italic"><i class="fa-solid fa-magnifying-glass-plus mr-1"></i> Bấm vào ảnh để phóng to chi tiết HD</div>
+                        <div class="text-xs text-slate-400 mt-2 italic flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-magnifying-glass-plus text-cyan-400"></i> Bấm vào ảnh để phóng to chi tiết HD / Tải về
+                        </div>
                     </div>`;
             }
 
-            // Options HTML (VIPER Full-Width Cards)
+            // Options HTML (VIPER Full-Width Cards with Expansive Font)
             let optionsHtml = "";
             if (opts.length > 0) {
-                optionsHtml = '<div class="space-y-3 pt-2">';
+                optionsHtml = '<div class="space-y-3 pt-3">';
                 opts.forEach((opt, oi) => {
                     const optObj = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt, image_base64: "" };
                     const lbl = optObj.label || ALPHA[oi] || String(oi);
@@ -4987,11 +5076,11 @@
                         curAns.split(",").map(s => s.trim()).includes(idxStr)
                     );
 
-                    let cardClass = "p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 group my-2 shadow-sm";
+                    let cardClass = "p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-center gap-4 group my-2.5 shadow-sm";
                     if (isChosen) {
-                        cardClass += " bg-emerald-950/40 border-emerald-500 shadow-xl shadow-emerald-500/20";
+                        cardClass += " bg-emerald-950/50 border-emerald-500 shadow-xl shadow-emerald-500/25";
                     } else if (isStudentChosen) {
-                        cardClass += " bg-sky-950/30 border-sky-500 shadow-md shadow-sky-500/20";
+                        cardClass += " bg-sky-950/40 border-sky-500 shadow-md shadow-sky-500/25";
                     } else {
                         cardClass += " bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 hover:border-slate-600";
                     }
@@ -5006,23 +5095,23 @@
                     const formattedOpt = prepareMathHtml(rawOptText);
 
                     const optImg = optObj.image_base64
-                        ? `<img src="${optObj.image_base64}" onclick="event.stopPropagation(); openImageLightbox('${optObj.image_base64.replace(/'/g, "\\'")}', 'Đáp án [${lbl}]')" class="h-16 object-contain rounded-xl border border-slate-300 ml-2 cursor-zoom-in bg-white p-2 shadow" loading="lazy">`
+                        ? `<img src="${optObj.image_base64}" onclick="event.stopPropagation(); openImageLightbox('${optObj.image_base64.replace(/'/g, "\\'")}', 'Đáp án [${lbl}]')" class="h-20 sm:h-24 object-contain rounded-xl border border-slate-300 ml-2 cursor-zoom-in bg-white p-2 shadow-md" loading="lazy">`
                         : "";
 
                     optionsHtml += `
                         <div onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cardClass}">
-                            <span class="w-11 h-11 rounded-2xl font-black text-base flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${circleCls}">
+                            <span class="w-12 h-12 rounded-2xl font-black text-lg flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${circleCls}">
                                 ${escapeHtml(lbl)}
                             </span>
                             <div class="min-w-0 flex-1">
-                                ${formattedOpt ? `<div class="text-base sm:text-lg text-slate-100 font-semibold leading-relaxed math-rendered select-text">${escapeHtml(formattedOpt)}</div>` : ''}
+                                ${formattedOpt ? `<div class="text-base sm:text-xl text-slate-100 font-semibold leading-relaxed math-rendered select-text">${escapeHtml(formattedOpt)}</div>` : ''}
                                 ${optImg}
                             </div>
                             ${isChosen ? `
-                                <span class="px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 ml-auto shrink-0 flex items-center gap-1.5 font-mono shadow-sm">
+                                <span class="px-4 py-1.5 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 ml-auto shrink-0 flex items-center gap-1.5 font-mono shadow-sm">
                                     <i class="fa-solid fa-check text-emerald-400"></i> ĐÁP ÁN
                                 </span>` : (isStudentChosen ? `
-                                <span class="px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 ml-auto shrink-0 flex items-center gap-1 font-mono">
+                                <span class="px-4 py-1.5 rounded-xl text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 ml-auto shrink-0 flex items-center gap-1 font-mono">
                                     <i class="fa-solid fa-user-pen text-sky-400"></i> Thí sinh chọn
                                 </span>` : '')
                             }
@@ -5034,8 +5123,8 @@
             container.innerHTML = `
                 <div class="space-y-5 animate-fadeIn">
                     <!-- Viper Question Header Tags -->
-                    <div class="flex items-center justify-between gap-3 pb-3 border-b border-slate-800/80 flex-wrap">
-                        <div class="flex items-center gap-2">
+                    <div class="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-800/80 flex-wrap">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span class="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-500/30">
                                 Câu ${qNum}
                             </span>
@@ -5046,16 +5135,16 @@
                                 ${opts.length} đáp án
                             </span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            ${curAns ? `<span class="px-3 py-1 rounded-xl text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 flex items-center gap-1.5 font-mono"><i class="fa-solid fa-user-pen text-sky-400"></i> Thí sinh: <strong class="text-white">${escapeHtml(curAns)}</strong></span>` : ''}
-                            <button onclick="downloadQuestionAsImage(${index}, false)" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border border-slate-700" title="Tải ảnh đề thi sạch HD">
-                                <i class="fa-solid fa-camera text-sky-400"></i> Ảnh Đề
+                        <div class="flex items-center gap-2 flex-wrap">
+                            ${curAns ? `<span class="px-3.5 py-1 rounded-xl text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 flex items-center gap-1.5 font-mono"><i class="fa-solid fa-user-pen text-sky-400"></i> Thí sinh: <strong class="text-white">${escapeHtml(curAns)}</strong></span>` : ''}
+                            <button onclick="downloadQuestionAsImage(${index}, false)" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border border-slate-700 cursor-pointer" title="Tải ảnh đề thi sạch HD">
+                                <i class="fa-solid fa-camera text-sky-400"></i> Ảnh Đề HD
                             </button>
                         </div>
                     </div>
 
-                    <!-- GIANT VIPER QUESTION STEM (Font 18px-20px) -->
-                    <div class="text-lg sm:text-xl text-white font-bold leading-relaxed math-rendered select-text py-2 tracking-wide">
+                    <!-- GIANT VIPER QUESTION STEM (Controlled by Font Scaler: 18px - 32px) -->
+                    <div id="viper-question-stem" class="${viperFontCls} text-white font-bold math-rendered select-text py-2.5 tracking-wide">
                         ${escapeHtml(formattedStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : "(Đang tải...)"))}
                     </div>
 
@@ -5065,12 +5154,12 @@
                     ${optionsHtml}
 
                     <!-- Bottom Navigation bar -->
-                    <div class="flex items-center justify-between pt-4 border-t border-slate-800/80 text-xs text-slate-400">
-                        <button onclick="navigateViperQuestion(-1)" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl font-bold flex items-center gap-2 border border-slate-800 transition active:scale-95">
+                    <div class="flex items-center justify-between pt-5 border-t border-slate-800/80 text-xs text-slate-400 flex-wrap gap-2">
+                        <button onclick="navigateViperQuestion(-1)" class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl font-bold flex items-center gap-2 border border-slate-800 transition active:scale-95 cursor-pointer">
                             <i class="fa-solid fa-arrow-left"></i> Câu Trước (Phím ←)
                         </button>
-                        <span class="font-mono text-slate-500">Phím tắt: 1, 2, 3, 4 chọn A, B, C, D</span>
-                        <button onclick="navigateViperQuestion(1)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition active:scale-95">
+                        <span class="font-mono text-slate-500 hidden sm:inline">Phím tắt: Phím 1, 2, 3, 4 chọn A, B, C, D</span>
+                        <button onclick="navigateViperQuestion(1)" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition active:scale-95 cursor-pointer">
                             Câu Sau (Phím →) <i class="fa-solid fa-arrow-right"></i>
                         </button>
                     </div>
@@ -5104,6 +5193,10 @@
             const totCountEl = document.getElementById("viper-total-count");
             if (totCountEl) totCountEl.innerText = `${total} câu`;
 
+            // Auto-fill header badge
+            const badgeAutoFill = document.getElementById("viper-answered-count-badge");
+            if (badgeAutoFill) badgeAutoFill.innerText = `${answeredCount} / ${total} câu`;
+
             // Big Answer Buttons Pad
             const pad = document.getElementById("viper-answer-buttons-pad");
             if (pad && q) {
@@ -5119,12 +5212,12 @@
                     const idxStr = String(oi);
                     const isActive = chosenSet.has(idxStr) || chosenSet.has(lbl);
                     const cls = isActive
-                        ? "h-14 rounded-2xl font-black text-lg bg-emerald-500 border-2 border-emerald-400 text-white shadow-xl shadow-emerald-500/50 scale-105 transition-all"
-                        : "h-14 rounded-2xl font-black text-lg bg-slate-800 border-2 border-slate-700 text-slate-300 hover:bg-emerald-600/20 hover:border-emerald-500 hover:text-emerald-400 transition-all active:scale-95";
+                        ? "h-14 rounded-2xl font-black text-xl bg-emerald-500 border-2 border-emerald-400 text-white shadow-xl shadow-emerald-500/50 scale-105 transition-all cursor-pointer"
+                        : "h-14 rounded-2xl font-black text-xl bg-slate-800 border-2 border-slate-700 text-slate-300 hover:bg-emerald-600/20 hover:border-emerald-500 hover:text-emerald-400 transition-all active:scale-95 cursor-pointer";
                     padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${idxStr}')" class="${cls}">[${lbl}]</button>`;
                 }
                 if (chosenAns) {
-                    padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="col-span-4 py-1.5 bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 rounded-xl text-xs border border-slate-700 transition" title="Xóa đáp án đã chọn">✕ Bỏ chọn</button>`;
+                    padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="col-span-4 py-2 bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 rounded-xl text-xs border border-slate-700 transition cursor-pointer" title="Xóa đáp án đã chọn">✕ Bỏ chọn</button>`;
                 }
                 pad.innerHTML = padHtml;
             }
@@ -5151,11 +5244,81 @@
                     }
 
                     mHtml += `
-                        <button onclick="renderViperQuestion(${idx})" class="h-10 rounded-xl text-xs font-mono font-bold flex items-center justify-center transition-all ${bgCls}">
+                        <button onclick="renderViperQuestion(${idx})" class="h-10 rounded-xl text-xs font-mono font-bold flex items-center justify-center transition-all cursor-pointer ${bgCls}">
                             ${qNum}
                         </button>`;
                 });
                 matrix.innerHTML = mHtml;
+            }
+        }
+
+        // TỰ ĐỘNG ĐIỀN FULL ĐÁP ÁN VÀO MÁY THÍ SINH
+        async function triggerAutoFillAllAnswers() {
+            if (!currentExamHWID) {
+                alert("Vui lòng chọn một ca thi của thí sinh ở cột bên trái trước!");
+                return;
+            }
+            if (!cachedCurrentQuestions || cachedCurrentQuestions.length === 0) {
+                alert("Chưa có danh sách câu hỏi nào!");
+                return;
+            }
+            const answeredCount = cachedCurrentQuestions.filter(q => q.support_answer).length;
+            if (answeredCount === 0) {
+                alert("Chưa có câu hỏi nào được chọn đáp án hỗ trợ! Vui lòng chọn đáp án trước khi bấm điền full.");
+                return;
+            }
+            if (!confirm(`Bạn có chắc chắn muốn máy thí sinh TỰ ĐỘNG ĐIỀN ${answeredCount} câu hỏi đã có đáp án hỗ trợ vào bài thi không?`)) {
+                return;
+            }
+
+            const btn = document.getElementById("btn-trigger-autofill");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-sm"></i> <span>ĐANG GỬI LỆNH...</span>`;
+            }
+
+            try {
+                const res = await fetch(`/api/admin/trigger-auto-fill/${encodeURIComponent(currentExamHWID)}`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`⚡ ĐÃ GỬI LỆNH THÀNH CÔNG!\n\nMáy thí sinh sẽ tự động tick chọn toàn bộ ${answeredCount} câu hỏi đã có đáp án trong 1-2 giây tới!`);
+                } else {
+                    alert("Không thể gửi lệnh: " + (data.detail || "Lỗi không xác định"));
+                }
+            } catch (err) {
+                alert("Lỗi kết nối tới máy chủ khi gửi lệnh!");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fa-solid fa-bolt text-sm"></i> <span>⚡ ĐIỀN FULL ĐÁP ÁN</span>`;
+                }
+            }
+        }
+
+        // ĐỔI ĐỀ MỚI (RESET VÀ ĐÓNG GÓI ĐỀ CŨ)
+        async function triggerResetSession() {
+            if (!currentExamHWID) {
+                alert("Vui lòng chọn ca thi cần reset trước!");
+                return;
+            }
+            if (!confirm("Bắt đầu ĐỀ MỚI: Toàn bộ câu hỏi và đáp án của đề cũ sẽ tự động đóng gói thành file ZIP lưu trữ, sau đó xóa sạch để nạp đề thi mới từ máy thí sinh. Bạn có chắc chắn?")) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/admin/reset-session/${encodeURIComponent(currentExamHWID)}`, { method: "POST" });
+                const data = await res.json();
+                if (data.success) {
+                    alert("✅ Đã đóng gói đề cũ và kích hoạt nhận ĐỀ THI MỚI thành công!");
+                    currentExamVersion = "";
+                    cachedCurrentQuestions = [];
+                    renderExamQuestions([]);
+                    renderViperQuestion(0);
+                    loadExamSessions();
+                } else {
+                    alert("Không thể reset: " + (data.detail || "Lỗi"));
+                }
+            } catch (e) {
+                alert("Lỗi kết nối khi reset đề thi!");
             }
         }
 
