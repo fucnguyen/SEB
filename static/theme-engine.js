@@ -107,8 +107,8 @@
     };
 
     const DEFAULT_PREFS = {
-        accent: "violet",
-        mode: "dark",
+        accent: "emerald",
+        mode: "light",
         font: "vietnam",
         scale: "normal"
     };
@@ -526,11 +526,17 @@
         updateModalActiveStates();
     };
 
-    window.resetThemeDefaults = function () {
-        currentPrefs = Object.assign({}, DEFAULT_PREFS);
-        savePrefs(currentPrefs);
-        applyTheme(currentPrefs);
-        updateModalActiveStates();
+    window.toggleViperTheme = function () {
+        const nextMode = currentPrefs.mode === "light" ? "dark" : "light";
+        window.setThemeMode(nextMode);
+        if (typeof window.onViperThemeChanged === "function") {
+            window.onViperThemeChanged(nextMode);
+        }
+        return nextMode;
+    };
+
+    window.getCurrentThemeMode = function () {
+        return currentPrefs.mode || "light";
     };
 
     // Auto-inject on DOM Ready

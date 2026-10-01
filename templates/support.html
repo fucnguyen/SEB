@@ -613,9 +613,9 @@
                 if (q.question_text && !isImageStemOnly) {
                     const cleanStem = cleanDisplayQuestionText(q.question_text);
                     const formattedStem = prepareMathHtml(cleanStem);
-                    textHtml = `<div class="text-base sm:text-lg text-white font-bold leading-relaxed math-rendered select-text py-1 tracking-wide">${escapeHtml(formattedStem)}</div>`;
+                    textHtml = `<div class="text-base sm:text-lg text-slate-900 dark:text-white font-bold leading-relaxed math-rendered select-text py-1 tracking-wide whitespace-pre-line">${escapeHtml(formattedStem)}</div>`;
                 } else if (isImageStemOnly) {
-                    textHtml = `<div class="mb-1"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 inline-block"><i class="fa-solid fa-image mr-1"></i>Đề bài dạng hình ảnh / biểu đồ</span></div>`;
+                    textHtml = `<div class="mb-1"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30 inline-block"><i class="fa-solid fa-image mr-1"></i>Đề bài dạng hình ảnh / biểu đồ</span></div>`;
                 }
 
                 // Hình ảnh đề thi (nếu có) - Sử dụng nền TRẮNG bg-white để công thức LaTeX/ma trận không bị chìm
@@ -624,7 +624,7 @@
                     imgHtml = `
                         <div class="my-2.5 inline-block max-w-full">
                             <img src="${q.image_base64}" onclick="openImageModal(this.src)" 
-                                 class="max-h-96 rounded-xl border border-slate-600 cursor-zoom-in hover:opacity-95 transition object-contain bg-white p-2.5 shadow-md block max-w-full" 
+                                 class="max-h-96 rounded-xl border border-slate-300 dark:border-slate-600 cursor-zoom-in hover:opacity-95 transition object-contain bg-white p-2.5 shadow-md block max-w-full" 
                                  alt="Đề thi câu ${qNum}">
                             <span class="text-[10px] text-slate-500 mt-1 block italic"><i class="fa-solid fa-magnifying-glass-plus mr-1"></i> Bấm vào ảnh để phóng to chi tiết</span>
                         </div>
@@ -640,6 +640,7 @@
                     const isCheckbox = q.question_type === 'checkbox';
                     const chosenSet = new Set((q.support_answer || "").split(",").map(s => s.trim().toUpperCase()).filter(Boolean));
                     const studentAnsSet = new Set((q.current_answer || "").split(",").map(s => s.trim().toUpperCase()).filter(Boolean));
+                    const clickAction = isCheckbox ? `toggleSupportCheckbox(${realQIndex}, '${optLabel}')` : `setSupportAnswer(${realQIndex}, '${optLabel}')`;
 
                     opts.forEach((opt, optIdx) => {
                         const optLabel = opt.label || String.fromCharCode(65 + optIdx);
@@ -647,13 +648,13 @@
                         const isSelectedByStudent = studentAnsSet.has(optLabel.toUpperCase()) || studentAnsSet.has(String(optIdx));
                         const clickAction = isCheckbox ? `toggleSupportCheckbox(${realQIndex}, '${optLabel}')` : `setSupportAnswer(${realQIndex}, '${optLabel}')`;
                         
-                        let cardStyle = 'p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3.5 my-1.5 group shadow-sm';
+                        let cardStyle = 'p-3 sm:p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 my-1.5 group shadow-sm';
                         if (isSelectedBySupport) {
-                            cardStyle += isCheckbox ? ' bg-purple-950/50 border-2 border-purple-400 text-white font-bold shadow-lg shadow-purple-500/20' : ' bg-emerald-950/40 border-2 border-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/25';
+                            cardStyle += isCheckbox ? ' bg-purple-50 dark:bg-purple-950/50 border-2 border-purple-500 text-purple-950 dark:text-white font-bold shadow-md shadow-purple-500/20' : ' bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-500 text-emerald-950 dark:text-white font-bold shadow-md shadow-emerald-500/25';
                         } else if (isSelectedByStudent) {
-                            cardStyle += ' bg-sky-950/30 border-2 border-sky-500 text-white shadow-md shadow-sky-500/20';
+                            cardStyle += ' bg-sky-50 dark:bg-sky-950/30 border-2 border-sky-400 text-sky-950 dark:text-white shadow-sm';
                         } else {
-                            cardStyle += ' bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 hover:border-slate-600 text-slate-100';
+                            cardStyle += ' bg-white dark:bg-slate-900/90 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-100';
                         }
 
                         const isGenericPlaceholder = opt.text === "[Hình ảnh lựa chọn]";
@@ -662,16 +663,16 @@
 
                         optionsHtml += `
                             <div onclick="${clickAction}" class="${cardStyle}">
-                                <div class="flex items-center gap-3.5 pr-2 flex-1">
-                                    <span class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl text-sm sm:text-base font-black flex items-center justify-center shrink-0 border-2 transition-transform group-hover:scale-105 ${
+                                <div class="flex items-center gap-3 pr-2 flex-1">
+                                    <span class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-sm sm:text-base font-black flex items-center justify-center shrink-0 border-2 transition-transform group-hover:scale-105 ${
                                         isSelectedBySupport 
                                             ? (isCheckbox ? 'bg-purple-500 border-purple-400 text-white shadow-md' : 'bg-emerald-500 border-emerald-400 text-white shadow-md') 
-                                            : (isSelectedByStudent ? 'bg-sky-500 border-sky-400 text-white shadow-md' : 'bg-slate-800 border-slate-600 text-slate-300 group-hover:border-emerald-400 group-hover:text-emerald-400')
+                                            : (isSelectedByStudent ? 'bg-sky-500 border-sky-400 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 group-hover:border-emerald-500 group-hover:text-emerald-500')
                                     }">
                                         ${optLabel}
                                     </span>
                                     <div class="min-w-0 flex-1">
-                                        ${formattedOptText ? `<div class="text-sm sm:text-base font-semibold leading-relaxed math-rendered select-text">${escapeHtml(formattedOptText)}</div>` : ''}
+                                        ${formattedOptText ? `<div class="text-sm sm:text-[15px] font-semibold leading-relaxed math-rendered select-text whitespace-pre-line text-slate-800 dark:text-slate-100">${escapeHtml(formattedOptText)}</div>` : ''}
                                     </div>
                                     ${opt.image_base64 ? `
                                         <div class="inline-block my-1">
@@ -898,7 +899,8 @@
                 .replace(/mso-[^;}]+;?/gi, " ")
                 .replace(/panose-1:[^;}]+;?/gi, " ")
                 .replace(/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?/gi, " ")
-                .replace(/\s+/g, " ")
+                .replace(/[ \t]+/g, " ")
+                .replace(/\n\s*\n+/g, "\n")
                 .trim();
         }
 
@@ -948,35 +950,57 @@
             const subMap = {'₀':'0','₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7','₈':'8','₉':'9'};
             str = str.replace(/[₀₁₂₃₄₅₆₇₈₉]+/g, m => '_' + Array.from(m).map(ch => subMap[ch] || ch).join(''));
 
-            // 2. Normalize units with exponents (e.g. 25cm^2, 16cm^2/s, 4cm/s)
-            str = str.replace(/\b(\d+)\s*cm\^2\/s\b/gi, (m, n) => "$" + n + "\\text{cm}^2/s$");
-            str = str.replace(/\b(\d+)\s*cm\^2\b/gi, (m, n) => "$" + n + "\\text{cm}^2$");
-            str = str.replace(/\b(\d+)\s*cm\/s\b/gi, (m, n) => "$" + n + "\\text{cm}/s$");
+            // 2. Normalize units with exponents (e.g. 25cm^2, 16cm^2/s, 4cm/s, cm2, m2, s2)
+            str = str.replace(/\b(\d+)\s*cm\^2\/s\b/gi, (m, n) => "$" + n + "\\text{ cm}^2/\\text{s}$");
+            str = str.replace(/\b(\d+)\s*cm\^2\b/gi, (m, n) => "$" + n + "\\text{ cm}^2$");
+            str = str.replace(/\b(\d+)\s*cm2\b/gi, (m, n) => "$" + n + "\\text{ cm}^2$");
+            str = str.replace(/\b(\d+)\s*m2\b/gi, (m, n) => "$" + n + "\\text{ m}^2$");
+            str = str.replace(/\b(\d+)\s*m\^2\b/gi, (m, n) => "$" + n + "\\text{ m}^2$");
+            str = str.replace(/\b(\d+)\s*cm\/s\b/gi, (m, n) => "$" + n + "\\text{ cm/s}$");
+            str = str.replace(/\b(\d+)\s*m\/s\b/gi, (m, n) => "$" + n + "\\text{ m/s}$");
 
-            // 3. If text already has $, ensure balanced or wrap remaining loose LaTeX
-            if (str.includes("$")) {
-                return str;
+            // 3. Linear Algebra variables vs Polynomial exponents
+            const isLinearAlgebra = /\b(?:x1|x_1|y1|y_1|z1|z_1)\b/i.test(str) || /\b(?:is free|tự do)\b/i.test(str);
+
+            if (isLinearAlgebra) {
+                // x1 -> x_1, x2 -> x_2, x3 -> x_3
+                str = str.replace(/\b([xyz])(\d+)\b/g, "$1_$2");
+                // Wrap sub-equations: x_1 = -27 + 11x_3
+                str = str.replace(/([xyz]_\d+\s*=\s*[^,\n;]+)/g, function(match, eq) {
+                    if (eq.includes("$")) return eq;
+                    return "$" + eq.trim() + "$";
+                });
+                str = str.replace(/([xyz]_\d+)\s+(is free|tự do)/gi, function(match, v, freeWord) {
+                    return "$" + v + "\\text{ " + freeWord + "}$";
+                });
+            } else {
+                // Calculus / Polynomials: x2 -> x^2, x3 -> x^3, y2 -> y^2, t2 -> t^2
+                str = str.replace(/\b([xyztabcdfvghXYZTABCDFVGH])([2-9])(?=[+\-*=\/\s\)\],;]|$)/g, "$1^$2");
             }
 
             // 4. Wrap common LaTeX commands if present without $: \frac, \sqrt, etc.
-            if (/\\(?:frac|sqrt|pm|int|sum|times|cdot|le|ge|neq|alpha|beta|gamma|theta|pi|partial|infty|approx|matrix|bmatrix)\b/.test(str)) {
+            if (!str.includes("$") && /\\(?:frac|sqrt|pm|int|sum|times|cdot|le|ge|neq|alpha|beta|gamma|theta|pi|partial|infty|approx|matrix|bmatrix)\b/.test(str)) {
                 return "$" + str + "$";
             }
 
             // 5. Wrap function equations: f(x) = ..., L(x) = ..., g(x) = ..., y = ...
             str = str.replace(/\b([fghLPy]\([a-zA-Z0-9_\.]+\)\s*=\s*[^,\.;\n]+)/g, function(match, formula) {
+                if (formula.includes("$")) return formula;
                 return "$" + formula.trim() + "$";
             });
 
-            // 6. Wrap variable equalities (m = 1, m = -1, c = 2/3) - FIX JS $$1 REPLACEMENT BUG
-            str = str.replace(/\b([a-zA-Z])\s*=\s*(\d+)\/(\d+)\b/g, (match, v, n, d) => "$" + v + " = \\frac{" + n + "}{" + d + "}$");
-            str = str.replace(/\b([a-zA-Z])\s*=\s*([0-9\.\-]+)\b/g, (match, v, val) => "$" + v + " = " + val + "$");
+            // 6. Wrap variable equalities: m = 1, m = -1, c = 2/3, x = 5
+            str = str.replace(/\b([a-zA-Z](?:_\d+)?)\s*=\s*(\d+)\/(\d+)\b/g, (match, v, n, d) => "$" + v + " = \\frac{" + n + "}{" + d + "}$");
+            str = str.replace(/\b([a-zA-Z](?:_\d+)?)\s*=\s*([0-9\.\-]+)\b/g, function(match, v, val) {
+                if (match.includes("$")) return match;
+                return "$" + v + " = " + val + "$";
+            });
 
             // 7. Standalone fractions in choices: 1/2, 2/3, -3/4
             str = str.replace(/^(\-?\d+)\/(\d+)$/g, (match, n, d) => "$\\frac{" + n + "}{" + d + "}$");
 
             // 8. Standalone exponent expressions: e.g. 3x^2 - 12x + 7, x^3 - 4x, (x^2 - 1)/(x + 1)
-            str = str.replace(/\b(\(?\s*[a-zA-Z0-9_\.\s\+\-\*]+\^[a-zA-Z0-9_\.\s\+\-\*]+\)?(?:\/\(?[a-zA-Z0-9_\.\s\+\-\*]+\)?)?)/g, function(match, poly) {
+            str = str.replace(/(\(?\s*[a-zA-Z0-9_\.\s\+\-\*]+\^[a-zA-Z0-9_\.\s\+\-\*]+\)?(?:\/\(?[a-zA-Z0-9_\.\s\+\-\*]+\)?)?)/g, function(match, poly) {
                 if (!poly.includes("$") && /[a-zA-Z0-9]\^[a-zA-Z0-9]/.test(poly)) {
                     var fracM = poly.match(/^\((.+)\)\s*\/\s*\((.+)\)$/);
                     if (fracM) {
@@ -987,17 +1011,11 @@
                 return match;
             });
 
-            // 9. Linear algebra variable subscripts: x1, x2, x3, x4, x5 -> x_1, x_2, x_3, x_4
-            if (/\b(?:x1|x2|x3|x4|x5|y1|y2|z1|z2)\b/.test(str) && !str.includes("$")) {
-                str = str.replace(/\b([xyz])(\d+)\b/g, (match, v, num) => v + "_" + num);
-                if (/=|[+\-*]/.test(str)) {
-                    str = str.replace(/([xyz]_\d+(?:\s*[+\-*=]\s*[^\s,;\n]+)+)/g, (m, eq) => "$" + eq.trim() + "$");
-                }
-            }
-
-            // 10. Automatically wrap any unparsed ^{...} or _{...} in $ for KaTeX
+            // 9. Automatically wrap any unparsed ^{...} or _{...} in $ for KaTeX
             if ((str.includes("^{") || str.includes("_{")) && !str.includes("$")) {
-                return "$" + str + "$";
+                if (str.length < 80 && !/\b(?:câu|đáp án|chọn|tìm|biết|tính|cho)\b/i.test(str)) {
+                    return "$" + str + "$";
+                }
             }
 
             return str;

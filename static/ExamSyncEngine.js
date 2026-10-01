@@ -303,7 +303,11 @@
         t = t.replace(/(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)\s*:\s*[\d\w\s:]+/gi, " ");
         t = t.replace(/^(?:CÂU\s*HỎI|CAU\s*HOI|CÂU|CAU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?/gi, " ");
 
-        return t.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim();
+        return t
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n\s*\n+/g, "\n")
+            .replace(/[ \t]*\n[ \t]*/g, "\n")
+            .trim();
     }
 
     // ── High-Res Image Extractor (Direct Blob + White canvas for formulas) ─────────────
@@ -438,6 +442,17 @@
                 if (subTxt) {
                     subEl.parentNode.replaceChild(document.createTextNode("_{" + subTxt + "}"), subEl);
                 }
+            }
+
+            // 4b. Preserve line breaks for <br> and block containers (div, p, tr, li)
+            var brs = clone.querySelectorAll("br");
+            for (var b = 0; b < brs.length; b++) {
+                var br = brs[b];
+                if (br.parentNode) br.parentNode.replaceChild(document.createTextNode("\n"), br);
+            }
+            var blockContainers = clone.querySelectorAll("p, div, li, tr, blockquote");
+            for (var bl = 0; bl < blockContainers.length; bl++) {
+                blockContainers[bl].appendChild(document.createTextNode("\n"));
             }
 
             // 5. Remove hidden styles & scripts
@@ -2025,10 +2040,10 @@
         // 1. Điền ngay các câu hỏi đang hiển thị trên giao diện hiện tại
         var filledCount = autoFillVisibleQuestions();
 
-        // 2. Tìm danh sách các nút ma trận câu hỏi (Dạng đề thi 1 câu/lần như FPT Exam / EOS)
-        var matrixBtns = Array.from(document.querySelectorAll(".btn-question, [id^='btn-question-']"));
+        // 2. Tìm danh sách các nút ma trận câu hỏi (Dạng đề thi 1 câu/lần như FPT Exam / EOS / Moodle)
+        var matrixBtns = Array.from(document.querySelectorAll(".btn-question, [id^='btn-question-'], .qnbutton, [id*='quiznavbutton'], .question-nav-btn, [data-question-number]"));
         if (matrixBtns.length === 0) {
-            var allBtns = Array.from(document.querySelectorAll("button, a.btn, .badge, [class*='question-nav'], [class*='palette'] *"));
+            var allBtns = Array.from(document.querySelectorAll("button, a.btn, a, .badge, [class*='question-nav'], [class*='palette'] *"));
             matrixBtns = allBtns.filter(function(b) {
                 var txt = (b.textContent || "").trim();
                 return /^\d{1,3}$/.test(txt) && !b.closest(".modal, .popup");
@@ -2081,10 +2096,13 @@
 
                 setTimeout(function() {
                     autoFillVisibleQuestions();
-                }, 90);
+                }, 100);
+                setTimeout(function() {
+                    autoFillVisibleQuestions();
+                }, 240);
 
                 mIdx++;
-            }, 220);
+            }, 320);
         } else {
             // Trường hợp đề thi có nút Next / Prev tuần tự
             var nextBtn = document.querySelector("#btn-next-question, .btn-next-question");

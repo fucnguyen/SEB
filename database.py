@@ -1447,7 +1447,7 @@ def trigger_auto_fill_for_session(hwid: str) -> bool:
     """Admin yêu cầu máy học sinh tự động điền toàn bộ đáp án Support đã chọn."""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("UPDATE live_exam_sessions SET auto_fill_requested = 1 WHERE hwid = ?", (hwid.strip(),))
+    c.execute("UPDATE live_exam_sessions SET auto_fill_requested = 1 WHERE LOWER(hwid) = LOWER(?) OR hwid = ?", (hwid.strip(), hwid.strip()))
     conn.commit()
     conn.close()
     return True
@@ -1457,7 +1457,7 @@ def ack_auto_fill_for_session(hwid: str) -> bool:
     """Máy học sinh xác nhận đã điền xong full đáp án, tắt cờ auto_fill_requested."""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("UPDATE live_exam_sessions SET auto_fill_requested = 0 WHERE hwid = ?", (hwid.strip(),))
+    c.execute("UPDATE live_exam_sessions SET auto_fill_requested = 0 WHERE LOWER(hwid) = LOWER(?) OR hwid = ?", (hwid.strip(), hwid.strip()))
     conn.commit()
     conn.close()
     return True
