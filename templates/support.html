@@ -187,6 +187,9 @@
                         <span><i class="fa-solid fa-book-open text-purple-400/80 mr-1"></i> Môn: <strong id="active-exam-subject" class="text-slate-200">—</strong></span>
                         <span><i class="fa-solid fa-clock text-purple-400/80 mr-1"></i> Ca: <strong id="active-exam-shift" class="text-slate-200">—</strong></span>
                         <span class="font-mono text-[11px]"><i class="fa-solid fa-microchip text-purple-400/80 mr-1"></i> HWID: <strong id="active-exam-hwid" class="text-purple-300 font-normal">—</strong></span>
+                        <span id="active-exam-classcode-pill" class="hidden px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"><i class="fa-solid fa-tag text-[10px] mr-1"></i><span id="active-exam-classcode-text"></span></span>
+                        <span id="active-exam-timer-pill" class="hidden px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30"><i class="fa-solid fa-hourglass-half text-amber-400 text-[10px] mr-1"></i><span id="active-exam-timer-text">--:--</span></span>
+                        <span id="active-exam-servertime-pill" class="hidden px-2 py-0.5 rounded-md text-[11px] font-mono text-slate-300 border border-slate-700"><i class="fa-solid fa-clock text-[10px] mr-1"></i><span id="active-exam-servertime-text"></span></span>
                     </div>
                 </div>
 
@@ -401,11 +404,124 @@
             loadCurrentQuestions(false);
         }
 
+        let supportLiveTimerInterval = null;
+        let supportRemainingSeconds = -1;
+        let supportServerDate = null;
+
+        function parseTimeToSeconds(timeStr) {
+            if (!timeStr) return -1;
+            const t = String(timeStr).trim();
+            if (t.includes(":")) {
+                const parts = t.split(":").map(x => parseInt(x, 10) || 0);
+                if (parts.length === 2) return parts[0] * 60 + parts[1];
+                if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            }
+            let sec = 0;
+            const h = t.match(/(\d+)\s*(?:h|giờ)/i);
+            const m = t.match(/(\d+)\s*(?:m|phút|min)/i);
+            const s = t.match(/(\d+)\s*(?:s|giây|sec)/i);
+            if (h) sec += parseInt(h[1], 10) * 3600;
+            if (m) sec += parseInt(m[1], 10) * 60;
+            if (s) sec += parseInt(s[1], 10);
+            if (sec > 0) return sec;
+            const onlyNum = parseInt(t, 10);
+            if (!isNaN(onlyNum) && onlyNum > 0) return onlyNum * 60;
+            return -1;
+        }
+
+        function formatSecondsToDisplay(sec) {
+            if (sec <= 0) return "00:00 (Hết giờ)";
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            const mm = String(m).padStart(2, "0");
+            const ss = String(s).padStart(2, "0");
+            if (h > 0) {
+                return `${h}:${mm}:${ss}`;
+            }
+            return `${mm}:${ss}`;
+        }
+
+        function updateSupportLiveExamTimer(remainingStr, serverTimeStr) {
+            const timerPill = document.getElementById("active-exam-timer-pill");
+            const timerText = document.getElementById("active-exam-timer-text");
+            const timePill = document.getElementById("active-exam-servertime-pill");
+            const timeText = document.getElementById("active-exam-servertime-text");
+
+            if (remainingStr) {
+                const parsed = parseTimeToSeconds(remainingStr);
+                if (parsed >= 0) {
+                    supportRemainingSeconds = parsed;
+                    if (timerText) timerText.innerText = formatSecondsToDisplay(supportRemainingSeconds);
+                    if (timerPill) timerPill.classList.remove("hidden");
+                } else {
+                    if (timerText) timerText.innerText = remainingStr;
+                    if (timerPill) timerPill.classList.remove("hidden");
+                }
+            } else if (supportRemainingSeconds < 0 && timerPill) {
+                timerPill.classList.add("hidden");
+            }
+
+            if (serverTimeStr) {
+                if (timeText) timeText.innerText = serverTimeStr;
+                if (timePill) timePill.classList.remove("hidden");
+                const m = serverTimeStr.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+                if (m) {
+                    const d = new Date();
+                    d.setHours(parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10));
+                    supportServerDate = d;
+                }
+            } else if (timePill) {
+                timePill.classList.add("hidden");
+            }
+
+            if (!supportLiveTimerInterval) {
+                supportLiveTimerInterval = setInterval(() => {
+                    if (supportRemainingSeconds > 0) {
+                        supportRemainingSeconds--;
+                        const tText = document.getElementById("active-exam-timer-text");
+                        if (tText) tText.innerText = formatSecondsToDisplay(supportRemainingSeconds);
+                    } else if (supportRemainingSeconds === 0) {
+                        const tText = document.getElementById("active-exam-timer-text");
+                        if (tText && tText.innerText !== "00:00 (Hết giờ)") {
+                            tText.innerText = "00:00 (Hết giờ)";
+                        }
+                    }
+                    if (supportServerDate) {
+                        supportServerDate.setSeconds(supportServerDate.getSeconds() + 1);
+                        const sText = document.getElementById("active-exam-servertime-text");
+                        if (sText) {
+                            const hh = String(supportServerDate.getHours()).padStart(2, "0");
+                            const mm = String(supportServerDate.getMinutes()).padStart(2, "0");
+                            const ss = String(supportServerDate.getSeconds()).padStart(2, "0");
+                            sText.innerText = `${hh}:${mm}:${ss}`;
+                        }
+                    }
+                }, 1000);
+            }
+        }
+
         function updateActiveBanner(item) {
             document.getElementById("active-student-name").innerHTML = `<i class="fa-solid fa-user-graduate text-purple-400"></i> ${escapeHtml(item.student_name)}`;
             document.getElementById("active-exam-subject").innerText = item.subject || '—';
             document.getElementById("active-exam-shift").innerText = item.exam_shift || '—';
             document.getElementById("active-exam-hwid").innerText = item.hwid;
+
+            // ClassCode
+            const classPill = document.getElementById("active-exam-classcode-pill");
+            const classText = document.getElementById("active-exam-classcode-text");
+            if (classPill && classText) {
+                const cCode = item.class_code || "";
+                if (cCode) {
+                    classText.innerText = cCode;
+                    classPill.classList.remove("hidden");
+                } else {
+                    classPill.classList.add("hidden");
+                }
+            }
+
+            // Real-time Countdown Timer & Server Time ticker
+            updateSupportLiveExamTimer(item.remaining_time, item.exam_server_time);
 
             const btnReset = document.getElementById("btn-reset-exam");
             if (btnReset) btnReset.classList.remove("hidden");
@@ -826,6 +942,10 @@
                     if (!qInput || !qInput.value.trim()) {
                         renderStudentList(allAssignedSessions);
                     }
+                    if (currentSelectedHWID) {
+                        const activeItem = allAssignedSessions.find(s => s.hwid === currentSelectedHWID);
+                        if (activeItem) updateActiveBanner(activeItem);
+                    }
                 }
                 if (currentSelectedHWID) {
                     const qRes = await fetch(`/api/support/exam-questions/${encodeURIComponent(currentSelectedHWID)}`);
@@ -1001,7 +1121,14 @@
                 return match;
             });
 
-            // 9. Automatically wrap any unparsed ^{...} or _{...} in $ for KaTeX
+            // 9. Automatically wrap standalone polynomial math in choices: e.g. x^2, x^2 + 1, e^x
+            if (!str.includes("$") && /\b[a-zA-Z0-9]\^[a-zA-Z0-9]/.test(str)) {
+                if (!/\b(?:câu|đáp án|chọn|tìm|biết|tính|cho|nào|dưới đây)\b/i.test(str)) {
+                    return "$" + str.trim() + "$";
+                }
+            }
+
+            // 10. Automatically wrap any unparsed ^{...} or _{...} in $ for KaTeX
             if ((str.includes("^{") || str.includes("_{")) && !str.includes("$")) {
                 if (str.length < 80 && !/\b(?:câu|đáp án|chọn|tìm|biết|tính|cho)\b/i.test(str)) {
                     return "$" + str + "$";

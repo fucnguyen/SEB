@@ -3121,29 +3121,31 @@
                     const div = document.createElement("div");
                     div.className = `p-3 rounded-xl cursor-pointer transition border ${
                         isSelected
-                            ? "bg-emerald-600/20 border-emerald-500/50"
-                            : "bg-slate-900/60 hover:bg-slate-900 border-slate-800"
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 shadow-xs"
+                            : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 shadow-2xs"
                     }`;
                     div.onclick = () => selectExamStudent(s.hwid, s.student_name, s.exam_title);
 
                     const lastSync = s.last_sync ? s.last_sync.split(" ")[1] : "—";
                     const isFinished = (s.status === 'finished' || s.status === 'archived');
                     const badgeHtml = isFinished 
-                        ? `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30">🏁 Đã nộp bài (< 24h)</span>`
-                        : `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-[10px] text-emerald-400 font-semibold">LIVE</span></span>`;
+                        ? `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">🏁 Đã nộp bài</span>`
+                        : `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span><span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">LIVE</span></span>`;
+
+                    const displaySub = s.class_code || s.exam_title || "Đang thi...";
 
                     div.innerHTML = `
                         <div class="flex items-center gap-2.5">
-                            <div class="w-9 h-9 rounded-full ${isFinished ? 'bg-blue-600/30 border border-blue-500/40 text-blue-400' : 'bg-emerald-600/30 border border-emerald-500/40 text-emerald-400'} flex items-center justify-center text-sm font-bold shrink-0">🧑‍🎓</div>
+                            <div class="w-9 h-9 rounded-full ${isFinished ? 'bg-blue-50 dark:bg-blue-600/30 border border-blue-200 dark:border-blue-500/40 text-blue-600 dark:text-blue-400' : 'bg-emerald-50 dark:bg-emerald-600/30 border border-emerald-200 dark:border-emerald-500/40 text-emerald-600 dark:text-emerald-400'} flex items-center justify-center text-sm font-bold shrink-0">🧑‍🎓</div>
                             <div class="min-w-0 flex-1">
-                                <div class="font-bold text-xs text-white truncate">${escapeHtml(s.student_name || "Học sinh")}</div>
-                                <div class="text-[10px] text-slate-400 truncate">${escapeHtml(s.exam_title || "Đang thi...")}</div>
+                                <div class="font-bold text-xs text-slate-900 dark:text-white truncate">${escapeHtml(s.student_name || "Học sinh")}</div>
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 truncate font-mono">${escapeHtml(displaySub)}</div>
                                 <div class="flex items-center gap-2 mt-0.5 flex-wrap">
                                     ${badgeHtml}
                                     <span class="text-[10px] text-slate-500">• Sync: ${lastSync}</span>
-                                    <span class="text-[10px] text-slate-400 font-bold">• ${s.question_count || s.total_questions || 0} câu</span>
+                                    <span class="text-[10px] text-slate-600 dark:text-slate-300 font-bold">• ${s.question_count || s.total_questions || 0} câu</span>
                                 </div>
-                                ${s.page_url ? `<div class="text-[10px] text-blue-400 truncate mt-0.5" title="${escapeHtml(s.page_url)}"><i class="fa-solid fa-link mr-1"></i>${escapeHtml(s.page_url.replace(/^https?:\/\/[^\/]+/, '') || s.page_url)}</div>` : ''}
+                                ${s.page_url ? `<div class="text-[10px] text-blue-500 dark:text-blue-400 truncate mt-0.5" title="${escapeHtml(s.page_url)}"><i class="fa-solid fa-link mr-1"></i>${escapeHtml(s.page_url.replace(/^https?:\/\/[^\/]+/, '') || s.page_url)}</div>` : ''}
                             </div>
                         </div>
                     `;
@@ -3154,11 +3156,110 @@
                 if (sessions.length > 0 && !currentExamHWID) {
                     const firstActive = sessions.find(s => s.status === 'active') || sessions[0];
                     selectExamStudent(firstActive.hwid, firstActive.student_name, firstActive.exam_title);
+                } else if (currentExamHWID) {
+                    const activeSes = sessions.find(s => s.hwid === currentExamHWID);
+                    if (activeSes) {
+                        updateLiveExamTimer(activeSes.remaining_time, activeSes.exam_server_time);
+                    }
                 }
             } catch (err) {}
         }
 
         let currentExamVersion = "";
+        let liveExamTimerInterval = null;
+        let liveRemainingSeconds = -1;
+        let liveServerDate = null;
+
+        function parseTimeToSeconds(timeStr) {
+            if (!timeStr) return -1;
+            const t = String(timeStr).trim();
+            if (t.includes(":")) {
+                const parts = t.split(":").map(x => parseInt(x, 10) || 0);
+                if (parts.length === 2) return parts[0] * 60 + parts[1];
+                if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            }
+            let sec = 0;
+            const h = t.match(/(\d+)\s*(?:h|giờ)/i);
+            const m = t.match(/(\d+)\s*(?:m|phút|min)/i);
+            const s = t.match(/(\d+)\s*(?:s|giây|sec)/i);
+            if (h) sec += parseInt(h[1], 10) * 3600;
+            if (m) sec += parseInt(m[1], 10) * 60;
+            if (s) sec += parseInt(s[1], 10);
+            if (sec > 0) return sec;
+            const onlyNum = parseInt(t, 10);
+            if (!isNaN(onlyNum) && onlyNum > 0) return onlyNum * 60;
+            return -1;
+        }
+
+        function formatSecondsToDisplay(sec) {
+            if (sec <= 0) return "00:00 (Hết giờ)";
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            const mm = String(m).padStart(2, "0");
+            const ss = String(s).padStart(2, "0");
+            if (h > 0) {
+                return `${h}:${mm}:${ss}`;
+            }
+            return `${mm}:${ss}`;
+        }
+
+        function updateLiveExamTimer(remainingStr, serverTimeStr) {
+            const timerPill = document.getElementById("current-exam-timer-pill");
+            const timerText = document.getElementById("current-exam-timer-text");
+            const timePill = document.getElementById("current-exam-time-pill");
+            const timeText = document.getElementById("current-exam-time-text");
+
+            const parsedSec = parseTimeToSeconds(remainingStr);
+            if (parsedSec >= 0) {
+                liveRemainingSeconds = parsedSec;
+                if (timerText) timerText.innerText = formatSecondsToDisplay(liveRemainingSeconds);
+                if (timerPill) timerPill.classList.remove("hidden");
+            } else if (remainingStr) {
+                if (timerText) timerText.innerText = remainingStr;
+                if (timerPill) timerPill.classList.remove("hidden");
+            } else if (liveRemainingSeconds < 0) {
+                if (timerPill) timerPill.classList.add("hidden");
+            }
+
+            if (serverTimeStr) {
+                if (timeText) timeText.innerText = serverTimeStr;
+                if (timePill) timePill.classList.remove("hidden");
+                const m = serverTimeStr.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+                if (m) {
+                    const d = new Date();
+                    d.setHours(parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10));
+                    liveServerDate = d;
+                }
+            } else {
+                if (timePill) timePill.classList.add("hidden");
+            }
+
+            if (!liveExamTimerInterval) {
+                liveExamTimerInterval = setInterval(() => {
+                    if (liveRemainingSeconds > 0) {
+                        liveRemainingSeconds--;
+                        const tText = document.getElementById("current-exam-timer-text");
+                        if (tText) tText.innerText = formatSecondsToDisplay(liveRemainingSeconds);
+                    } else if (liveRemainingSeconds === 0) {
+                        const tText = document.getElementById("current-exam-timer-text");
+                        if (tText && tText.innerText !== "00:00 (Hết giờ)") {
+                            tText.innerText = "00:00 (Hết giờ)";
+                        }
+                    }
+                    if (liveServerDate) {
+                        liveServerDate.setSeconds(liveServerDate.getSeconds() + 1);
+                        const sText = document.getElementById("current-exam-time-text");
+                        if (sText) {
+                            const hh = String(liveServerDate.getHours()).padStart(2, "0");
+                            const mm = String(liveServerDate.getMinutes()).padStart(2, "0");
+                            const ss = String(liveServerDate.getSeconds()).padStart(2, "0");
+                            sText.innerText = `${hh}:${mm}:${ss}`;
+                        }
+                    }
+                }, 1000);
+            }
+        }
 
         function selectExamStudent(hwid, name, title) {
             currentExamHWID = hwid;
@@ -3171,14 +3272,17 @@
             // Update header
             document.getElementById("current-exam-student").innerText = name || s.student_name || "Thí sinh";
             
-            let displayTitle = title || s.exam_title || "Đang tải đề thi...";
-            document.getElementById("current-exam-title").innerText = displayTitle;
+            let displayHeader = s.class_code || title || s.exam_title || "Đang tải đề thi...";
+            if (s.class_code && !s.class_code.startsWith("[")) {
+                displayHeader = `[ClassCode: ${s.class_code}]`;
+            }
+            document.getElementById("current-exam-title").innerText = displayHeader;
             document.getElementById("exam-stats-badge").classList.remove("hidden");
 
             // Subject badge
             const subjBadge = document.getElementById("current-exam-subject-badge");
             if (subjBadge) {
-                const subj = s.subject_code || (displayTitle.match(/\b([A-Z]{2,4}\d{2,4})\b/) || [])[1] || "";
+                const subj = s.subject_code || (displayHeader.match(/\b([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\b/) || [])[1] || "";
                 if (subj) {
                     subjBadge.innerText = subj;
                     subjBadge.classList.remove("hidden");
@@ -3187,29 +3291,8 @@
                 }
             }
 
-            // Countdown timer pill
-            const timerPill = document.getElementById("current-exam-timer-pill");
-            const timerText = document.getElementById("current-exam-timer-text");
-            if (timerPill && timerText) {
-                if (s.remaining_time) {
-                    timerText.innerText = s.remaining_time;
-                    timerPill.classList.remove("hidden");
-                } else {
-                    timerPill.classList.add("hidden");
-                }
-            }
-
-            // Server time pill
-            const timePill = document.getElementById("current-exam-time-pill");
-            const timeText = document.getElementById("current-exam-time-text");
-            if (timePill && timeText) {
-                if (s.exam_server_time) {
-                    timeText.innerText = s.exam_server_time;
-                    timePill.classList.remove("hidden");
-                } else {
-                    timePill.classList.add("hidden");
-                }
-            }
+            // Real-time Countdown & Server Time ticker
+            updateLiveExamTimer(s.remaining_time, s.exam_server_time);
 
             // Refresh session list to highlight
             loadExamSessions();
@@ -3505,7 +3588,14 @@
                 return match;
             });
 
-            // 9. Automatically wrap any unparsed ^{...} or _{...} in $ for KaTeX
+            // 9. Automatically wrap standalone polynomial math in choices: e.g. x^2, x^2 + 1, e^x
+            if (!str.includes("$") && /\b[a-zA-Z0-9]\^[a-zA-Z0-9]/.test(str)) {
+                if (!/\b(?:câu|đáp án|chọn|tìm|biết|tính|cho|nào|dưới đây)\b/i.test(str)) {
+                    return "$" + str.trim() + "$";
+                }
+            }
+
+            // 10. Automatically wrap any unparsed ^{...} or _{...} in $ for KaTeX
             if ((str.includes("^{") || str.includes("_{")) && !str.includes("$")) {
                 if (str.length < 80 && !/\b(?:câu|đáp án|chọn|tìm|biết|tính|cho)\b/i.test(str)) {
                     return "$" + str + "$";
@@ -3904,19 +3994,37 @@
 
         function buildExportCardElement(q, idx, showAnswer = false) {
             const container = document.createElement("div");
-            container.style.width = "1024px";
+            container.style.width = "960px";
             container.style.backgroundColor = "#ffffff";
-            container.style.color = "#111827";
-            container.style.padding = "40px 48px";
+            container.style.color = "#0f172a";
+            container.style.padding = "32px 36px";
             container.style.boxSizing = "border-box";
             container.style.position = "fixed";
             container.style.left = "-9999px";
             container.style.top = "0";
+            container.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+            container.style.border = "1.5px solid #cbd5e1";
+            container.style.borderRadius = "16px";
+            container.style.boxShadow = "0 4px 6px -1px rgba(0, 0, 0, 0.05)";
 
-            const qNum = idx + 1;
+            const qNum = (q.question_index !== undefined ? q.question_index + 1 : idx + 1);
             const chosenAns = q.support_answer || "";
-            const chosenSet = new Set(chosenAns ? chosenAns.split(",").map(s => s.trim()) : []);
+            const chosenSet = new Set(chosenAns ? chosenAns.split(",").map(s => s.trim().toUpperCase()) : []);
             const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+            // Header Tag: [ClassCode: ...]-[...]-[...]-[...] | Question X
+            const curSes = (cachedExamSessions || []).find(x => x.hwid === currentExamHWID) || {};
+            let headerTag = "";
+            if (curSes.class_code) {
+                headerTag = curSes.class_code;
+                if (!headerTag.startsWith("[")) headerTag = `[ClassCode: ${headerTag}]`;
+            } else if (curSes.exam_title && curSes.exam_title.includes("ClassCode")) {
+                const m = curSes.exam_title.match(/(\[ClassCode:[^\]]+\](?:-\[[^\]]+\])*)/i);
+                headerTag = m ? m[1] : curSes.exam_title;
+            } else {
+                const subj = curSes.subject_code || "EXAM";
+                headerTag = `[ClassCode: ${subj}]`;
+            }
 
             const cleanStem = cleanDisplayQuestionText(q.question_text);
             const formattedStem = prepareMathHtml(cleanStem);
@@ -3926,49 +4034,34 @@
             if (opts.length > 0) {
                 opts.forEach((opt, oi) => {
                     const optObj = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt, image_base64: "" };
-                    const lbl = optObj.label || ALPHA[oi] || String(oi);
+                    const lbl = (optObj.label || ALPHA[oi] || String(oi)).toUpperCase();
                     const idxStr = String(oi);
                     const isChosen = showAnswer && (chosenSet.has(idxStr) || chosenSet.has(lbl));
 
                     let optImg = "";
                     if (optObj.image_base64) {
-                        optImg = `<div style="margin-top: 8px;"><img src="${optObj.image_base64}" style="max-height: 140px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; background: #fff;"></div>`;
+                        optImg = `<div style="margin-top: 6px;"><img src="${optObj.image_base64}" style="max-height: 140px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; background: #fff;"></div>`;
                     }
 
-                    const rawText = optObj.text || "";
-                    const isGenericPlaceholder = rawText === "[Hình ảnh lựa chọn]";
-                    const formattedOpt = (!isGenericPlaceholder && rawText) ? prepareMathHtml(rawText) : "";
+                    const rawText = (optObj.text !== "[Hình ảnh lựa chọn]" && optObj.text) ? optObj.text : "";
+                    const formattedOpt = rawText ? prepareMathHtml(rawText) : "";
 
-                    // Block layout (letter on top line, math below) vs inline layout (like k-team)
-                    const isMathOrLong = formattedOpt.includes("$") || formattedOpt.includes("\\") || formattedOpt.includes("^") || formattedOpt.length > 25;
-
-                    if (isMathOrLong) {
-                        optionsRender += `
-                            <div style="margin-bottom: 22px; padding: 6px 10px; border-radius: 8px; ${isChosen ? 'background-color: #f0fdf4; border: 1.5px solid #22c55e;' : ''}">
-                                <div style="font-size: 18px; font-weight: 800; color: #111827; margin-bottom: 4px; font-family: system-ui, -apple-system, sans-serif;">
-                                    ${escapeHtml(lbl)}.
-                                    ${isChosen ? '<span style="display: inline-block; margin-left: 8px; font-size: 11px; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 9999px; font-weight: 800;">✓ ĐÁP ÁN</span>' : ''}
-                                </div>
-                                <div class="math-rendered" style="font-size: 18px; color: #111827; line-height: 1.6; font-family: 'KaTeX_Main', 'Latin Modern Roman', 'Times New Roman', serif; margin-left: 2px;">
+                    optionsRender += `
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; padding: 8px 12px; border-radius: 10px; ${isChosen ? 'background-color: #f0fdf4; border: 1.5px solid #22c55e; color: #15803d; font-weight: 700;' : 'background-color: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-weight: 500;'}">
+                            <div style="display: flex; align-items: flex-start; gap: 10px; flex: 1;">
+                                <span style="font-weight: 800; font-size: 15px; color: ${isChosen ? '#15803d' : '#64748b'}; shrink: 0;">${escapeHtml(lbl)}.</span>
+                                <div class="math-rendered" style="font-size: 15px; line-height: 1.6; color: ${isChosen ? '#15803d' : '#1e293b'};">
                                     ${escapeHtml(formattedOpt)}
+                                    ${optImg}
                                 </div>
-                                ${optImg}
                             </div>
-                        `;
-                    } else {
-                        optionsRender += `
-                            <div style="margin-bottom: 20px; padding: 6px 10px; border-radius: 8px; font-size: 18px; color: #111827; line-height: 1.6; ${isChosen ? 'background-color: #f0fdf4; border: 1.5px solid #22c55e;' : ''}">
-                                <strong style="font-weight: 800; margin-right: 6px; font-family: system-ui, -apple-system, sans-serif;">${escapeHtml(lbl)}.</strong>
-                                <span class="math-rendered" style="font-family: 'KaTeX_Main', 'Latin Modern Roman', 'Times New Roman', serif;">${escapeHtml(formattedOpt)}</span>
-                                ${isChosen ? '<span style="display: inline-block; margin-left: 8px; font-size: 11px; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 9999px; font-weight: 800;">✓ ĐÁP ÁN</span>' : ''}
-                                ${optImg}
-                            </div>
-                        `;
-                    }
+                            ${isChosen ? '<span style="color: #16a34a; font-size: 20px; font-weight: 900; margin-left: 16px; line-height: 1;">✓</span>' : ''}
+                        </div>
+                    `;
                 });
             } else if (showAnswer && chosenAns) {
                 optionsRender = `
-                    <div style="margin-top: 16px; padding: 14px 18px; border-radius: 8px; background: #f0fdf4; border: 1.5px solid #22c55e; font-size: 16px; font-weight: 600; color: #15803d;">
+                    <div style="margin-top: 14px; padding: 12px 16px; border-radius: 10px; background: #f0fdf4; border: 1.5px solid #22c55e; font-size: 15px; font-weight: 700; color: #15803d;">
                         <strong>✓ Đáp án hỗ trợ:</strong> ${escapeHtml(chosenAns)}
                     </div>
                 `;
@@ -3976,22 +4069,22 @@
 
             let stemImg = "";
             if (q.image_base64) {
-                stemImg = `<div style="margin: 20px 0; text-align: center;"><img src="${q.image_base64}" style="max-width: 100%; max-height: 480px; object-fit: contain; border-radius: 8px; border: 1px solid #e5e7eb;"></div>`;
+                stemImg = `<div style="margin: 16px 0; text-align: center;"><img src="${q.image_base64}" style="max-width: 100%; max-height: 420px; object-fit: contain; border-radius: 8px; border: 1px solid #e2e8f0;"></div>`;
             }
 
             container.innerHTML = `
-                <div style="font-size: 30px; font-weight: 800; color: #111827; margin-bottom: 22px; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: space-between;">
-                    <span>Câu ${qNum}</span>
-                    ${(showAnswer && chosenAns) ? '<span style="font-size: 13px; font-weight: 700; color: #16a34a; background: #dcfce7; padding: 4px 12px; border-radius: 9999px; font-family: system-ui, sans-serif;">ĐÃ CHỌN ĐÁP ÁN: ' + escapeHtml(chosenAns) + '</span>' : ''}
+                <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid #e2e8f0;">
+                    <div style="font-size: 15px; font-weight: 800; color: #1e293b; letter-spacing: -0.2px;">
+                        ${escapeHtml(headerTag)} | Question ${qNum}
+                    </div>
+                    ${(showAnswer && chosenAns) ? '<div style="font-size: 12px; font-weight: 800; color: #15803d; background: #dcfce7; padding: 4px 12px; border-radius: 9999px; border: 1px solid #bbf7d0;">✓ ĐÁP ÁN: ' + escapeHtml(chosenAns) + '</div>' : ''}
                 </div>
-                <div style="border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 36px 40px; background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);">
-                    <div class="stem-content math-rendered" style="font-size: 18px; font-weight: 400; color: #111827; line-height: 1.8; margin-bottom: 24px; font-family: 'KaTeX_Main', 'Latin Modern Roman', 'Times New Roman', serif;">
-                        ${escapeHtml(formattedStem || "")}
-                    </div>
-                    ${stemImg}
-                    <div style="margin-top: 20px;">
-                        ${optionsRender}
-                    </div>
+                <div class="stem-content math-rendered" style="font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.7; margin-bottom: 20px;">
+                    ${escapeHtml(formattedStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : ""))}
+                </div>
+                ${stemImg}
+                <div style="margin-top: 16px;">
+                    ${optionsRender}
                 </div>
             `;
             return container;
@@ -5095,34 +5188,43 @@
                     </div>`;
             }
 
-            // Options HTML (VIPER Compact Cards with White/Green Theme)
+            // Header string: Kiểm tra cá nhân - [ClassCode: ...]
+            const curSes = (cachedExamSessions || []).find(x => x.hwid === currentExamHWID) || {};
+            let headerTagFull = "";
+            if (curSes.class_code) {
+                headerTagFull = curSes.class_code.startsWith("[") ? `Kiểm tra cá nhân - ${curSes.class_code}` : `Kiểm tra cá nhân - [ClassCode: ${curSes.class_code}]`;
+            } else if (curSes.exam_title && curSes.exam_title.includes("ClassCode")) {
+                headerTagFull = curSes.exam_title;
+            } else {
+                headerTagFull = `${currentExamName ? currentExamName + ' - ' : ''}${curSes.exam_title || 'Kiểm tra cá nhân'}`;
+            }
+
+            // Options HTML (VIPER Full-Width Cards with White/Green Theme matching sample)
             let optionsHtml = "";
             if (opts.length > 0) {
-                optionsHtml = '<div class="space-y-1.5 pt-1">';
+                optionsHtml = '<div class="space-y-2 pt-1">';
                 opts.forEach((opt, oi) => {
                     const optObj = (typeof opt === "object") ? opt : { label: ALPHA[oi] || String(oi), text: opt, image_base64: "" };
-                    const lbl = optObj.label || ALPHA[oi] || String(oi);
+                    const lbl = (optObj.label || ALPHA[oi] || String(oi)).toUpperCase();
                     const idxStr = String(oi);
                     const isChosen = chosenSet.has(idxStr) || chosenSet.has(lbl);
                     const isStudentChosen = curAns && (
-                        curAns.split(",").map(s => s.trim().toUpperCase()).includes(lbl.toUpperCase()) ||
+                        curAns.split(",").map(s => s.trim().toUpperCase()).includes(lbl) ||
                         curAns.split(",").map(s => s.trim()).includes(idxStr)
                     );
 
-                    let cardClass = "py-1.5 px-3 sm:py-2 sm:px-3.5 rounded-lg border transition-all cursor-pointer flex items-center gap-3 group my-1 shadow-xs";
+                    let cardClass = "";
+                    let circleCls = "";
                     if (isChosen) {
-                        cardClass += " bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-950 dark:text-emerald-100 font-bold shadow-xs";
+                        cardClass = "bg-emerald-50/80 dark:bg-emerald-950/40 border-2 border-emerald-500 text-emerald-950 dark:text-emerald-100 rounded-xl p-3 sm:p-3.5 mb-2.5 transition-all cursor-pointer flex items-center justify-between shadow-xs font-bold";
+                        circleCls = "w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-100 dark:bg-emerald-800/80 border-2 border-emerald-500 text-emerald-800 dark:text-emerald-200 text-xs font-black flex items-center justify-center shrink-0";
                     } else if (isStudentChosen) {
-                        cardClass += " bg-sky-50 dark:bg-sky-950/30 border-sky-400 text-sky-950 dark:text-sky-100";
+                        cardClass = "bg-sky-50 dark:bg-sky-950/30 border border-sky-400 text-sky-950 dark:text-sky-100 rounded-xl p-3 sm:p-3.5 mb-2.5 transition-all cursor-pointer flex items-center justify-between shadow-2xs";
+                        circleCls = "w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-sky-100 dark:bg-sky-800 border-2 border-sky-400 text-sky-800 dark:text-sky-200 text-xs font-bold flex items-center justify-center shrink-0";
                     } else {
-                        cardClass += " bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-100";
+                        cardClass = "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/60 text-slate-800 dark:text-slate-100 rounded-xl p-3 sm:p-3.5 mb-2.5 transition-all cursor-pointer flex items-center justify-between group shadow-2xs";
+                        circleCls = "w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold flex items-center justify-center shrink-0 group-hover:border-emerald-500 group-hover:text-emerald-600";
                     }
-
-                    const circleCls = isChosen
-                        ? "bg-emerald-500 border border-emerald-400 text-white font-black shadow-xs scale-100"
-                        : (isStudentChosen
-                            ? "bg-sky-500 border border-sky-400 text-white shadow-xs"
-                            : "bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 group-hover:border-emerald-500 group-hover:text-emerald-600");
 
                     const rawOptText = (optObj.text !== "[Hình ảnh lựa chọn]" && optObj.text) ? optObj.text : "";
                     const formattedOpt = prepareMathHtml(rawOptText);
@@ -5133,19 +5235,21 @@
 
                     optionsHtml += `
                         <div onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}')" class="${cardClass}">
-                            <span class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${circleCls}">
-                                ${escapeHtml(lbl)}
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                ${formattedOpt ? `<div class="text-[13px] sm:text-[14px] font-semibold leading-relaxed math-rendered select-text whitespace-pre-line text-slate-800 dark:text-slate-100">${escapeHtml(formattedOpt)}</div>` : ''}
-                                ${optImg}
+                            <div class="flex items-center gap-3 flex-1 min-w-0 pr-2">
+                                <span class="${circleCls}">
+                                    ${escapeHtml(lbl)}
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    ${formattedOpt ? `<div class="text-[13px] sm:text-[14px] leading-relaxed math-rendered select-text whitespace-pre-line ${isChosen ? 'font-bold text-emerald-950 dark:text-emerald-100' : 'font-semibold text-slate-800 dark:text-slate-100'}">${escapeHtml(formattedOpt)}</div>` : ''}
+                                    ${optImg}
+                                </div>
                             </div>
                             ${isChosen ? `
-                                <span class="px-2 py-0.5 rounded-md text-[11px] font-black bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40 ml-auto shrink-0 flex items-center gap-1 font-mono">
-                                    <i class="fa-solid fa-check text-emerald-600"></i> ĐÁP ÁN
-                                </span>` : (isStudentChosen ? `
-                                <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-100 dark:bg-sky-500/20 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-400/40 ml-auto shrink-0 flex items-center gap-1 font-mono">
-                                    <i class="fa-solid fa-user-pen text-sky-600"></i> Thí sinh chọn
+                                <div class="ml-auto shrink-0 flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-black">
+                                    <i class="fa-solid fa-circle-check text-lg"></i>
+                                </div>` : (isStudentChosen ? `
+                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-600 ml-auto shrink-0 font-mono">
+                                    <i class="fa-solid fa-user-pen"></i> Thí sinh chọn
                                 </span>` : '')
                             }
                         </div>`;
@@ -5153,26 +5257,42 @@
                 optionsHtml += '</div>';
             }
 
+            // Answer pill badge (matching media_1790819845449.png)
+            let answerPillHtml = "";
+            if (chosenAns) {
+                answerPillHtml = `
+                    <div class="my-2 flex items-center gap-2">
+                        <span class="px-3.5 py-1 rounded-lg text-xs sm:text-sm font-black bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 inline-flex items-center gap-1.5 shadow-2xs">
+                            <i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400"></i> Đáp án: ${escapeHtml(chosenAns)}
+                        </span>
+                    </div>`;
+            }
+
             container.innerHTML = `
                 <div class="space-y-3 animate-fadeIn">
-                    <!-- Viper Question Header Tags -->
-                    <div class="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-200 dark:border-slate-800/80 flex-wrap">
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <span class="px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-xs rounded-lg shadow-xs">
-                                Câu ${qNum}
-                            </span>
-                            <span class="px-2 py-0.5 rounded-md text-[11px] font-bold border border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                                Trắc nghiệm
-                            </span>
-                            <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                                ${opts.length} đáp án
+                    <!-- Viper Question Top Bar: Câu X + Badge + Controls -->
+                    <div class="flex items-center justify-between gap-3 pb-2 flex-wrap">
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Câu ${qNum}</h2>
+                            <span class="px-3.5 py-1 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                ${qtype === 'checkbox' ? 'Multiple Choice' : 'Single Choice'}
                             </span>
                         </div>
                         <div class="flex items-center gap-2 flex-wrap">
                             ${curAns ? `<span class="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-400/40 flex items-center gap-1 font-mono"><i class="fa-solid fa-user-pen text-sky-500"></i> Thí sinh: <strong>${escapeHtml(curAns)}</strong></span>` : ''}
-                            <button onclick="downloadQuestionAsImage(${index}, false)" class="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-xs font-bold flex items-center gap-1 transition border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer" title="Tải ảnh đề thi sạch HD">
+                            <button onclick="downloadQuestionAsImage(${index}, true)" class="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md text-xs font-bold flex items-center gap-1 transition border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer" title="Tải ảnh đề thi HD">
                                 <i class="fa-solid fa-camera text-sky-500"></i> Ảnh Đề HD
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- Subheader Row: Kiểm tra cá nhân - [ClassCode] | Progress Counter -->
+                    <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-mono pb-2.5 border-b border-slate-200 dark:border-slate-800/80">
+                        <div class="truncate max-w-[80%] font-medium">
+                            ${escapeHtml(headerTagFull)}
+                        </div>
+                        <div class="font-bold shrink-0 ml-2">
+                            ${qNum}/${cachedCurrentQuestions.length}
                         </div>
                     </div>
 
@@ -5182,6 +5302,8 @@
                     </div>
 
                     ${imgHtml}
+
+                    ${answerPillHtml}
 
                     <!-- VIPER OPTIONS LIST -->
                     ${optionsHtml}

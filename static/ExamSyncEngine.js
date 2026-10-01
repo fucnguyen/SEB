@@ -746,26 +746,52 @@
         }
         if (!fullTitle) fullTitle = document.title || "";
 
-        // ClassCode: ví dụ [ClassCode: MAE101.3] hoặc ClassCode: MAE101.3
-        var mClass = fullTitle.match(/\[?\s*ClassCode\s*:\s*([^\]\s\-]+)\s*\]?/i);
-        if (mClass) meta.class_code = mClass[1].trim();
+        // Trích xuất chuỗi composite đầy đủ: ví dụ [ClassCode: MKT1905-DIG]-[HCM202]-[donnt3@fpt.edu.vn]-[185]
+        var mComposite = fullTitle.match(/(\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
+        if (!mComposite && document.body) {
+            var bodyText = (document.body.innerText || "").slice(0, 3000);
+            mComposite = bodyText.match(/(\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
+        }
+        if (mComposite) {
+            meta.full_class_info = mComposite[1].trim();
+        }
 
-        // SubjectCode: ví dụ [MAE101] hoặc sau ClassCode
+        // ClassCode đơn lẻ (ví dụ MKT1905-DIG hoặc MAE101.3): Cho phép dấu '-' và '.' trong mã lớp
+        var mClass = fullTitle.match(/\[?\s*ClassCode\s*:\s*([^\]]+?)\s*\]/i);
+        if (!mClass && meta.full_class_info) {
+            mClass = meta.full_class_info.match(/ClassCode\s*:\s*([^\]]+)/i);
+        }
+        if (mClass) {
+            meta.class_code = mClass[1].trim();
+        }
+
+        // Ưu tiên hiển thị trọn vẹn: Nếu có composite header đầy đủ, dùng cho class_code
+        if (meta.full_class_info) {
+            meta.class_code = meta.full_class_info;
+        }
+
+        // SubjectCode: ví dụ [HCM202] hoặc [MAE101] trong chuỗi composite hoặc sau ClassCode
         var mSubj = fullTitle.match(/-\[([A-Za-z0-9_.]+)\]-/);
+        if (!mSubj && meta.full_class_info) mSubj = meta.full_class_info.match(/-\[([A-Za-z0-9_.]+)\]-/);
         if (!mSubj) mSubj = fullTitle.match(/\[([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\]/);
         if (mSubj) {
             meta.subject_code = mSubj[1].trim();
         } else if (meta.class_code) {
-            var parts = meta.class_code.split(".");
-            meta.subject_code = parts[0].trim();
+            var parts = meta.class_code.replace(/\[|\]/g, "").split(/[\.\-]/);
+            if (parts.length > 0) meta.subject_code = parts[0].replace(/ClassCode\s*:\s*/i, "").trim();
         }
 
         // Proctor email: ví dụ [donnt3@fpt.edu.vn]
         var mEmail = fullTitle.match(/\[([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)\]/);
+        if (!mEmail && meta.full_class_info) mEmail = meta.full_class_info.match(/\[([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)\]/);
         if (mEmail) meta.proctor_email = mEmail[1].trim();
 
-        // Paper UUID / Code: ví dụ [eb09e692-618d-469e-be6a-c230625259cc]
+        // Paper UUID / Code: ví dụ [eb09e692-618d-469e-be6a-c230625259cc] hoặc [185]
         var mPaper = fullTitle.match(/\[([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\]/);
+        if (!mPaper && meta.full_class_info) {
+            var mAttempt = meta.full_class_info.match(/-\[(\d+)\]$/);
+            if (mAttempt) mPaper = mAttempt;
+        }
         if (!mPaper) mPaper = fullTitle.match(/\[([a-zA-Z0-9_-]{16,})\]/);
         if (mPaper) meta.paper_code = mPaper[1].trim();
 

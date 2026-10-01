@@ -2108,7 +2108,7 @@ def get_support_assigned_exams_for_date(support_key: str, target_date: Optional[
     c.execute("""
         SELECT a.*, 
                s.exam_title, s.total_questions, s.status as session_status, s.last_sync,
-               s.remaining_time, s.exam_server_time, s.subject_code,
+               s.remaining_time, s.exam_server_time, s.subject_code, s.class_code, s.campus,
                l.student_name as lic_student_name, l.machine_name, l.ip_address, l.status as lic_status
         FROM support_assignments a
         LEFT JOIN live_exam_sessions s ON a.hwid = s.hwid
