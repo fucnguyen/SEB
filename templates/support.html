@@ -1,10 +1,15 @@
 <!DOCTYPE html>
-<html lang="vi" class="dark">
+<html lang="vi" class="light theme-mode-light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Bàn Làm Việc Support - SEB Live Exam Console</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        };
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- KaTeX for math formulas -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
@@ -16,78 +21,61 @@
     <script src="/static/theme-engine.js"></script>
     <style>
         :root {
-            --primary-accent: #8b5cf6;
-            --primary-hover: #7c3aed;
-            --primary-gradient: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-            --primary-glow: 0 0 25px -4px rgba(139, 92, 246, 0.4);
-            --primary-badge-bg: rgba(139, 92, 246, 0.18);
-            --primary-badge-text: #c4b5fd;
-            --primary-badge-border: rgba(139, 92, 246, 0.35);
-            --primary-accent-subtle: rgba(139, 92, 246, 0.12);
+            --primary-accent: #10b981;
+            --primary-hover: #059669;
+            --primary-gradient: linear-gradient(135deg, #10b981 0%, #0d9488 100%);
+            --primary-glow: 0 0 20px -4px rgba(16, 185, 129, 0.35);
+            --primary-badge-bg: rgba(16, 185, 129, 0.12);
+            --primary-badge-text: #047857;
+            --primary-badge-border: rgba(16, 185, 129, 0.25);
+            --primary-accent-subtle: rgba(16, 185, 129, 0.08);
             --app-font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
             --app-font-size: 100%;
         }
         body { 
             font-family: var(--app-font-family); 
             font-size: var(--app-font-size);
-            background-color: #0b0f19;
-            background-image: 
-                radial-gradient(at 15% 15%, rgba(99, 102, 241, 0.12) 0px, transparent 45%),
-                radial-gradient(at 85% 20%, rgba(139, 92, 246, 0.10) 0px, transparent 45%),
-                radial-gradient(at 50% 90%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
-            background-attachment: fixed;
-            background-size: cover;
-            color: #f1f5f9;
-            transition: background-color 0.25s ease, color 0.25s ease;
+            background-color: #f8fafc;
+            color: #0f172a;
+            transition: background-color 0.2s ease, color 0.2s ease;
         }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         .glass-card {
-            background: rgba(15, 23, 42, 0.75) !important;
+            background: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+            transition: all 0.2s ease;
+        }
+        header {
+            background: rgba(255, 255, 255, 0.98) !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        /* Scoped Dark Mode Overrides */
+        html.dark body {
+            background-color: #0b0f19 !important;
+            background-image: 
+                radial-gradient(at 15% 15%, rgba(99, 102, 241, 0.12) 0px, transparent 45%),
+                radial-gradient(at 85% 20%, rgba(139, 92, 246, 0.10) 0px, transparent 45%),
+                radial-gradient(at 50% 90%, rgba(16, 185, 129, 0.05) 0px, transparent 50%) !important;
+            background-attachment: fixed !important;
+            background-size: cover !important;
+            color: #f1f5f9 !important;
+        }
+        html.dark .glass-card {
+            background: rgba(15, 23, 42, 0.85) !important;
             backdrop-filter: blur(20px) !important;
             -webkit-backdrop-filter: blur(20px) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
-            transition: all 0.25s ease;
         }
-        .glow-box-purple {
-            box-shadow: 0 0 25px -5px rgba(168, 85, 247, 0.25);
-        }
-        /* Light Theme Overrides */
-        html.theme-mode-light body {
-            background-color: #f8fafc !important;
-            color: #0f172a !important;
-        }
-        html.theme-mode-light .glass-card {
-            background: rgba(255, 255, 255, 0.95) !important;
-            border-color: #e2e8f0 !important;
-            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05) !important;
-        }
-        html.theme-mode-light header {
-            background: rgba(255, 255, 255, 0.96) !important;
-            border-color: #e2e8f0 !important;
-        }
-        html.theme-mode-light .text-white {
-            color: #0f172a !important;
-        }
-        html.theme-mode-light .text-slate-100, html.theme-mode-light .text-slate-200, html.theme-mode-light .text-slate-300 {
-            color: #1e293b !important;
-        }
-        html.theme-mode-light .text-slate-400 {
-            color: #475569 !important;
-        }
-        html.theme-mode-light .bg-slate-900, html.theme-mode-light .bg-slate-950 {
-            background-color: #f1f5f9 !important;
-        }
-        html.theme-mode-light .bg-slate-800 {
-            background-color: #e2e8f0 !important;
-            color: #0f172a !important;
-        }
-        html.theme-mode-light .border-slate-800, html.theme-mode-light .border-slate-700 {
-            border-color: #cbd5e1 !important;
+        html.dark header {
+            background: rgba(11, 15, 25, 0.95) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
         }
         /* OLED Mode Overrides */
         html.theme-mode-oled body {
             background-color: #000000 !important;
+            color: #ffffff !important;
         }
         html.theme-mode-oled .glass-card {
             background: #000000 !important;
@@ -99,48 +87,50 @@
         }
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
-        ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.4); border-radius: 9999px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.6); }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        html.dark ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        html.dark ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.4); }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-purple-600 selection:text-white">
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
 
     <!-- Header Navigation -->
-    <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-3">
+    <header class="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3 shadow-xs">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white text-lg shadow-lg shadow-purple-600/30">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg shadow-md" style="background: var(--primary-gradient)">
                     <i class="fa-solid fa-headset"></i>
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="text-base font-extrabold text-white tracking-tight">Bàn Làm Việc Hỗ Trợ Ca Thi</h1>
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> TRỰC TUYẾN
+                        <h1 class="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Bàn Làm Việc Hỗ Trợ Ca Thi</h1>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 flex items-center gap-1 font-mono">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> TRỰC TUYẾN
                         </span>
                     </div>
-                    <p class="text-[11px] text-slate-400">Chỉ hiển thị các máy được phân công hôm nay: <span id="current-date-badge" class="font-mono text-purple-300 font-semibold">...</span></p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Chỉ hiển thị các máy được phân công hôm nay: <span id="current-date-badge" class="font-mono text-emerald-700 dark:text-purple-300 font-semibold">...</span></p>
                 </div>
             </div>
 
             <!-- User Info & Logout -->
             <div class="flex items-center gap-3">
                 <div class="hidden sm:flex flex-col items-end">
-                    <span id="support-user-name" class="text-xs font-bold text-white flex items-center gap-1.5">
-                        <i class="fa-solid fa-user-circle text-purple-400"></i> Đang tải...
+                    <span id="support-user-name" class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-circle text-emerald-600"></i> Đang tải...
                     </span>
-                    <span id="support-key-badge" class="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60 mt-0.5">
+                    <span id="support-key-badge" class="text-[10px] font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700/60 mt-0.5">
                         SUP-XXXX-XXXX
                     </span>
                 </div>
-                <button onclick="window.toggleAppearanceModal()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-purple-500/30" title="Tùy biến giao diện: Màu sắc, Chế độ sáng/tối & Phông chữ">
-                    <i class="fa-solid fa-palette text-amber-400"></i> <span class="hidden sm:inline">Giao Diện</span>
+                <button onclick="window.toggleAppearanceModal()" class="px-2.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-purple-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-200 dark:border-purple-500/30 shadow-xs" title="Tùy biến giao diện: Màu sắc, Chế độ sáng/tối & Phông chữ">
+                    <i class="fa-solid fa-palette text-amber-500"></i> <span class="hidden sm:inline">Giao Diện</span>
                 </button>
-                <button onclick="refreshData()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition" title="Làm mới">
+                <button onclick="refreshData()" class="p-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs transition border border-slate-200 dark:border-slate-700 shadow-xs" title="Làm mới">
                     <i id="btn-refresh-icon" class="fa-solid fa-arrows-rotate"></i>
                 </button>
-                <a href="/api/support/logout" class="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/50 text-rose-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition" title="Đăng xuất">
+                <a href="/api/support/logout" class="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs" title="Đăng xuất">
                     <i class="fa-solid fa-right-from-bracket"></i> <span class="hidden sm:inline">Đăng Xuất</span>
                 </a>
             </div>
@@ -648,11 +638,11 @@
                         const isSelectedByStudent = studentAnsSet.has(optLabel.toUpperCase()) || studentAnsSet.has(String(optIdx));
                         const clickAction = isCheckbox ? `toggleSupportCheckbox(${realQIndex}, '${optLabel}')` : `setSupportAnswer(${realQIndex}, '${optLabel}')`;
                         
-                        let cardStyle = 'p-3 sm:p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 my-1.5 group shadow-sm';
+                        let cardStyle = 'py-1.5 px-3 sm:py-2 sm:px-3.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 my-1 group shadow-xs';
                         if (isSelectedBySupport) {
-                            cardStyle += isCheckbox ? ' bg-purple-50 dark:bg-purple-950/50 border-2 border-purple-500 text-purple-950 dark:text-white font-bold shadow-md shadow-purple-500/20' : ' bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-500 text-emerald-950 dark:text-white font-bold shadow-md shadow-emerald-500/25';
+                            cardStyle += isCheckbox ? ' bg-purple-50 dark:bg-purple-950/50 border-purple-500 text-purple-950 dark:text-white font-bold shadow-xs' : ' bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-950 dark:text-white font-bold shadow-xs';
                         } else if (isSelectedByStudent) {
-                            cardStyle += ' bg-sky-50 dark:bg-sky-950/30 border-2 border-sky-400 text-sky-950 dark:text-white shadow-sm';
+                            cardStyle += ' bg-sky-50 dark:bg-sky-950/30 border-sky-400 text-sky-950 dark:text-white shadow-xs';
                         } else {
                             cardStyle += ' bg-white dark:bg-slate-900/90 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 text-slate-800 dark:text-slate-100';
                         }
@@ -663,35 +653,35 @@
 
                         optionsHtml += `
                             <div onclick="${clickAction}" class="${cardStyle}">
-                                <div class="flex items-center gap-3 pr-2 flex-1">
-                                    <span class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-sm sm:text-base font-black flex items-center justify-center shrink-0 border-2 transition-transform group-hover:scale-105 ${
+                                <div class="flex items-center gap-2.5 pr-2 flex-1">
+                                    <span class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs sm:text-sm font-black flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
                                         isSelectedBySupport 
-                                            ? (isCheckbox ? 'bg-purple-500 border-purple-400 text-white shadow-md' : 'bg-emerald-500 border-emerald-400 text-white shadow-md') 
-                                            : (isSelectedByStudent ? 'bg-sky-500 border-sky-400 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 group-hover:border-emerald-500 group-hover:text-emerald-500')
+                                            ? (isCheckbox ? 'bg-purple-600 border-purple-500 text-white shadow-xs' : 'bg-emerald-600 border-emerald-500 text-white shadow-xs') 
+                                            : (isSelectedByStudent ? 'bg-sky-500 border-sky-400 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 group-hover:border-emerald-500 group-hover:text-emerald-600')
                                     }">
                                         ${optLabel}
                                     </span>
                                     <div class="min-w-0 flex-1">
-                                        ${formattedOptText ? `<div class="text-sm sm:text-[15px] font-semibold leading-relaxed math-rendered select-text whitespace-pre-line text-slate-800 dark:text-slate-100">${escapeHtml(formattedOptText)}</div>` : ''}
+                                        ${formattedOptText ? `<div class="text-[13px] sm:text-[14px] font-semibold leading-relaxed math-rendered select-text whitespace-pre-line text-slate-800 dark:text-slate-100">${escapeHtml(formattedOptText)}</div>` : ''}
                                     </div>
                                     ${opt.image_base64 ? `
                                         <div class="inline-block my-1">
                                             <img src="${opt.image_base64}" onclick="event.stopPropagation(); openImageModal(this.src)" 
-                                                 class="max-h-24 max-w-xs rounded-lg border border-slate-600 bg-white p-1.5 cursor-zoom-in hover:border-emerald-400 transition object-contain shadow-sm" 
+                                                 class="max-h-20 max-w-xs rounded-lg border border-slate-300 dark:border-slate-600 bg-white p-1 cursor-zoom-in hover:border-emerald-400 transition object-contain shadow-xs" 
                                                  alt="Đáp án ${optLabel}">
                                         </div>` : ''}
                                     ${isSelectedByStudent ? `
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 flex items-center gap-1 shrink-0 ml-auto mr-2 font-mono">
-                                            <i class="fa-solid fa-user-pen"></i> Thí sinh đang chọn
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-400/40 flex items-center gap-1 shrink-0 ml-auto mr-1.5 font-mono">
+                                            <i class="fa-solid fa-user-pen"></i> Thí sinh chọn
                                         </span>` : ''}
                                 </div>
                                 <button onclick="${clickAction}" 
-                                    class="px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${
+                                    class="px-2.5 py-1 rounded-md text-xs font-bold transition shrink-0 ${
                                         isSelectedBySupport 
                                             ? 'bg-emerald-600 text-white hover:bg-emerald-500' 
-                                            : 'bg-purple-600/20 text-purple-300 hover:bg-purple-600 hover:text-white border border-purple-500/30'
+                                            : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-600 hover:text-white border border-emerald-300 dark:border-emerald-500/30'
                                     }">
-                                    ${isSelectedBySupport ? '<i class="fa-solid fa-check mr-1"></i> ' + (isCheckbox ? 'Đang Chọn' : 'Đã Chọn') : (isCheckbox ? '+ Chọn' : 'Chọn Đáp Án Này')}
+                                    ${isSelectedBySupport ? '<i class="fa-solid fa-check mr-1"></i> ' + (isCheckbox ? 'Đang Chọn' : 'Đã Chọn') : (isCheckbox ? '+ Chọn' : 'Chọn')}
                                 </button>
                             </div>
                         `;

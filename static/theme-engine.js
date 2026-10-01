@@ -9,7 +9,7 @@
  */
 
 (function () {
-    const THEME_STORAGE_KEY = "seb_ui_theme_prefs_v1";
+    const THEME_STORAGE_KEY = "seb_ui_theme_prefs_v2";
 
     const ACCENTS = {
         violet: {
@@ -95,9 +95,9 @@
     };
 
     const MODES = {
-        dark:  { name: "Dark Glass (Mặc định)", bg: "#090d16", text: "#f1f5f9" },
-        oled:  { name: "Midnight OLED (Đen tuyền)", bg: "#000000", text: "#ffffff" },
-        light: { name: "Modern Light (Sáng dịu mắt)", bg: "#f8fafc", text: "#0f172a" }
+        light: { name: "Modern Light (Sáng dịu mắt - Viper)", bg: "#f8fafc", text: "#0f172a" },
+        dark:  { name: "Dark Glass (Kính tối)", bg: "#090d16", text: "#f1f5f9" },
+        oled:  { name: "Midnight OLED (Đen tuyền)", bg: "#000000", text: "#ffffff" }
     };
 
     const SCALES = {
@@ -134,9 +134,9 @@
 
     function applyTheme(prefs) {
         const root = document.documentElement;
-        const ac = ACCENTS[prefs.accent] || ACCENTS.violet;
+        const ac = ACCENTS[prefs.accent] || ACCENTS.emerald;
         const fn = FONTS[prefs.font] || FONTS.vietnam;
-        const md = prefs.mode || "dark";
+        const md = prefs.mode || "light";
         const sc = SCALES[prefs.scale] || SCALES.normal;
 
         // Apply CSS custom variables
@@ -215,23 +215,28 @@
             }
         `;
 
+        // Apply mode class immediately to root (document.documentElement)
+        root.classList.remove("theme-mode-dark", "theme-mode-oled", "theme-mode-light", "dark", "light");
+        if (md === "light") {
+            root.classList.add("theme-mode-light", "light");
+        } else if (md === "oled") {
+            root.classList.add("theme-mode-oled", "dark");
+        } else {
+            root.classList.add("theme-mode-dark", "dark");
+        }
+
         // Apply to body if available
         if (document.body) {
             document.body.style.fontFamily = fn.css;
             document.body.style.fontSize = sc.val;
 
-            // Apply mode class
-            root.classList.remove("theme-mode-dark", "theme-mode-oled", "theme-mode-light", "dark", "light");
             if (md === "light") {
-                root.classList.add("theme-mode-light", "light");
-                document.body.classList.remove("bg-slate-950", "text-slate-100");
+                document.body.classList.remove("bg-slate-950", "text-slate-100", "bg-black");
                 document.body.classList.add("bg-slate-50", "text-slate-900");
             } else if (md === "oled") {
-                root.classList.add("theme-mode-oled", "dark");
-                document.body.classList.remove("bg-slate-50", "text-slate-900");
+                document.body.classList.remove("bg-slate-50", "text-slate-900", "bg-slate-950");
                 document.body.classList.add("bg-black", "text-white");
             } else {
-                root.classList.add("theme-mode-dark", "dark");
                 document.body.classList.remove("bg-slate-50", "text-slate-900", "bg-black");
                 document.body.classList.add("bg-slate-950", "text-slate-100");
             }
@@ -242,6 +247,19 @@
             document.querySelectorAll("[data-theme-color]").forEach(el => {
                 el.style.color = ac.primary;
             });
+
+            // Sync Viper theme toggle buttons if present on page
+            const iconViperTheme = document.getElementById("icon-viper-theme");
+            const textViperTheme = document.getElementById("text-viper-theme");
+            if (iconViperTheme && textViperTheme) {
+                if (md === "light") {
+                    iconViperTheme.className = "fa-solid fa-moon text-indigo-500";
+                    textViperTheme.innerText = "Chuyển Chế Độ Tối";
+                } else {
+                    iconViperTheme.className = "fa-solid fa-sun text-amber-500";
+                    textViperTheme.innerText = "Giao diện Viper (Trắng)";
+                }
+            }
         }
     }
 
@@ -250,10 +268,6 @@
         applyTheme(currentPrefs);
     } catch(e) {
         console.warn("Initial applyTheme deferred:", e);
-    }
-
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", () => applyTheme(currentPrefs));
     }
 
     // Build the Appearance Modal
@@ -539,10 +553,14 @@
         return currentPrefs.mode || "light";
     };
 
-    // Auto-inject on DOM Ready
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", injectAppearanceModal);
-    } else {
+    // Auto-apply and inject on DOM Ready
+    function initThemeOnReady() {
+        applyTheme(currentPrefs);
         injectAppearanceModal();
+    }
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initThemeOnReady);
+    } else {
+        initThemeOnReady();
     }
 })();
