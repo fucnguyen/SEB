@@ -686,8 +686,22 @@
     }
 
     function getExamTitle() {
-        // Priority 1: Match real subject codes like [MAS291], [MAD101], [SWR302], MAS291_SP24
+        // Priority 0: Chuỗi tiêu đề đầy đủ "Kiểm tra cá nhân - [ClassCode: ...]" từ DOM (chuẩn luồng SEB)
         var bodyText = document.body ? (document.body.innerText || "") : "";
+        var mExactHeader = bodyText.match(/(Kiểm tra cá nhân\s*-\s*\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
+        if (!mExactHeader && document.title) {
+            mExactHeader = document.title.match(/(Kiểm tra cá nhân\s*-\s*\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
+        }
+        if (mExactHeader) {
+            return mExactHeader[1].trim();
+        }
+
+        var mBracket = bodyText.match(/(\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
+        if (mBracket) {
+            return "Kiểm tra cá nhân - " + mBracket[1].trim();
+        }
+
+        // Priority 1: Match real subject codes like [MAS291], [MAD101], [SWR302], MAS291_SP24
         var mCode = bodyText.match(/\b([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\b/);
         var subjectCodeFound = mCode ? mCode[1].trim() : "";
 
@@ -735,28 +749,33 @@
             remaining_time: ""
         };
 
-        // 1. Quét các phần tử chứa tiêu đề bài thi (header-title, breadcrumb, h1..h4, title)
-        var titleNodes = document.querySelectorAll("h1, h2, h3, h4, .title, [class*='title'], [class*='breadcrumb'], [class*='header'], [class*='sub-header'], [class*='info']");
+        // 1. Quét các phần tử chứa tiêu đề bài thi (header-title, breadcrumb, h1..h4, title, div, span)
+        var titleNodes = document.querySelectorAll("h1, h2, h3, h4, .title, [class*='title'], [class*='breadcrumb'], [class*='header'], [class*='sub-header'], [class*='info'], div, p, span, strong, b");
         var fullTitle = "";
         for (var i = 0; i < titleNodes.length; i++) {
             var txt = (titleNodes[i].innerText || titleNodes[i].textContent || "").trim();
-            if (txt.includes("ClassCode") || txt.includes("Kiểm tra") || txt.includes("Exam") || txt.includes("@fpt.edu.vn")) {
+            if (txt.includes("ClassCode") || txt.includes("Kiểm tra cá nhân")) {
                 fullTitle += " " + txt;
+                if (fullTitle.length >= 600) break;
             }
         }
-        if (!fullTitle) fullTitle = document.title || "";
+        if (!fullTitle) fullTitle = (document.body ? document.body.innerText : "") || document.title || "";
 
-        // Trích xuất chuỗi composite đầy đủ: ví dụ [ClassCode: MKT1905-DIG]-[HCM202]-[donnt3@fpt.edu.vn]-[185]
+        // Trích xuất chuỗi composite đầy đủ: ví dụ [ClassCode: MAE101.3]-[MAE101]-[donnt3@fpt.edu.vn]-[eb09e692-618d-469e-be6a-c230625259cc]
         var mComposite = fullTitle.match(/(\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
-        if (!mComposite && document.body) {
-            var bodyText = (document.body.innerText || "").slice(0, 3000);
-            mComposite = bodyText.match(/(\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
-        }
         if (mComposite) {
             meta.full_class_info = mComposite[1].trim();
         }
 
-        // ClassCode đơn lẻ (ví dụ MKT1905-DIG hoặc MAE101.3): Cho phép dấu '-' và '.' trong mã lớp
+        // Trích xuất chuỗi tiêu đề đầy đủ có prefix "Kiểm tra cá nhân - "
+        var mPref = fullTitle.match(/(Kiểm tra cá nhân\s*-\s*\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
+        if (mPref) {
+            meta.exam_header = mPref[1].trim();
+        } else if (meta.full_class_info) {
+            meta.exam_header = "Kiểm tra cá nhân - " + meta.full_class_info;
+        }
+
+        // ClassCode đơn lẻ (ví dụ MAE101.3 hoặc MKT1905-DIG)
         var mClass = fullTitle.match(/\[?\s*ClassCode\s*:\s*([^\]]+?)\s*\]/i);
         if (!mClass && meta.full_class_info) {
             mClass = meta.full_class_info.match(/ClassCode\s*:\s*([^\]]+)/i);
@@ -765,12 +784,12 @@
             meta.class_code = mClass[1].trim();
         }
 
-        // Ưu tiên hiển thị trọn vẹn: Nếu có composite header đầy đủ, dùng cho class_code
+        // Ưu tiên hiển thị trọn vẹn: Dùng chuỗi composite đầy đủ cho class_code
         if (meta.full_class_info) {
             meta.class_code = meta.full_class_info;
         }
 
-        // SubjectCode: ví dụ [HCM202] hoặc [MAE101] trong chuỗi composite hoặc sau ClassCode
+        // SubjectCode: ví dụ [MAE101] hoặc [HCM202]
         var mSubj = fullTitle.match(/-\[([A-Za-z0-9_.]+)\]-/);
         if (!mSubj && meta.full_class_info) mSubj = meta.full_class_info.match(/-\[([A-Za-z0-9_.]+)\]-/);
         if (!mSubj) mSubj = fullTitle.match(/\[([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\]/);
@@ -789,7 +808,7 @@
         // Paper UUID / Code: ví dụ [eb09e692-618d-469e-be6a-c230625259cc] hoặc [185]
         var mPaper = fullTitle.match(/\[([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\]/);
         if (!mPaper && meta.full_class_info) {
-            var mAttempt = meta.full_class_info.match(/-\[(\d+)\]$/);
+            var mAttempt = meta.full_class_info.match(/-\[([^\]]+)\]$/);
             if (mAttempt) mPaper = mAttempt;
         }
         if (!mPaper) mPaper = fullTitle.match(/\[([a-zA-Z0-9_-]{16,})\]/);
@@ -818,25 +837,63 @@
         }
 
         // 3. Quét thời gian còn lại (Remaining time countdown)
-        var timerEls = document.querySelectorAll("[class*='timer'], [class*='countdown'], [id*='timer'], [id*='countdown'], [class*='time-left'], [class*='remaining']");
+        // Hỗ trợ chính xác: "26m : 0s", "1h : 20m : 0s", "45:20", "30 phút 15 giây", "45m"
+        var timerRegex = /(\d+\s*(?:h|giờ)\s*:\s*\d+\s*(?:m|phút)\s*:\s*\d+\s*(?:s|giây)|\d+\s*(?:m|phút)\s*:\s*\d+\s*(?:s|giây)|\d+\s*(?:h|giờ)\s*:\s*\d+\s*(?:m|phút)|\d+\s*(?:h|giờ)\s+\d+\s*(?:m|phút)(?:\s+\d+\s*(?:s|giây))?|\d+\s*(?:phút|mins?|m)(?:\s+\d+\s*(?:giây|secs?|s))?|\d{1,2}:\d{2}(?::\d{2})?)/i;
+
+        // Ưu tiên 1: Quét các element timer chuyên biệt
+        var timerEls = document.querySelectorAll("#quiz-timer, #quiz-time-left, [role='timer'], [class*='timer'], [class*='countdown'], [id*='timer'], [id*='countdown'], [class*='time-left'], [class*='remaining']");
         for (var t = 0; t < timerEls.length; t++) {
-            var tText = (timerEls[t].innerText || "").trim();
-            var mRem = tText.match(/(\d+\s*(?:m|phút|h|giây|s|\:)\s*\d*(?:\s*(?:m|phút|s|giây))?)/i);
-            if (mRem && mRem[1].length >= 3) {
+            var tText = (timerEls[t].innerText || timerEls[t].textContent || "").trim();
+            var mRem = tText.match(timerRegex);
+            if (mRem && mRem[1]) {
                 meta.remaining_time = mRem[1].replace(/\s+/g, " ").trim();
                 break;
             }
         }
+
+        // Ưu tiên 2: Quét nhãn "Thời gian còn lại" hoặc "Time left" (trong ảnh mẫu: Thời gian còn lại \n 26m : 0s)
         if (!meta.remaining_time) {
-            var allElems = document.querySelectorAll("div, span, p");
-            for (var d = 0; d < allElems.length; d++) {
-                var dt = (allElems[d].innerText || "").trim();
-                if (dt.includes("Thời gian còn lại") || dt.includes("Time left")) {
-                    var cText = dt.replace(/Thời gian còn lại|Time left/i, "").trim();
-                    if (cText.length >= 2 && cText.length <= 25) {
-                        meta.remaining_time = cText;
+            var labelEls = document.querySelectorAll("div, span, p, label, b, strong");
+            for (var d = 0; d < labelEls.length; d++) {
+                var rawTxt = (labelEls[d].innerText || labelEls[d].textContent || "").trim();
+                if (rawTxt.includes("Thời gian còn lại") || rawTxt.includes("Time left")) {
+                    var m1 = rawTxt.match(timerRegex);
+                    if (m1 && m1[1]) {
+                        meta.remaining_time = m1[1].replace(/\s+/g, " ").trim();
                         break;
                     }
+                    var sib = labelEls[d].nextElementSibling;
+                    if (sib) {
+                        var sTxt = (sib.innerText || sib.textContent || "").trim();
+                        var m2 = sTxt.match(timerRegex);
+                        if (m2 && m2[1]) {
+                            meta.remaining_time = m2[1].replace(/\s+/g, " ").trim();
+                            break;
+                        }
+                    }
+                    var par = labelEls[d].parentElement;
+                    if (par) {
+                        var pTxt = (par.innerText || par.textContent || "").trim();
+                        var m3 = pTxt.match(timerRegex);
+                        if (m3 && m3[1]) {
+                            meta.remaining_time = m3[1].replace(/\s+/g, " ").trim();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ưu tiên 3: Quét fallback toàn bộ body
+        if (!meta.remaining_time && document.body) {
+            var bText = document.body.innerText || "";
+            var mDirect = bText.match(/(\b\d+\s*m\s*:\s*\d+\s*s\b|\b\d+\s*h\s*:\s*\d+\s*m\s*:\s*\d+\s*s\b)/i);
+            if (mDirect && mDirect[1]) {
+                meta.remaining_time = mDirect[1].replace(/\s+/g, " ").trim();
+            } else {
+                var mB = bText.match(/(?:Thời gian còn lại|Time left)[\s\:\-]+(\d+\s*m\s*:\s*\d+\s*s|\d+\s*h\s*:\s*\d+\s*m\s*:\s*\d+\s*s|\d{1,2}:\d{2}(?::\d{2})?|\d+\s*(?:phút|mins?|m))/i);
+                if (mB && mB[1]) {
+                    meta.remaining_time = mB[1].replace(/\s+/g, " ").trim();
                 }
             }
         }

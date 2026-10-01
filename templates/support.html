@@ -408,23 +408,59 @@
         let supportRemainingSeconds = -1;
         let supportServerDate = null;
 
+        function formatExamHeaderDisplay(s) {
+            if (!s) return "";
+            let val = (typeof s === "string") ? s : (s.class_code || s.exam_title || "");
+            if (!val) return "";
+            val = val.trim();
+            if (val.startsWith("Kiểm tra cá nhân")) {
+                return val;
+            }
+            if (val.startsWith("[")) {
+                return `Kiểm tra cá nhân - ${val}`;
+            }
+            if (val.includes("ClassCode")) {
+                const m = val.match(/(\[ClassCode:[^\]]+\](?:-\[[^\]]+\])*)/i);
+                if (m) return `Kiểm tra cá nhân - ${m[1]}`;
+            }
+            if (typeof s === "object" && s.class_code && s.class_code.trim()) {
+                const c = s.class_code.trim();
+                if (c.startsWith("[")) return `Kiểm tra cá nhân - ${c}`;
+                return `Kiểm tra cá nhân - [ClassCode: ${c}]`;
+            }
+            return `Kiểm tra cá nhân - [ClassCode: ${val}]`;
+        }
+
         function parseTimeToSeconds(timeStr) {
             if (!timeStr) return -1;
             const t = String(timeStr).trim();
+
+            // 1. Nếu có đơn vị giờ / phút / giây (vd: "26m : 0s", "1h : 20m : 0s", "30 phút 15 giây")
+            const hasUnit = /(?:h|giờ|m|phút|min|s|giây|sec)/i.test(t);
+            if (hasUnit) {
+                let sec = 0;
+                let matched = false;
+                const h = t.match(/(\d+)\s*(?:h|giờ)/i);
+                const m = t.match(/(\d+)\s*(?:m|phút|min)/i);
+                const s = t.match(/(\d+)\s*(?:s|giây|sec)/i);
+                if (h) { sec += parseInt(h[1], 10) * 3600; matched = true; }
+                if (m) { sec += parseInt(m[1], 10) * 60; matched = true; }
+                if (s) { sec += parseInt(s[1], 10); matched = true; }
+                if (matched) return sec;
+            }
+
+            // 2. Nếu thuần dạng số với dấu hai chấm (vd: "45:20", "01:25:30")
             if (t.includes(":")) {
-                const parts = t.split(":").map(x => parseInt(x, 10) || 0);
+                const parts = t.split(":").map(x => {
+                    const num = parseInt(x.replace(/[^\d]/g, ""), 10);
+                    return isNaN(num) ? 0 : num;
+                });
                 if (parts.length === 2) return parts[0] * 60 + parts[1];
                 if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
             }
-            let sec = 0;
-            const h = t.match(/(\d+)\s*(?:h|giờ)/i);
-            const m = t.match(/(\d+)\s*(?:m|phút|min)/i);
-            const s = t.match(/(\d+)\s*(?:s|giây|sec)/i);
-            if (h) sec += parseInt(h[1], 10) * 3600;
-            if (m) sec += parseInt(m[1], 10) * 60;
-            if (s) sec += parseInt(s[1], 10);
-            if (sec > 0) return sec;
-            const onlyNum = parseInt(t, 10);
+
+            // 3. Fallback chỉ có số duy nhất (mặc định phút)
+            const onlyNum = parseInt(t.replace(/[^\d]/g, ""), 10);
             if (!isNaN(onlyNum) && onlyNum > 0) return onlyNum * 60;
             return -1;
         }
@@ -507,11 +543,11 @@
             document.getElementById("active-exam-shift").innerText = item.exam_shift || '—';
             document.getElementById("active-exam-hwid").innerText = item.hwid;
 
-            // ClassCode
+            // ClassCode & Header
             const classPill = document.getElementById("active-exam-classcode-pill");
             const classText = document.getElementById("active-exam-classcode-text");
             if (classPill && classText) {
-                const cCode = item.class_code || "";
+                const cCode = formatExamHeaderDisplay(item);
                 if (cCode) {
                     classText.innerText = cCode;
                     classPill.classList.remove("hidden");

@@ -2152,7 +2152,10 @@ def get_support_assigned_exams_for_date(support_key: str, target_date: Optional[
             "is_online": is_online,
             "remaining_time": d.get("remaining_time") or "",
             "exam_server_time": d.get("exam_server_time") or "",
-            "subject_code": d.get("subject_code") or ""
+            "subject_code": d.get("subject_code") or "",
+            "class_code": d.get("class_code") or "",
+            "exam_title": d.get("exam_title") or "",
+            "campus": d.get("campus") or ""
         })
 
     return {
