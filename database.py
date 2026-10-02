@@ -1140,12 +1140,13 @@ def check_is_new_exam(
     if not existing:
         return False
 
-    status = (existing["status"] or "").strip().lower()
+    d_exist = dict(existing)
+    status = (d_exist.get("status") or "").strip().lower()
     if status in ("finished", "archived", "reset_requested"):
         return True
 
     # 1. So sánh tên bài thi chuẩn hóa (bỏ qua các tên generic)
-    old_title = (existing["exam_title"] or "").strip().lower()
+    old_title = (d_exist.get("exam_title") or "").strip().lower()
     norm_new = (new_title or "").strip().lower()
     generic_titles = {
         "", "bài thi trực tuyến", "bai thi truc tuyen", "kiểm tra", "kiem tra",
@@ -1156,13 +1157,13 @@ def check_is_new_exam(
             return True
 
     # 1.1 So sánh mã môn thi (subject_code) nếu có
-    old_sub = (existing["subject_code"] or "").strip().lower()
+    old_sub = (d_exist.get("subject_code") or "").strip().lower()
     new_sub = (new_subject_code or "").strip().lower()
     if old_sub and new_sub and old_sub != new_sub:
         return True
 
     # 2. Kiểm tra URL thay đổi
-    old_url = (existing["page_url"] or "").strip().lower()
+    old_url = (d_exist.get("page_url") or "").strip().lower()
     new_url = (new_page_url or "").strip().lower()
     if old_url and new_url and old_url != new_url:
         import re
@@ -1266,7 +1267,7 @@ def sync_student_exam_data(
     questions_to_sync = valid_questions if valid_questions else questions
 
     # 1. Kiểm tra session hiện có và xác định xem có phải ĐỀ MỚI không
-    c.execute("SELECT id, status, exam_title, page_url, total_questions, created_at, last_sync FROM live_exam_sessions WHERE hwid = ?", (hwid,))
+    c.execute("SELECT id, status, exam_title, page_url, total_questions, created_at, last_sync, subject_code, class_code FROM live_exam_sessions WHERE hwid = ?", (hwid,))
     existing = c.fetchone()
 
     is_new = check_is_new_exam(existing, exam_title, page_url, questions_to_sync, c, hwid, new_subject_code=subject_code)

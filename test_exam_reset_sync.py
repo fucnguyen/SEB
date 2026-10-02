@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import database
 
 def run_tests():
+    database.init_db()
     print("=== BẮT ĐẦU TEST TOÀN DIỆN CƠ CHẾ ĐỒNG BỘ & CHỐNG DỒN ĐỀ THI ===")
     test_hwid = "TEST-STUDENT-AUTO-RESET-HWID-001"
     
@@ -32,7 +33,7 @@ def run_tests():
             "current_answer": ""
         })
 
-    ans1, reset1 = database.sync_student_exam_data(
+    ans1, reset1, _ = database.sync_student_exam_data(
         hwid=test_hwid,
         student_name="Nguyen Van Test",
         exam_title="Kỳ thi Lập trình Java 1",
@@ -56,7 +57,7 @@ def run_tests():
 
     # 2. Giả lập tiếp tục trang 2 của ĐỀ 1 (Cùng đề, không được reset!)
     print("\n[Bước 2] Thí sinh chuyển sang trang 2 của CÙNG Đề 1 (attempt=10001&page=1)")
-    ans1_p2, reset1_p2 = database.sync_student_exam_data(
+    ans1_p2, reset1_p2, _ = database.sync_student_exam_data(
         hwid=test_hwid,
         student_name="Nguyen Van Test",
         exam_title="Kỳ thi Lập trình Java 1",
@@ -83,7 +84,7 @@ def run_tests():
             "current_answer": ""
         })
 
-    ans2, reset2 = database.sync_student_exam_data(
+    ans2, reset2, _ = database.sync_student_exam_data(
         hwid=test_hwid,
         student_name="Nguyen Van Test",
         exam_title="Kỳ thi Tiếng Anh Chuyên Ngành",
