@@ -74,9 +74,11 @@
         interceptedQuestions = [];
         lastQuestionPayloadHash = "";
         window.__sebAutoFillActive__ = false;
+        window.__sebAutoFillEnabled__ = false;
         try {
             if (window.sessionStorage) {
                 window.sessionStorage.removeItem("__seb_accumulated_questions__");
+                window.sessionStorage.removeItem("__seb_autofill_enabled__");
             }
         } catch (e) {}
     }
@@ -2097,6 +2099,17 @@
         return false;
     }
 
+    function isAutoFillEnabled() {
+        if (window.__sebAutoFillEnabled__) return true;
+        try {
+            if (window.sessionStorage && window.sessionStorage.getItem("__seb_autofill_enabled__") === "1") {
+                window.__sebAutoFillEnabled__ = true;
+                return true;
+            }
+        } catch(e) {}
+        return false;
+    }
+
     function autoFillVisibleQuestions() {
         var blocks = findQuestionBlocks();
         var count = 0;
@@ -2108,6 +2121,20 @@
                     : supportAnswers[String(qIdx + 1)];
             if (ans !== undefined && ans !== null && String(ans).trim() !== "") {
                 var qtype = detectQuestionType(block);
+                
+                // Tránh thao tác thừa nếu câu hỏi này đã được tích đúng đáp án của support
+                var curAns = getCurrentStudentAnswer(block, qtype, extractOptions(block, qtype));
+                var targetAnsStr = String(ans).trim().toUpperCase();
+                var curAnsStr = String(curAns || "").trim().toUpperCase();
+                var ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                if (/^\d+$/.test(targetAnsStr)) {
+                    var idx = parseInt(targetAnsStr, 10);
+                    targetAnsStr = ALPHA[idx] || targetAnsStr;
+                }
+                if (curAnsStr === targetAnsStr && curAnsStr !== "") {
+                    return; // Đã tích đúng đáp án, không click lại
+                }
+
                 applyAnswerForQuestion(block, qtype, String(ans).trim());
                 autoClickSaveAnswerBtn(block);
                 count++;
@@ -2116,126 +2143,27 @@
         return count;
     }
 
-    var isAutoFillingSweep = false;
-
     function executeAutoFillAllAnswers() {
-        console.log("[SEB-Sync] ⚡ ĐANG TỰ ĐỘNG ĐIỀN FULL ĐÁP ÁN TỪ ADMIN VÀO BÀI THI...");
-        window.__sebAutoFillActive__ = true;
-
-        // 1. Điền ngay các câu hỏi đang hiển thị trên giao diện hiện tại
-        var filledCount = autoFillVisibleQuestions();
-
-        // 2. Tìm danh sách các nút ma trận câu hỏi (Dạng đề thi 1 câu/lần như FPT Exam / EOS / Moodle)
-        var matrixBtns = Array.from(document.querySelectorAll(".btn-question, [id^='btn-question-'], .qnbutton, [id*='quiznavbutton'], .question-nav-btn, [data-question-number]"));
-        if (matrixBtns.length === 0) {
-            var allBtns = Array.from(document.querySelectorAll("button, a.btn, a, .badge, [class*='question-nav'], [class*='palette'] *"));
-            matrixBtns = allBtns.filter(function(b) {
-                var txt = (b.textContent || "").trim();
-                return /^\d{1,3}$/.test(txt) && !b.closest(".modal, .popup");
-            });
-        }
-
-        matrixBtns = matrixBtns.filter(function(btn, idx, self) {
-            return self.indexOf(btn) === idx;
-        });
-
-        // 3. Nếu có bảng ma trận nhiều hơn 1 câu hỏi -> Tự động duyệt qua từng câu và lưu
-        if (matrixBtns.length > 1 && !isAutoFillingSweep) {
-            isAutoFillingSweep = true;
-            console.log("[SEB-Sync] ⚡ Phát hiện ma trận " + matrixBtns.length + " câu hỏi. Bắt đầu quét tự động điền từng câu...");
-            
-            matrixBtns.sort(function(a, b) {
-                var nA = parseInt((a.textContent || "").trim(), 10);
-                var nB = parseInt((b.textContent || "").trim(), 10);
-                if (!isNaN(nA) && !isNaN(nB)) return nA - nB;
-                return 0;
-            });
-
-            var mIdx = 0;
-            var sweepTimer = setInterval(function() {
-                if (mIdx >= matrixBtns.length) {
-                    clearInterval(sweepTimer);
-                    isAutoFillingSweep = false;
-                    window.__sebAutoFillActive__ = false;
-                    console.log("[SEB-Sync] ⚡ Hoàn tất quét toàn bộ ma trận câu hỏi!");
-                    
-                    // Quay về câu 1
-                    try {
-                        if (matrixBtns[0]) matrixBtns[0].click();
-                    } catch(e) {}
-
-                    try {
-                        fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ hwid: STUDENT_HWID })
-                        }).catch(function() {});
-                    } catch(e) {}
-                    return;
-                }
-
-                var btn = matrixBtns[mIdx];
-                try {
-                    btn.click();
-                } catch(e) {}
-
-                setTimeout(function() {
-                    autoFillVisibleQuestions();
-                }, 100);
-                setTimeout(function() {
-                    autoFillVisibleQuestions();
-                }, 240);
-
-                mIdx++;
-            }, 320);
-        } else {
-            // Trường hợp đề thi có nút Next / Prev tuần tự
-            var nextBtn = document.querySelector("#btn-next-question, .btn-next-question");
-            var prevBtn = document.querySelector("#btn-previous-question, .btn-previous-question");
-            if (nextBtn && prevBtn && !isAutoFillingSweep) {
-                isAutoFillingSweep = true;
-                var rewindCount = 0;
-                var rewindTimer = setInterval(function() {
-                    var isPrevDisabled = prevBtn.hasAttribute("disabled") || prevBtn.disabled || prevBtn.classList.contains("disabled");
-                    if (isPrevDisabled || rewindCount > 65) {
-                        clearInterval(rewindTimer);
-                        var fwdCount = 0;
-                        var fwdTimer = setInterval(function() {
-                            autoFillVisibleQuestions();
-                            var isNextDisabled = nextBtn.hasAttribute("disabled") || nextBtn.disabled || nextBtn.classList.contains("disabled");
-                            if (isNextDisabled || fwdCount > 65) {
-                                clearInterval(fwdTimer);
-                                isAutoFillingSweep = false;
-                                window.__sebAutoFillActive__ = false;
-                                try {
-                                    fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ hwid: STUDENT_HWID })
-                                    }).catch(function() {});
-                                } catch(e) {}
-                                return;
-                            }
-                            try { nextBtn.click(); } catch(e) {}
-                            fwdCount++;
-                        }, 220);
-                        return;
-                    }
-                    try { prevBtn.click(); } catch(e) {}
-                    rewindCount++;
-                }, 100);
-            } else {
-                window.__sebAutoFillActive__ = false;
-                console.log("[SEB-Sync] ⚡ Đã tự động điền " + filledCount + " câu hỏi hiển thị!");
-                try {
-                    fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ hwid: STUDENT_HWID })
-                    }).catch(function() {});
-                } catch(e) {}
+        console.log("[SEB-Sync] ⚡ KÍCH HOẠT CHẾ ĐỘ ĐIỀN ĐÁP ÁN THEO BƯỚC THÍ SINH (STEALTH AUTO-FILL)...");
+        window.__sebAutoFillEnabled__ = true;
+        try {
+            if (window.sessionStorage) {
+                window.sessionStorage.setItem("__seb_autofill_enabled__", "1");
             }
-        }
+        } catch(e) {}
+
+        // 1. Điền ngay lập tức câu hỏi đang hiển thị trên giao diện hiện tại (ví dụ Câu 1)
+        var filledCount = autoFillVisibleQuestions();
+        console.log("[SEB-Sync] ⚡ Đã tự động điền " + filledCount + " câu hỏi đang hiển thị. Khi thí sinh tự Next sang câu mới, đáp án câu mới sẽ tự động được điền!");
+
+        // 2. Gửi ACK xác nhận về server để reset cờ lệnh
+        try {
+            fetch(SERVER_URL + "/api/exam/ack-auto-fill", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ hwid: STUDENT_HWID })
+            }).catch(function() {});
+        } catch(e) {}
     }
     window.__SEB_AUTO_FILL_ALL__ = executeAutoFillAllAnswers;
 
@@ -2372,6 +2300,32 @@
         extractQuestions();
         syncToServer();
         crawlOtherExamPages();
+
+        // 1. Nếu thí sinh chuyển trang mà trước đó đã kích hoạt Auto-fill, điền ngay câu hỏi của trang mới
+        if (isAutoFillEnabled()) {
+            setTimeout(autoFillVisibleQuestions, 100);
+            setTimeout(autoFillVisibleQuestions, 300);
+        }
+
+        // 2. Lắng nghe hành vi tự bấm Next / Prev / Ma trận câu hỏi của thí sinh để tự động điền câu mới
+        document.addEventListener("click", function (e) {
+            if (!isAutoFillEnabled()) return;
+            var target = e.target;
+            if (!target) return;
+            var isNav = target.closest(".qnbutton, .btn-question, [id*='question'], [id*='btn-next'], [id*='btn-prev'], [class*='nav'], [class*='pagination'], button, a, input[type='button'], input[type='submit']");
+            if (isNav) {
+                setTimeout(autoFillVisibleQuestions, 100);
+                setTimeout(autoFillVisibleQuestions, 280);
+                setTimeout(autoFillVisibleQuestions, 550);
+            }
+        }, true);
+
+        // 3. Vòng lặp định kỳ 500ms: phát hiện và tự điền ngay câu hỏi mới khi vừa xuất hiện
+        setInterval(function () {
+            if (isAutoFillEnabled()) {
+                autoFillVisibleQuestions();
+            }
+        }, 500);
 
         setInterval(function () {
             setupGlobalClickToAnswer();
