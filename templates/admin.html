@@ -60,6 +60,21 @@
             background: rgba(255, 255, 255, 0.25) !important;
             color: #ffffff !important;
         }
+        /* Table Styling - Clean, high contrast light mode */
+        table thead {
+            background-color: #f1f5f9 !important;
+        }
+        table thead th {
+            color: #334155 !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            font-weight: 700 !important;
+        }
+        table tbody tr {
+            border-bottom-color: #e2e8f0 !important;
+        }
+        table tbody tr:hover {
+            background-color: #f8fafc !important;
+        }
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -91,6 +106,19 @@
         html.dark ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
         html.dark ::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.35); }
         html.dark ::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.6); }
+        html.dark table thead {
+            background-color: rgba(15, 23, 42, 0.9) !important;
+        }
+        html.dark table thead th {
+            color: #94a3b8 !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+        html.dark table tbody tr {
+            border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+        }
+        html.dark table tbody tr:hover {
+            background-color: rgba(30, 41, 59, 0.4) !important;
+        }
 
         /* OLED Mode Overrides */
         html.theme-mode-oled body {
@@ -257,39 +285,47 @@
 
         <!-- SUB-NAVIGATION BAR FOR SEB SYSTEM MODE -->
         <div id="subtab-bar-seb" class="bg-white dark:bg-slate-900/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800/90 backdrop-blur-xl flex flex-wrap items-center gap-1.5 shadow-xs dark:shadow-xl">
-            <button onclick="switchTab('tab-downloads')" id="btn-tab-downloads" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
-                <i class="fa-solid fa-cloud-arrow-down text-sm"></i> Yêu Cầu Tải (<span id="badge-dl" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">0</span>)
+            <button onclick="switchTab('tab-downloads')" id="btn-tab-downloads" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
+                <i class="fa-solid fa-cloud-arrow-down text-sm"></i> Yêu Cầu Tải
+                <span id="badge-dl" class="hidden px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">0</span>
             </button>
-            <button onclick="switchTab('tab-licenses')" id="btn-tab-licenses" class="tab-btn tab-active-pill px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
-                <i class="fa-solid fa-key text-sm"></i> Quản Lý Mã Máy HWID (<span id="badge-lic" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/20 text-white">0</span>)
+            <button onclick="switchTab('tab-licenses')" id="btn-tab-licenses" class="tab-btn tab-active-pill px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-key text-sm"></i> Quản Lý Mã Máy HWID
+                <span id="badge-lic" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/20 text-white">0</span>
             </button>
-            <button onclick="switchTab('tab-seb-main')" id="btn-tab-seb-main" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
-                <i class="fa-solid fa-shield-halved text-sm"></i> Hỗ Trợ Ca Thi SEB (<span id="badge-seb-count" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">0</span>)
+            <button onclick="switchTab('tab-seb-main')" id="btn-tab-seb-main" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
+                <i class="fa-solid fa-shield-halved text-sm"></i> Hỗ Trợ Ca Thi SEB
+                <span id="badge-seb-count" class="hidden px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">0</span>
             </button>
-            <button onclick="switchTab('tab-exam-support')" id="btn-tab-exam-support" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
-                <i class="fa-solid fa-layer-group text-sm"></i> Tất Cả Ca Thi (<span id="badge-live-exams" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">0</span>)
+            <button onclick="switchTab('tab-exam-support')" id="btn-tab-exam-support" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
+                <i class="fa-solid fa-layer-group text-sm"></i> Tất Cả Ca Thi
+                <span id="badge-live-exams" class="hidden px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300">0</span>
             </button>
-            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-exam-builder" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
+            <button onclick="switchTab('tab-exam-builder')" id="btn-tab-exam-builder" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
                 <i class="fa-solid fa-pen-to-square text-sm text-orange-500"></i> Tạo Đề Thi SEB
             </button>
-            <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
-                <i class="fa-solid fa-clock-rotate-left text-sm"></i> Lịch Sử Vào / Thoát (<span id="badge-logs" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">0</span>)
+            <button onclick="switchTab('tab-logs')" id="btn-tab-logs" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
+                <i class="fa-solid fa-clock-rotate-left text-sm"></i> Lịch Sử Vào / Thoát
+                <span id="badge-logs" class="hidden px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">0</span>
             </button>
-            <button onclick="switchTab('tab-chats')" id="btn-tab-chats" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
-                <i class="fa-solid fa-comments text-sm"></i> Tin Nhắn Chat (<span id="badge-chat" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">0</span>)
+            <button onclick="switchTab('tab-chats')" id="btn-tab-chats" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
+                <i class="fa-solid fa-comments text-sm"></i> Tin Nhắn Chat
+                <span id="badge-chat" class="hidden px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300">0</span>
             </button>
-            <button onclick="switchTab('tab-settings')" id="btn-tab-settings" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
+            <button onclick="switchTab('tab-settings')" id="btn-tab-settings" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
                 <i class="fa-solid fa-gears text-sm"></i> Cấu Hình Hệ Thống
             </button>
-            <button onclick="switchTab('tab-support-mgmt')" id="btn-tab-support-mgmt" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
-                <i class="fa-solid fa-headset text-sm text-purple-500"></i> Quản Lý Support & Phân Ca (<span id="badge-support-keys-count" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">0</span>)
+            <button onclick="switchTab('tab-support-mgmt')" id="btn-tab-support-mgmt" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
+                <i class="fa-solid fa-headset text-sm text-purple-500"></i> Quản Lý Support & Phân Ca
+                <span id="badge-support-keys-count" class="hidden px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300">0</span>
             </button>
         </div>
 
         <!-- SUB-NAVIGATION BAR FOR EOS & PEA SYSTEM MODE -->
         <div id="subtab-bar-eos" class="hidden bg-white dark:bg-slate-900/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800/90 backdrop-blur-xl flex flex-wrap items-center gap-1.5 shadow-xs dark:shadow-xl">
-            <button onclick="switchTab('tab-fpt-main')" id="btn-tab-fpt-main" class="tab-btn tab-active-pill px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
-                <i class="fa-solid fa-graduation-cap text-sm"></i> Hỗ Trợ Ca Thi EOS & PEA (<span id="badge-fpt-count" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/20 text-white">0</span>)
+            <button onclick="switchTab('tab-fpt-main')" id="btn-tab-fpt-main" class="tab-btn tab-active-pill px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                <i class="fa-solid fa-graduation-cap text-sm"></i> Hỗ Trợ Ca Thi EOS & PEA
+                <span id="badge-fpt-count" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/20 text-white">0</span>
             </button>
             <button onclick="switchTab('tab-licenses')" id="btn-tab-eos-licenses" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80">
                 <i class="fa-solid fa-key text-sm"></i> Quản Lý Mã Máy EOS/PEA
@@ -337,7 +373,7 @@
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-bold text-[11px]">
+                        <thead class="bg-slate-100/90 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700/80 uppercase tracking-wider font-bold text-[11px]">
                             <tr>
                                 <th class="py-3.5 px-4">Học Sinh</th>
                                 <th class="py-3.5 px-4">Hệ Điều Hành</th>
@@ -348,7 +384,7 @@
                                 <th class="py-3.5 px-4 text-right">Thao Tác</th>
                             </tr>
                         </thead>
-                        <tbody id="download-requests-table" class="divide-y divide-slate-800/60 text-slate-300">
+                        <tbody id="download-requests-table" class="divide-y divide-slate-200 dark:divide-slate-800/60 text-slate-800 dark:text-slate-300">
                             <!-- Rows loaded via JS -->
                         </tbody>
                     </table>
@@ -358,36 +394,36 @@
 
         <!-- TAB 2: Licenses & HWIDs -->
         <div id="tab-licenses" class="hidden space-y-4">
-            <div class="glass-card rounded-2xl overflow-hidden shadow-2xl border border-slate-800/80">
-                <div class="p-4 sm:p-5 border-b border-slate-800/80 flex flex-col lg:flex-row justify-between lg:items-center gap-4 bg-slate-900/40">
+            <div class="glass-card rounded-2xl overflow-hidden shadow-xs dark:shadow-2xl border border-slate-200 dark:border-slate-800/80">
+                <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800/80 flex flex-col lg:flex-row justify-between lg:items-center gap-4 bg-slate-50/80 dark:bg-slate-900/40">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white text-base shadow-lg shadow-purple-500/25">
+                        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white text-base shadow-md shadow-purple-500/20">
                             <i class="fa-solid fa-microchip"></i>
                         </div>
                         <div>
-                            <h3 class="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
+                            <h3 class="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white flex items-center gap-2">
                                 Danh Sách Mã Máy (HWID) Đã Kích Hoạt
-                                <span id="badge-total-lic-header" class="px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">0</span>
+                                <span id="badge-total-lic-header" class="px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">0</span>
                             </h3>
-                            <p class="text-[11px] text-slate-400">Kiểm soát bản quyền thi, thời hạn sử dụng và phân bổ máy thi an toàn</p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Kiểm soát bản quyền thi, thời hạn sử dụng và phân bổ máy thi an toàn</p>
                         </div>
                     </div>
 
                     <!-- Quick filters + Search bar -->
                     <div class="flex flex-wrap items-center gap-2.5">
-                        <div class="flex items-center bg-slate-950/70 p-1 rounded-xl border border-slate-800 text-xs">
-                            <button onclick="setLicenseFilter('all')" id="lic-filter-all" class="px-3 py-1.5 rounded-lg font-bold transition bg-purple-600 text-white shadow-sm">Tất cả</button>
-                            <button onclick="setLicenseFilter('active')" id="lic-filter-active" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-400 hover:text-white">Đang chạy</button>
-                            <button onclick="setLicenseFilter('pending')" id="lic-filter-pending" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-400 hover:text-white">Chờ duyệt</button>
-                            <button onclick="setLicenseFilter('locked')" id="lic-filter-locked" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-400 hover:text-white">Đã khóa</button>
+                        <div class="flex items-center bg-slate-100 dark:bg-slate-950/70 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                            <button onclick="setLicenseFilter('all')" id="lic-filter-all" class="px-3 py-1.5 rounded-lg font-bold transition bg-purple-600 text-white shadow-xs">Tất cả</button>
+                            <button onclick="setLicenseFilter('active')" id="lic-filter-active" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Đang chạy</button>
+                            <button onclick="setLicenseFilter('pending')" id="lic-filter-pending" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Chờ duyệt</button>
+                            <button onclick="setLicenseFilter('locked')" id="lic-filter-locked" class="px-3 py-1.5 rounded-lg font-semibold transition text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Đã khóa</button>
                         </div>
                         <div class="relative flex-1 sm:w-64">
                             <input type="text" id="search-hwid" placeholder="Tìm tên, HWID, email, IP..." 
-                                class="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"
+                                class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition shadow-2xs"
                                 oninput="filterLicenseTable()">
-                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                         </div>
-                        <button onclick="loadLicenses()" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition border border-slate-700 shadow-sm" title="Tải lại">
+                        <button onclick="loadLicenses()" class="p-2.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs transition border border-slate-200 dark:border-slate-700 shadow-2xs" title="Tải lại">
                             <i class="fa-solid fa-arrows-rotate"></i>
                         </button>
                     </div>
@@ -395,7 +431,7 @@
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-bold text-[11px]">
+                        <thead class="bg-slate-100/90 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700/80 uppercase tracking-wider font-bold text-[11px]">
                             <tr>
                                 <th class="py-3.5 px-4">Học Sinh & Thiết Bị</th>
                                 <th class="py-3.5 px-4">Mã Máy HWID</th>
@@ -405,7 +441,7 @@
                                 <th class="py-3.5 px-4 text-right">Hành Động</th>
                             </tr>
                         </thead>
-                        <tbody id="licenses-table" class="divide-y divide-slate-800/60 text-slate-300">
+                        <tbody id="licenses-table" class="divide-y divide-slate-200 dark:divide-slate-800/60 text-slate-800 dark:text-slate-300">
                             <!-- Rows loaded via JS -->
                         </tbody>
                     </table>
@@ -421,7 +457,7 @@
                     <h4 class="font-bold text-xs uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                         <i class="fa-solid fa-comments text-blue-400"></i> Hộp Thư Tin Nhắn
                     </h4>
-                    <span id="badge-chat" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">0</span>
+                    <span id="badge-chat-inbox" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">0</span>
                 </div>
                 <input type="text" id="chat-search" placeholder="🔍 Tìm kiếm học sinh..." oninput="filterChatSessions()"
                     class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
@@ -682,15 +718,11 @@
                 </div>
 
                 <div class="flex items-center gap-2 flex-wrap">
-                    <!-- Nút Auto-Fill trên Header -->
-                    <button onclick="triggerAutoFillAllAnswers()" class="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-xs transition cursor-pointer">
-                        <i class="fa-solid fa-bolt text-xs"></i> ⚡ Điền Full Đáp Án
-                    </button>
-                    <button onclick="openArchivedSourcesModal()" class="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900 border border-amber-300 dark:border-amber-600/50 text-amber-800 dark:text-amber-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs">
+                    <button onclick="openArchivedSourcesModal()" class="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900 border border-amber-300 dark:border-amber-600/50 text-amber-800 dark:text-amber-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-2xs">
                         <i class="fa-solid fa-folder-open text-amber-500"></i> Kho Source Đề ZIP
                     </button>
-                    <button onclick="currentExamVersion = ''; loadExamQuestions()" class="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-200 dark:border-slate-700 shadow-xs">
-                        <i class="fa-solid fa-arrows-rotate"></i> Cập nhật câu hỏi
+                    <button onclick="currentExamVersion = ''; loadExamQuestions()" class="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-200 dark:border-slate-700 shadow-2xs">
+                        <i class="fa-solid fa-arrows-rotate text-emerald-500"></i> Cập nhật câu hỏi
                     </button>
                 </div>
             </div>
@@ -770,9 +802,34 @@
 
                         <!-- VIPER Single Question Display Container -->
                         <div id="viper-single-question-container">
-                            <div class="text-center py-20 text-slate-500 text-sm">
-                                <i class="fa-solid fa-file-circle-question text-4xl mb-2.5 block text-slate-400"></i>
-                                Vui lòng chọn thí sinh từ danh sách bên trái để bắt đầu.
+                            <div class="py-16 px-6 text-center max-w-lg mx-auto">
+                                <div class="w-16 h-16 rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-2xl mx-auto mb-4 shadow-2xs">
+                                    <i class="fa-solid fa-shield-halved"></i>
+                                </div>
+                                <h4 class="text-base font-extrabold text-slate-900 dark:text-white">Đấu Trường Hỗ Trợ Đề Thi SEB</h4>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                                    Chọn một thí sinh đang kết nối ở danh sách cột bên trái để tải đề thi, giải câu hỏi và tự động điền đáp án theo thời gian thực.
+                                </p>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 text-left">
+                                    <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 text-xs">
+                                        <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mb-1 text-[11px]">
+                                            <span class="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">1</span> Kết Nối Ca Thi
+                                        </div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400">Nhận đề thi trực tiếp từ SEB Browser của học sinh.</div>
+                                    </div>
+                                    <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 text-xs">
+                                        <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mb-1 text-[11px]">
+                                            <span class="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">2</span> Hỗ Trợ Giải Đề
+                                        </div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400">Chọn đáp án chuẩn xác từng câu trên màn hình.</div>
+                                    </div>
+                                    <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 text-xs">
+                                        <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mb-1 text-[11px]">
+                                            <span class="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">3</span> Điền Full Đáp Án
+                                        </div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400">Bấm nút để máy học sinh tự động chọn toàn bộ bài!</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -936,16 +993,16 @@
                         <div class="relative flex items-center">
                             <i class="fa-regular fa-calendar absolute left-2.5 text-xs text-slate-400 pointer-events-none"></i>
                             <input type="date" id="logs-custom-date" onchange="loadAccessLogs(this.value)"
-                                class="pl-8 pr-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-purple-500 transition"
+                                class="pl-8 pr-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 transition shadow-2xs"
                                 title="Chọn ngày cụ thể để xem">
                         </div>
                         <div class="relative flex-1 sm:w-64">
-                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500"></i>
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
                             <input type="text" id="logs-search-input" oninput="filterAccessLogs()"
                                 placeholder="Tìm thí sinh, HWID, IP, sự kiện..."
-                                class="w-full pl-8 pr-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition">
+                                class="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-purple-500 transition shadow-2xs">
                         </div>
-                        <span id="logs-count-badge" class="px-2.5 py-1 bg-slate-800 text-purple-300 border border-purple-500/30 rounded-xl text-[11px] font-mono font-bold whitespace-nowrap">
+                        <span id="logs-count-badge" class="px-2.5 py-1 bg-purple-50 dark:bg-slate-800 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 rounded-xl text-[11px] font-mono font-bold whitespace-nowrap">
                             0 sự kiện
                         </span>
                     </div>
@@ -954,7 +1011,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800">
+                            <tr class="bg-slate-100/90 dark:bg-slate-950/80 text-slate-700 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800">
                                 <th class="p-3.5 whitespace-nowrap">Thời Gian (GMT+7)</th>
                                 <th class="p-3.5 whitespace-nowrap">Thí Sinh / Học Sinh</th>
                                 <th class="p-3.5 whitespace-nowrap">Hành Động / Sự Kiện</th>
@@ -963,7 +1020,7 @@
                                 <th class="p-3.5 whitespace-nowrap">Mã Máy HWID</th>
                             </tr>
                         </thead>
-                        <tbody id="logs-table-body" class="divide-y divide-slate-800/60">
+                        <tbody id="logs-table-body" class="divide-y divide-slate-200 dark:divide-slate-800/60 text-slate-800 dark:text-slate-300">
                             <tr>
                                 <td colspan="6" class="p-8 text-center text-slate-500">
                                     <i class="fa-solid fa-spinner fa-spin mr-2 text-purple-400"></i> Đang tải dữ liệu nhật ký...
@@ -1042,24 +1099,24 @@
             </div>
 
             <!-- SECTION 1: DANH SÁCH MÃ KEY SUPPORT -->
-            <div class="glass-card rounded-2xl overflow-hidden shadow-xl border border-slate-800">
-                <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-slate-900/70">
+            <div class="glass-card rounded-2xl overflow-hidden shadow-xs dark:shadow-xl border border-slate-200 dark:border-slate-800">
+                <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-slate-50/80 dark:bg-slate-900/70">
                     <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-id-badge text-purple-400"></i>
-                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">Danh Sách Mã Key Support (CTV)</h3>
-                        <span id="sup-keys-table-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300">0</span>
+                        <i class="fa-solid fa-id-badge text-purple-600 dark:text-purple-400"></i>
+                        <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Danh Sách Mã Key Support (CTV)</h3>
+                        <span id="sup-keys-table-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300">0</span>
                     </div>
                     <div class="w-full sm:w-64 relative">
                         <input type="text" id="filter-sup-key-input" oninput="filterSupportKeysTable()" placeholder="Tìm tên CTV / Mã key..."
-                            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500 pr-8">
-                        <i class="fa-solid fa-magnifying-glass absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                            class="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 pr-8 shadow-2xs">
+                        <i class="fa-solid fa-magnifying-glass absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     </div>
                 </div>
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800 text-[11px]">
+                            <tr class="bg-slate-100/90 dark:bg-slate-950/80 text-slate-700 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 text-[11px]">
                                 <th class="p-3">Mã Key Support</th>
                                 <th class="p-3">Người Nhận / CTV</th>
                                 <th class="p-3">Trạng Thái</th>
@@ -1069,7 +1126,7 @@
                                 <th class="p-3 text-right">Thao Tác</th>
                             </tr>
                         </thead>
-                        <tbody id="sup-keys-table-body" class="divide-y divide-slate-800/60">
+                        <tbody id="sup-keys-table-body" class="divide-y divide-slate-200 dark:divide-slate-800/60 text-slate-800 dark:text-slate-300">
                             <tr>
                                 <td colspan="7" class="p-6 text-center text-slate-500">
                                     <i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải danh sách key support...
@@ -1081,28 +1138,28 @@
             </div>
 
             <!-- SECTION 2: BẢNG PHÂN CA THI & GẮN MÁY THI SINH -->
-            <div class="glass-card rounded-2xl overflow-hidden shadow-xl border border-slate-800">
-                <div class="p-4 border-b border-slate-800 flex flex-col md:flex-row justify-between md:items-center gap-3 bg-slate-900/70">
+            <div class="glass-card rounded-2xl overflow-hidden shadow-xs dark:shadow-xl border border-slate-200 dark:border-slate-800">
+                <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between md:items-center gap-3 bg-slate-50/80 dark:bg-slate-900/70">
                     <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-calendar-check text-indigo-400"></i>
-                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">Lịch Thi & Phân Công Máy Theo Ngày</h3>
-                        <span id="sup-assignments-table-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300">0</span>
+                        <i class="fa-solid fa-calendar-check text-indigo-600 dark:text-indigo-400"></i>
+                        <h3 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Lịch Thi & Phân Công Máy Theo Ngày</h3>
+                        <span id="sup-assignments-table-count" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">0</span>
                     </div>
 
                     <!-- Filters for Assignments -->
                     <div class="flex items-center gap-2 flex-wrap">
-                        <select id="filter-assign-date" onchange="filterAssignmentsTable()" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                        <select id="filter-assign-date" onchange="filterAssignmentsTable()" class="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 shadow-2xs">
                             <option value="">Tất cả các ngày</option>
                             <option value="today" selected>Hôm nay</option>
                             <option value="tomorrow">Ngày mai</option>
                         </select>
-                        <select id="filter-assign-support" onchange="filterAssignmentsTable()" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                        <select id="filter-assign-support" onchange="filterAssignmentsTable()" class="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 shadow-2xs">
                             <option value="">Tất cả Support</option>
                         </select>
                         <div class="relative w-44">
                             <input type="text" id="filter-assign-search" oninput="filterAssignmentsTable()" placeholder="Tìm thí sinh / HWID..."
-                                class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500 pr-7">
-                            <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                                class="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 pr-7 shadow-2xs">
+                            <i class="fa-solid fa-magnifying-glass absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                         </div>
                     </div>
                 </div>
@@ -1110,7 +1167,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800 text-[11px]">
+                            <tr class="bg-slate-100/90 dark:bg-slate-950/80 text-slate-700 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-800 text-[11px]">
                                 <th class="p-3">Ngày Thi</th>
                                 <th class="p-3">Ca / Giờ Thi</th>
                                 <th class="p-3">Môn Thi</th>
@@ -1120,7 +1177,7 @@
                                 <th class="p-3 text-right">Thao Tác</th>
                             </tr>
                         </thead>
-                        <tbody id="sup-assignments-table-body" class="divide-y divide-slate-800/60">
+                        <tbody id="sup-assignments-table-body" class="divide-y divide-slate-200 dark:divide-slate-800/60 text-slate-800 dark:text-slate-300">
                             <tr>
                                 <td colspan="7" class="p-6 text-center text-slate-500">
                                     <i class="fa-solid fa-spinner fa-spin mr-2"></i> Đang tải dữ liệu phân ca...
@@ -1583,6 +1640,20 @@
             setInterval(loadDashboardStats, 5000);
         });
 
+        function updateNavBadge(id, count) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const n = parseInt(count, 10) || 0;
+            el.innerText = n;
+            if (n > 0) {
+                el.classList.remove("hidden");
+            } else {
+                if (id !== "badge-lic" && id !== "badge-fpt-count") {
+                    el.classList.add("hidden");
+                }
+            }
+        }
+
         function switchTab(tabId) {
             const tabs = ["tab-downloads", "tab-licenses", "tab-logs", "tab-chats", "tab-settings", "tab-exam-support", "tab-fpt-main", "tab-seb-main", "tab-exam-builder", "tab-support-mgmt"];
             tabs.forEach(id => {
@@ -1596,11 +1667,10 @@
             
             subbarBtns.forEach(btn => {
                 btn.classList.remove("tab-active-pill", "border-blue-500", "border-emerald-500", "text-blue-400", "text-emerald-400", "text-white");
-                btn.classList.add("text-slate-400");
+                btn.classList.add("text-slate-600", "dark:text-slate-400");
                 const badge = btn.querySelector("span[id^='badge-']");
                 if (badge) {
                     badge.classList.remove("bg-white/20", "text-white");
-                    badge.classList.add("bg-slate-800", "text-slate-300");
                 }
             });
 
@@ -1609,11 +1679,10 @@
 
             subbarBtns.forEach(btn => {
                 if (btn.getAttribute("onclick") && btn.getAttribute("onclick").includes(tabId)) {
-                    btn.classList.remove("text-slate-400");
+                    btn.classList.remove("text-slate-600", "dark:text-slate-400");
                     btn.classList.add("tab-active-pill", "text-white");
                     const badge = btn.querySelector("span[id^='badge-']");
                     if (badge) {
-                        badge.classList.remove("bg-slate-800", "text-slate-300");
                         badge.classList.add("bg-white/20", "text-white");
                     }
                 }
@@ -1707,9 +1776,7 @@
             try {
                 const res = await fetch("/api/admin/fpt-sessions");
                 if (res.status === 401) return;
-                const data = await res.json();
-                const badge = document.getElementById("badge-fpt-count");
-                if (badge) badge.innerText = data.count || 0;
+                updateNavBadge("badge-fpt-count", data.count || 0);
                 cachedFPTSessions = data.sessions || [];
                 filterFPTSessions();
             } catch (err) {}
@@ -1747,8 +1814,7 @@
                 if (res.status === 401) return;
                 const data = await res.json();
                 const grid = document.getElementById("seb-sessions-grid");
-                const badge = document.getElementById("badge-seb-count");
-                if (badge) badge.innerText = data.count || 0;
+                updateNavBadge("badge-seb-count", data.count || 0);
                 if (!grid) return;
                 const sessions = data.sessions || [];
                 if (sessions.length === 0) {
@@ -1791,8 +1857,8 @@
                 document.getElementById("stat-active-lic").innerText = data.active_licenses;
                 document.getElementById("stat-locked-lic").innerText = data.locked_licenses;
 
-                document.getElementById("badge-dl").innerText = data.pending_downloads;
-                document.getElementById("badge-lic").innerText = data.total_licenses;
+                updateNavBadge("badge-dl", data.pending_downloads);
+                updateNavBadge("badge-lic", data.total_licenses);
             } catch (err) {}
         }
 
@@ -2021,36 +2087,36 @@
 
             list.forEach(l => {
                 const tr = document.createElement("tr");
-                tr.className = "hover:bg-slate-800/40 transition group border-b border-slate-800/50";
+                tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/40 transition group border-b border-slate-200 dark:border-slate-800/50";
 
                 let statusBadge = `
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-sm shadow-amber-500/10">
-                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> Chờ Duyệt
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 shadow-2xs">
+                        <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span> Chờ Duyệt
                     </span>
                 `;
                 if (l.status === "active") {
                     statusBadge = `
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm shadow-emerald-500/10">
-                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Hoạt Động
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30 shadow-2xs">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Hoạt Động
                         </span>
                     `;
                 } else if (l.status === "locked") {
                     statusBadge = `
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 shadow-sm shadow-rose-500/10">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-500/30 shadow-2xs">
                             <i class="fa-solid fa-lock text-[10px]"></i> Đã Khóa
                         </span>
                     `;
                 }
 
                 let contactBadges = '';
-                if (l.email) contactBadges += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[11px] font-medium truncate max-w-[200px]" title="${escapeHtml(l.email)}"><i class="fa-regular fa-envelope text-[10px]"></i>${escapeHtml(l.email)}</span>`;
-                if (l.phone) contactBadges += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[11px] font-medium font-mono"><i class="fa-solid fa-phone text-[10px]"></i>${escapeHtml(l.phone)}</span>`;
-                if (l.notes) contactBadges += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[11px] italic truncate max-w-[200px]" title="${escapeHtml(l.notes)}">📝 ${escapeHtml(l.notes)}</span>`;
+                if (l.email) contactBadges += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/20 text-[11px] font-medium truncate max-w-[200px]" title="${escapeHtml(l.email)}"><i class="fa-regular fa-envelope text-[10px]"></i>${escapeHtml(l.email)}</span>`;
+                if (l.phone) contactBadges += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20 text-[11px] font-bold font-mono"><i class="fa-solid fa-phone text-[10px]"></i>${escapeHtml(l.phone)}</span>`;
+                if (l.notes) contactBadges += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/20 text-[11px] italic truncate max-w-[200px]" title="${escapeHtml(l.notes)}">📝 ${escapeHtml(l.notes)}</span>`;
 
                 let machineBadges = `
-                    <div class="flex items-center gap-2 mt-1.5 text-[11px] text-slate-400 flex-wrap">
-                        <span class="inline-flex items-center gap-1 text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60" title="Tên máy tính"><i class="fa-solid fa-laptop text-slate-400"></i> ${escapeHtml(l.machine_name || 'PC')}</span>
-                        <span class="inline-flex items-center gap-1 text-indigo-300 bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-800/40 font-mono" title="Địa chỉ IP"><i class="fa-solid fa-network-wired text-indigo-400"></i> ${escapeHtml(l.ip_address || '—')}</span>
+                    <div class="flex items-center gap-2 mt-1.5 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
+                        <span class="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700/60" title="Tên máy tính"><i class="fa-solid fa-laptop text-slate-400"></i> ${escapeHtml(l.machine_name || 'PC')}</span>
+                        <span class="inline-flex items-center gap-1 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/40 font-mono" title="Địa chỉ IP"><i class="fa-solid fa-network-wired text-indigo-500 dark:text-indigo-400"></i> ${escapeHtml(l.ip_address || '—')}</span>
                     </div>
                 `;
 
@@ -2062,35 +2128,35 @@
                         <div class="flex items-start gap-3">
                             ${avatarHtml}
                             <div class="min-w-0">
-                                <span class="font-extrabold text-sm text-white group-hover:text-purple-300 transition block">${escapeHtml(l.student_name || 'Học sinh')}</span>
+                                <span class="font-extrabold text-sm text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300 transition block">${escapeHtml(l.student_name || 'Học sinh')}</span>
                                 <div class="flex items-center gap-1.5 flex-wrap mt-1">
-                                    ${contactBadges || '<span class="text-[10px] text-slate-500 italic">Chưa có Email/SĐT</span>'}
+                                    ${contactBadges || '<span class="text-[10px] text-slate-400 italic">Chưa có Email/SĐT</span>'}
                                 </div>
                                 ${machineBadges}
                             </div>
                         </div>
                     </td>
                     <td class="py-3.5 px-4">
-                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 font-mono text-xs shadow-sm hover:border-purple-500/50 hover:bg-slate-850 transition cursor-pointer group/hwid" onclick="copyToClipboard('${escapeHtml(l.hwid || '')}')" title="Click để sao chép mã HWID">
-                            <i class="fa-solid fa-microchip text-purple-400 text-xs"></i>
-                            <span class="tracking-wide">${escapeHtml(shortHwid)}</span>
-                            <i class="fa-regular fa-copy text-[10px] text-slate-500 group-hover/hwid:text-purple-300 transition ml-1"></i>
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-mono text-xs shadow-2xs hover:border-purple-500/50 transition cursor-pointer group/hwid" onclick="copyToClipboard('${escapeHtml(l.hwid || '')}')" title="Click để sao chép mã HWID">
+                            <i class="fa-solid fa-microchip text-purple-600 dark:text-purple-400 text-xs"></i>
+                            <span class="tracking-wide font-medium">${escapeHtml(shortHwid)}</span>
+                            <i class="fa-regular fa-copy text-[10px] text-slate-400 group-hover/hwid:text-purple-600 dark:group-hover/hwid:text-purple-300 transition ml-1"></i>
                         </div>
                     </td>
                     <td class="py-3.5 px-4">
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800/80 text-slate-200 border border-slate-700/60">
-                            <i class="fa-solid fa-hourglass-half text-amber-400 text-[10px]"></i> ${escapeHtml(l.duration_type || '—')}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+                            <i class="fa-solid fa-hourglass-half text-amber-500 text-[10px]"></i> ${escapeHtml(l.duration_type || '—')}
                         </span>
                     </td>
                     <td class="py-3.5 px-4">
-                        <div class="font-mono text-xs text-slate-300 flex items-center gap-1.5">
-                            <i class="fa-regular fa-calendar-check text-slate-400"></i>
+                        <div class="font-mono text-xs text-slate-700 dark:text-slate-300 font-medium flex items-center gap-1.5">
+                            <i class="fa-regular fa-calendar-check text-slate-400 dark:text-slate-500"></i>
                             <span>${escapeHtml(l.expires_at || '—')}</span>
                         </div>
                     </td>
                     <td class="py-3.5 px-4">${statusBadge}</td>
                     <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
-                        <button onclick="openStudentInfoModal('${escapeHtml(l.hwid)}')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-white rounded-xl text-xs font-bold transition border border-slate-700/80 shadow-sm inline-flex items-center gap-1.5" title="Xem & Sửa Thông Tin Học Sinh (Email, SĐT, Ghi chú)">
+                        <button onclick="openStudentInfoModal('${escapeHtml(l.hwid)}')" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-sky-300 hover:text-slate-900 dark:hover:text-white rounded-xl text-xs font-bold transition border border-slate-300 dark:border-slate-700/80 shadow-2xs inline-flex items-center gap-1.5" title="Xem & Sửa Thông Tin Học Sinh (Email, SĐT, Ghi chú)">
                             <i class="fa-solid fa-user-pen text-[10px]"></i> Sửa TT
                         </button>
 
@@ -2107,27 +2173,27 @@
                         ` : ''}
 
                         ${l.status === 'active' ? `
-                            <button onclick="openApprovalModal('${l.hwid}', '${(l.student_name || 'Học sinh').replace(/'/g, "\\'")}', '${l.expires_at || ''}')" class="px-2.5 py-1.5 bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-slate-950 rounded-xl text-xs font-bold transition border border-amber-500/30 shadow-sm inline-flex items-center gap-1.5" title="Sửa hạn / Gia hạn thêm giờ thi">
+                            <button onclick="openApprovalModal('${l.hwid}', '${(l.student_name || 'Học sinh').replace(/'/g, "\\'")}', '${l.expires_at || ''}')" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:hover:bg-amber-500 dark:text-amber-300 dark:hover:text-slate-950 rounded-xl text-xs font-bold transition border border-amber-300 dark:border-amber-500/30 shadow-2xs inline-flex items-center gap-1.5" title="Sửa hạn / Gia hạn thêm giờ thi">
                                 <i class="fa-regular fa-clock text-[10px]"></i> Sửa Hạn
                             </button>
-                            <button onclick="lockLicense('${l.hwid}')" class="px-2.5 py-1.5 bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold transition border border-rose-500/30 shadow-sm inline-flex items-center gap-1.5" title="Khóa máy học sinh (Phần mềm tự hủy)">
+                            <button onclick="lockLicense('${l.hwid}')" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:hover:bg-rose-600 dark:text-rose-300 dark:hover:text-white rounded-xl text-xs font-bold transition border border-rose-300 dark:border-rose-500/30 shadow-2xs inline-flex items-center gap-1.5" title="Khóa máy học sinh (Phần mềm tự hủy)">
                                 <i class="fa-solid fa-lock text-[10px]"></i> Khóa
                             </button>
                         ` : ''}
 
                         ${l.status === 'locked' ? `
-                            <button onclick="unlockLicense('${l.hwid}')" class="px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-600 text-emerald-300 hover:text-white rounded-xl text-xs font-bold transition border border-emerald-500/30 shadow-sm inline-flex items-center gap-1.5" title="Mở khóa máy">
+                            <button onclick="unlockLicense('${l.hwid}')" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:hover:bg-emerald-600 dark:text-emerald-300 dark:hover:text-white rounded-xl text-xs font-bold transition border border-emerald-300 dark:border-emerald-500/30 shadow-2xs inline-flex items-center gap-1.5" title="Mở khóa máy">
                                 <i class="fa-solid fa-lock-open text-[10px]"></i> Mở
                             </button>
                         ` : ''}
 
                         ${l.license_key ? `
-                            <button onclick="copyToClipboard('${l.license_key}')" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 inline-flex items-center justify-center text-xs transition border border-slate-700/80 shadow-sm" title="Sao chép Key">
+                            <button onclick="copyToClipboard('${l.license_key}')" class="w-8 h-8 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 inline-flex items-center justify-center text-xs transition border border-slate-300 dark:border-slate-700 shadow-2xs" title="Sao chép Key">
                                 <i class="fa-regular fa-copy"></i>
                             </button>
                         ` : ''}
 
-                        <button onclick="deleteLicense('${l.hwid}')" class="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 inline-flex items-center justify-center text-xs transition border border-slate-700/80 shadow-sm" title="Xóa">
+                        <button onclick="deleteLicense('${l.hwid}')" class="w-8 h-8 rounded-xl bg-white hover:bg-rose-50 dark:bg-slate-800/80 dark:hover:bg-rose-900/60 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-300 inline-flex items-center justify-center text-xs transition border border-slate-300 dark:border-slate-700 shadow-2xs" title="Xóa">
                             <i class="fa-regular fa-trash-can"></i>
                         </button>
                     </td>
@@ -2358,8 +2424,7 @@
                 cachedAccessLogs = data.logs || [];
                 const dates = data.dates || [];
 
-                const badge = document.getElementById("badge-logs");
-                if (badge) badge.innerText = cachedAccessLogs.length;
+                updateNavBadge("badge-logs", cachedAccessLogs.length);
 
                 renderDateFilterPills(dates, currentLogDateFilter);
                 renderAccessLogsTable(cachedAccessLogs);
@@ -2788,7 +2853,9 @@
                 const res = await fetch("/api/admin/chat-sessions");
                 if (res.status === 401) { window.location.href = "/login"; return; }
                 allChatSessions = await res.json();
-                document.getElementById("badge-chat").innerText = allChatSessions.length;
+                updateNavBadge("badge-chat", allChatSessions.length);
+                const chatInboxBadge = document.getElementById("badge-chat-inbox");
+                if (chatInboxBadge) chatInboxBadge.innerText = allChatSessions.length;
                 renderChatSessionsList(allChatSessions);
             } catch (err) {}
         }
@@ -3104,8 +3171,7 @@
                 cachedExamSessions = sessions;
 
                 // Update badge count
-                const badge = document.getElementById("badge-live-exams");
-                if (badge) badge.innerText = sessions.length;
+                updateNavBadge("badge-live-exams", sessions.length);
 
                 const list = document.getElementById("exam-sessions-list");
                 if (!list) return;
@@ -4472,8 +4538,7 @@
                 const res = await fetch("/api/admin/exam-sessions");
                 if (!res.ok) return;
                 const sessions = await res.json();
-                const badge = document.getElementById("badge-live-exams");
-                if (badge) badge.innerText = sessions.length;
+                updateNavBadge("badge-live-exams", sessions.length);
             } catch (err) {}
         }, 5000);
 
@@ -4567,7 +4632,7 @@
             if (totalEl) totalEl.innerText = total;
             if (activeEl) activeEl.innerText = active;
             if (suspendedEl) suspendedEl.innerText = suspended;
-            if (countBadge) countBadge.innerText = total;
+            updateNavBadge("badge-support-keys-count", total);
             if (tableBadge) tableBadge.innerText = total;
         }
 

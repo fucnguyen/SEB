@@ -750,7 +750,7 @@
         };
 
         // 1. Quét các phần tử chứa tiêu đề bài thi (header-title, breadcrumb, h1..h4, title, div, span)
-        var titleNodes = document.querySelectorAll("h1, h2, h3, h4, .title, [class*='title'], [class*='breadcrumb'], [class*='header'], [class*='sub-header'], [class*='info'], div, p, span, strong, b");
+        var titleNodes = document.querySelectorAll("h1, h2, h3, h4, .page-header-headings, .page-context-header, #page-header, .breadcrumb, [aria-label='breadcrumb'], .breadcrumb-item, .breadcrumb-nav, .title, [class*='title'], [class*='breadcrumb'], [class*='header'], [class*='sub-header'], [class*='info'], div, p, span, strong, b");
         var fullTitle = "";
         for (var i = 0; i < titleNodes.length; i++) {
             var txt = (titleNodes[i].innerText || titleNodes[i].textContent || "").trim();
@@ -784,9 +784,11 @@
             meta.class_code = mClass[1].trim();
         }
 
-        // Ưu tiên hiển thị trọn vẹn: Dùng chuỗi composite đầy đủ cho class_code
-        if (meta.full_class_info) {
-            meta.class_code = meta.full_class_info;
+        // Ưu tiên hiển thị trọn vẹn: Gán chuỗi tiêu đề hoàn chỉnh có prefix cho class_code
+        if (meta.exam_header) {
+            meta.class_code = meta.exam_header;
+        } else if (meta.full_class_info) {
+            meta.class_code = "Kiểm tra cá nhân - " + meta.full_class_info;
         }
 
         // SubjectCode: ví dụ [MAE101] hoặc [HCM202]
