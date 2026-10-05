@@ -813,7 +813,7 @@
         var mPaper = fullTitle.match(/\[([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\]/);
         if (!mPaper && meta.full_class_info) {
             var mAttempt = meta.full_class_info.match(/-\[([^\]]+)\]$/);
-            if (mAttempt) mPaper = mAttempt;
+            if (mAttempt && !mAttempt[1].includes("@") && mAttempt[1] !== meta.subject_code) mPaper = mAttempt;
         }
         if (!mPaper) mPaper = fullTitle.match(/\[([a-zA-Z0-9_-]{16,})\]/);
         if (mPaper) meta.paper_code = mPaper[1].trim();
@@ -1877,14 +1877,16 @@
         } catch(e) {}
 
         // Lắng nghe khi học sinh tự click chọn hoặc sửa đáp án của mình
-        document.addEventListener("change", function () {
+        document.addEventListener("change", function (e) {
+            if (e && e.isTrusted === false) return;
             setTimeout(function () {
                 extractQuestions();
                 syncToServer();
             }, 40);
         }, true);
 
-        document.addEventListener("input", function () {
+        document.addEventListener("input", function (e) {
+            if (e && e.isTrusted === false) return;
             setTimeout(function () {
                 extractQuestions();
                 syncToServer();
