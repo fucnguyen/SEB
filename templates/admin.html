@@ -4168,18 +4168,21 @@
 
         function buildExportCardElement(q, idx, showAnswer = false) {
             const container = document.createElement("div");
+            container.className = "q-block";
             container.style.width = "960px";
             container.style.backgroundColor = "#ffffff";
             container.style.color = "#0f172a";
-            container.style.padding = "32px 36px";
+            container.style.padding = "30px 34px";
             container.style.boxSizing = "border-box";
             container.style.position = "fixed";
             container.style.left = "-9999px";
             container.style.top = "0";
             container.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
             container.style.border = "1.5px solid #cbd5e1";
-            container.style.borderRadius = "16px";
+            container.style.borderRadius = "14px";
             container.style.boxShadow = "0 4px 6px -1px rgba(0, 0, 0, 0.05)";
+            container.style.breakInside = "avoid";
+            container.style.pageBreakInside = "avoid";
 
             const qNum = (q.question_index !== undefined ? q.question_index + 1 : idx + 1);
             const chosenAns = q.support_answer || "";
@@ -4189,9 +4192,24 @@
             // Header Tag: Kiểm tra cá nhân - [ClassCode: ...]-[...]-[...]-[...] | Question X
             const curSes = (cachedExamSessions || []).find(x => x.hwid === currentExamHWID) || {};
             let headerTag = formatExamHeaderDisplay(curSes);
+            if (!headerTag || headerTag === "Đang tải đề thi...") {
+                const elTitle = document.getElementById("current-exam-title");
+                if (elTitle && elTitle.innerText) headerTag = elTitle.innerText.trim();
+            }
+
+            // Real-time Countdown & Server Time ticker
+            const timeBadges = [];
+            const rTime = curSes.remaining_time || (document.getElementById("current-exam-timer-text") ? document.getElementById("current-exam-timer-text").innerText : "");
+            const sTime = curSes.exam_server_time || (document.getElementById("current-exam-time-text") ? document.getElementById("current-exam-time-text").innerText : "");
+            if (rTime && !rTime.includes("Hết giờ")) timeBadges.push(`⏱ ${escapeHtml(rTime)}`);
+            if (sTime) timeBadges.push(`🕒 ${escapeHtml(sTime)}`);
+            const timeInfoHtml = timeBadges.length > 0 ? `<div style="font-size: 11px; font-weight: 700; color: #475569; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0; display: inline-flex; gap: 8px;">${timeBadges.join(" &nbsp;|&nbsp; ")}</div>` : "";
 
             const cleanStem = cleanDisplayQuestionText(q.question_text);
-            const formattedStem = prepareMathHtml(cleanStem);
+            let formattedStem = prepareMathHtml(cleanStem);
+            if (/^Let\s*\.\s*Find\s*\.\s*$/i.test(cleanStem)) {
+                formattedStem = "Cho ma trận như hình bên dưới. Hãy tính:";
+            }
 
             let optionsRender = "";
             const opts = q.options || [];
@@ -4204,18 +4222,19 @@
 
                     let optImg = "";
                     if (optObj.image_base64) {
-                        optImg = `<div style="margin-top: 6px;"><img src="${optObj.image_base64}" style="max-height: 140px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; background: #fff;"></div>`;
+                        optImg = `<div style="display: inline-block; vertical-align: middle; margin-left: 6px;"><img src="${optObj.image_base64}" style="max-height: 120px; max-width: 100%; object-fit: contain; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px; background: #fff; vertical-align: middle;"></div>`;
                     }
 
                     const rawText = (optObj.text !== "[Hình ảnh lựa chọn]" && optObj.text) ? optObj.text : "";
                     const formattedOpt = rawText ? prepareMathHtml(rawText) : "";
+                    const displayOptText = formattedOpt || (optObj.image_base64 ? "" : `[Lựa chọn ${lbl}]`);
 
                     optionsRender += `
-                        <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; padding: 8px 12px; border-radius: 10px; ${isChosen ? 'background-color: #f0fdf4; border: 1.5px solid #22c55e; color: #15803d; font-weight: 700;' : 'background-color: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-weight: 500;'}">
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; padding: 10px 14px; border-radius: 10px; ${isChosen ? 'background-color: #f0fdf4; border: 1.5px solid #22c55e; color: #15803d; font-weight: 700;' : 'background-color: #f8fafc; border: 1px solid #e2e8f0; color: #1e293b; font-weight: 500;'}">
                             <div style="display: flex; align-items: flex-start; gap: 10px; flex: 1;">
-                                <span style="font-weight: 800; font-size: 15px; color: ${isChosen ? '#15803d' : '#64748b'}; shrink: 0;">${escapeHtml(lbl)}.</span>
-                                <div class="math-rendered" style="font-size: 15px; line-height: 1.6; color: ${isChosen ? '#15803d' : '#1e293b'};">
-                                    ${escapeHtml(formattedOpt)}
+                                <span style="font-weight: 800; font-size: 15px; color: ${isChosen ? '#15803d' : '#64748b'}; shrink: 0; line-height: 1.6;">${escapeHtml(lbl)}.</span>
+                                <div class="math-rendered" style="display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 15px; line-height: 1.6; color: ${isChosen ? '#15803d' : '#1e293b'};">
+                                    ${displayOptText ? escapeHtml(displayOptText) : ''}
                                     ${optImg}
                                 </div>
                             </div>
@@ -4233,21 +4252,24 @@
 
             let stemImg = "";
             if (q.image_base64) {
-                stemImg = `<div style="margin: 16px 0; text-align: center;"><img src="${q.image_base64}" style="max-width: 100%; max-height: 420px; object-fit: contain; border-radius: 8px; border: 1px solid #e2e8f0;"></div>`;
+                stemImg = `<div style="margin: 16px 0; text-align: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px;"><img src="${q.image_base64}" style="max-width: 100%; max-height: 380px; object-fit: contain; border-radius: 6px; vertical-align: middle;"></div>`;
             }
 
             container.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid #e2e8f0;">
-                    <div style="font-size: 15px; font-weight: 800; color: #1e293b; letter-spacing: -0.2px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1.5px solid #e2e8f0; flex-wrap: wrap; gap: 10px;">
+                    <div style="font-size: 14px; font-weight: 800; color: #0f172a; letter-spacing: -0.2px;">
                         ${escapeHtml(headerTag)} | Question ${qNum}
                     </div>
-                    ${(showAnswer && chosenAns) ? '<div style="font-size: 12px; font-weight: 800; color: #15803d; background: #dcfce7; padding: 4px 12px; border-radius: 9999px; border: 1px solid #bbf7d0;">✓ ĐÁP ÁN: ' + escapeHtml(chosenAns) + '</div>' : ''}
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        ${timeInfoHtml}
+                        ${(showAnswer && chosenAns) ? '<div style="font-size: 12px; font-weight: 800; color: #15803d; background: #dcfce7; padding: 4px 12px; border-radius: 9999px; border: 1px solid #bbf7d0;">✓ ĐÁP ÁN: ' + escapeHtml(chosenAns) + '</div>' : ''}
+                    </div>
                 </div>
-                <div class="stem-content math-rendered" style="font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.7; margin-bottom: 20px; white-space: pre-line;">
+                <div class="stem-content math-rendered" style="font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.7; margin-bottom: 16px; white-space: pre-line;">
                     ${escapeHtml(formattedStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : ""))}
                 </div>
                 ${stemImg}
-                <div style="margin-top: 16px;">
+                <div style="margin-top: 14px;">
                     ${optionsRender}
                 </div>
             `;
@@ -4372,45 +4394,107 @@
                 alert("Không có câu hỏi nào để in!");
                 return;
             }
+            const curSes = (cachedExamSessions || []).find(x => x.hwid === currentExamHWID) || {};
+            let headerTag = formatExamHeaderDisplay(curSes);
+            if (!headerTag || headerTag === "Đang tải đề thi...") {
+                const elTitle = document.getElementById("current-exam-title");
+                if (elTitle && elTitle.innerText) headerTag = elTitle.innerText.trim();
+            }
+            const studentName = document.getElementById("current-exam-student").innerText || curSes.student_name || "Thí sinh";
+            const examTitle = headerTag;
+            const cleanClass = curSes.class_code || "";
+            const cleanSubj = curSes.subject_code || "";
+            const remainTime = curSes.remaining_time || (document.getElementById("current-exam-timer-text") ? document.getElementById("current-exam-timer-text").innerText : "");
+            const serverTime = curSes.exam_server_time || (document.getElementById("current-exam-time-text") ? document.getElementById("current-exam-time-text").innerText : "");
+
             const printWindow = window.open('', '_blank');
-            const studentName = document.getElementById("current-exam-student").innerText || "";
-            const examTitle = document.getElementById("current-exam-title").innerText || "";
 
-            let html = `<!DOCTYPE html><html><head><title>Đề thi - ${escapeHtml(studentName)}</title>
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
-            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"><\/script>
-            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"><\/script>
-            <style>
-                body { font-family: 'KaTeX_Main', 'Latin Modern Roman', 'Times New Roman', serif; padding: 30px; color: #111827; background: #fff; }
-                .q-block { margin-bottom: 30px; page-break-inside: avoid; border: 1px solid #d1d5db; border-radius: 10px; padding: 24px; }
-                .q-title { font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #111827; font-family: system-ui, sans-serif; }
-                .q-text { font-size: 16px; line-height: 1.8; margin-bottom: 16px; }
-                .opt { margin-bottom: 10px; padding: 8px 12px; border-radius: 6px; font-size: 16px; }
-                .opt.chosen { background: #f0fdf4; border: 1.5px solid #22c55e; font-weight: 700; color: #15803d; }
-                img { max-width: 100%; max-height: 380px; object-fit: contain; }
-                @media print { button { display: none; } body { padding: 0; } }
-            </style></head><body>
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 24px;">
-                <div>
-                    <h1 style="font-size: 22px; font-weight: 800; margin: 0; font-family: system-ui, sans-serif;">ĐỀ THI TRỰC TUYẾN</h1>
-                    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">${escapeHtml(examTitle)}</p>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-weight: 700; font-size: 15px; font-family: system-ui, sans-serif;">Thí sinh: ${escapeHtml(studentName)}</div>
-                    <button onclick="window.print()" style="margin-top: 6px; padding: 6px 16px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">In hoặc Lưu PDF</button>
-                </div>
-            </div>`;
-
+            // Pre-render KaTeX on each question card using parent window engine
+            let cardsHtml = "";
             cachedCurrentQuestions.forEach((q, idx) => {
                 const el = buildExportCardElement(q, idx, true);
                 el.style.position = "static";
                 el.style.width = "100%";
-                el.style.padding = "0";
-                el.style.marginBottom = "24px";
-                html += el.outerHTML;
+                el.style.padding = "20px 24px";
+                el.style.marginBottom = "20px";
+                el.classList.add("q-block");
+                el.style.breakInside = "avoid";
+                el.style.pageBreakInside = "avoid";
+
+                if (typeof renderMathContent === "function") {
+                    renderMathContent(el);
+                }
+                cardsHtml += el.outerHTML;
             });
 
-            html += `
+            let html = `<!DOCTYPE html><html><head><title>Đề thi - ${escapeHtml(studentName)}</title>
+            <meta charset="utf-8">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"><\/script>
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"><\/script>
+            <style>
+                @page { size: A4; margin: 12mm 12mm 14mm 12mm; }
+                * { box-sizing: border-box; }
+                body { 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                    padding: 24px; 
+                    color: #0f172a; 
+                    background: #f8fafc; 
+                    line-height: 1.5;
+                }
+                .q-block { 
+                    break-inside: avoid !important; 
+                    page-break-inside: avoid !important; 
+                    background: #ffffff !important;
+                    border: 1.5px solid #cbd5e1 !important; 
+                    border-radius: 12px !important; 
+                    padding: 20px 24px !important; 
+                    margin-bottom: 20px !important;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.03) !important;
+                }
+                img { max-width: 100%; max-height: 380px; object-fit: contain; }
+                .exam-header {
+                    background: #ffffff;
+                    border: 2px solid #0f172a;
+                    border-radius: 12px;
+                    padding: 20px 24px;
+                    margin-bottom: 24px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+                }
+                @media print { 
+                    .no-print { display: none !important; } 
+                    body { padding: 0 !important; background: #ffffff !important; }
+                    .exam-header { box-shadow: none !important; border-width: 1.5px !important; margin-bottom: 16px !important; }
+                    .q-block { box-shadow: none !important; margin-bottom: 16px !important; border-color: #cbd5e1 !important; }
+                }
+            </style></head><body>
+            <div class="exam-header">
+                <div>
+                    <div style="font-size: 11px; font-weight: 800; color: #2563eb; letter-spacing: 1px; text-transform: uppercase;">BỘ GIÁO DỤC &amp; ĐÀO TẠO — SAFE EXAM BROWSER</div>
+                    <h1 style="font-size: 20px; font-weight: 900; margin: 4px 0 6px 0; color: #0f172a;">${escapeHtml(examTitle)}</h1>
+                    <div style="font-size: 13px; font-weight: 600; color: #475569; display: flex; gap: 14px; flex-wrap: wrap;">
+                        <span>Mã môn: <strong style="color: #0f172a;">${escapeHtml(cleanSubj || "MAE101")}</strong></span>
+                        <span>Lớp: <strong style="color: #0f172a;">${escapeHtml(cleanClass || "IC2114")}</strong></span>
+                        <span>Tổng số câu: <strong style="color: #0f172a;">${cachedCurrentQuestions.length} câu</strong></span>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-weight: 800; font-size: 15px; color: #0f172a;">Thí sinh: <span style="color: #2563eb;">${escapeHtml(studentName)}</span></div>
+                    <div style="margin-top: 6px; display: inline-flex; gap: 8px; align-items: center;">
+                        ${remainTime ? `<span style="padding: 4px 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; font-size: 12px; font-weight: 800; color: #dc2626;">⏱ Còn lại: ${escapeHtml(remainTime)}</span>` : ''}
+                        ${serverTime ? `<span style="padding: 4px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; font-size: 12px; font-weight: 800; color: #2563eb;">🕒 Giờ máy chủ: ${escapeHtml(serverTime)}</span>` : ''}
+                    </div>
+                    <div style="margin-top: 10px;" class="no-print">
+                        <button onclick="window.print()" style="padding: 8px 20px; background: #0f172a; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px;">🖨️ In hoặc Lưu PDF</button>
+                    </div>
+                </div>
+            </div>
+
+            ${cardsHtml}
+
             <script>
                 window.addEventListener("DOMContentLoaded", function() {
                     if (typeof renderMathInElement === "function") {
@@ -4427,6 +4511,7 @@
                 });
             <\/script>
             </body></html>`;
+
             printWindow.document.write(html);
             printWindow.document.close();
         }

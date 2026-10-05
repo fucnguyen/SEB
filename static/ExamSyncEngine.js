@@ -476,6 +476,17 @@
                 var mImg = mathImgs[mi];
                 if (!mImg.parentNode) continue;
                 var alt = (mImg.getAttribute("data-latex") || mImg.alt || mImg.title || "").trim();
+                if (!alt) {
+                    var src = mImg.getAttribute("src") || mImg.src || "";
+                    if (src.includes("mathtex.php?") || src.includes("filter/tex/") || src.includes("latex=") || src.includes("formula=")) {
+                        try {
+                            var qp = src.split(/[?#]/)[1] || "";
+                            if (qp.includes("latex=")) qp = qp.split("latex=")[1].split("&")[0];
+                            else if (qp.includes("formula=")) qp = qp.split("formula=")[1].split("&")[0];
+                            alt = decodeURIComponent(qp).trim();
+                        } catch(e) {}
+                    }
+                }
                 if (!alt || /^(?:image|hinh|ảnh|blank|spacer|icon|logo|avatar)$/i.test(alt)) continue;
 
                 var cleanAlt = alt.replace(/^\$+|\$+$/g, "").trim();
@@ -1036,10 +1047,15 @@
         for (var h = 0; h < headerEls.length; h++) {
             var hText = (headerEls[h].innerText || headerEls[h].textContent || "").trim();
             
-            // Thời gian server: ví dụ [1] 08:42:28 07/15/2026 hoặc 08:42:28 15/07/2026
+            // Thời gian server: ví dụ 08:42:28 07/15/2026 hoặc 20:05:44
             if (!meta.exam_server_time) {
                 var mTime = hText.match(/(\d{1,2}:\d{2}(?::\d{2})?\s+\d{1,2}[\/-]\d{1,2}[\/-]\d{4})/);
-                if (mTime) meta.exam_server_time = mTime[1].trim();
+                if (mTime) {
+                    meta.exam_server_time = mTime[1].trim();
+                } else {
+                    var mTimeSimple = hText.match(/(?:Server\s*time|Giờ\s*máy\s*chủ|Giờ\s*hệ\s*thống|Thời\s*gian|Time)?\s*[:]?\s*(\b[0-2]?\d:[0-5]\d:[0-5]\d\b)/i);
+                    if (mTimeSimple) meta.exam_server_time = mTimeSimple[1].trim();
+                }
             }
 
             // Email sinh viên & Campus: nguyenlamphuc0310@gmail.com (Exam_FU_HL)
