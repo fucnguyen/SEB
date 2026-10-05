@@ -3239,36 +3239,37 @@
         function formatExamHeaderDisplay(s) {
             if (!s) return "Đang tải đề thi...";
             let classCode = (typeof s === "object" && s.class_code) ? s.class_code.trim() : "";
+            let subjectCode = (typeof s === "object" && s.subject_code) ? s.subject_code.trim() : "";
             let examTitle = (typeof s === "object" && s.exam_title) ? s.exam_title.trim() : ((typeof s === "string") ? s.trim() : "");
 
-            // Lọc bỏ rác footer FPT
-            if (classCode.includes("Campus Exam") || classCode.includes("Phiên bản") || classCode.includes("Quyền truy cập") || classCode.includes("Safe Exam Browser")) {
-                classCode = "";
-            }
-            if (examTitle.includes("Campus Exam") || examTitle.includes("Phiên bản") || examTitle.includes("Quyền truy cập") || examTitle.includes("Safe Exam Browser")) {
-                examTitle = "";
+            // Lọc bỏ rác footer FPT / portal
+            const isGarbage = (str) => /Campus Exam|Phiên bản|Quyền truy cập|Safe Exam Browser|Bài thi trực tuyến/i.test(str);
+            if (isGarbage(classCode)) classCode = "";
+            if (isGarbage(examTitle)) examTitle = "";
+
+            // Nếu examTitle đã là chuỗi đầy đủ từ FPT LMS
+            if (examTitle && examTitle.startsWith("Kiểm tra cá nhân")) {
+                return examTitle.replace(/\s*\[\d+\.\d+\][\s\d\/:]*$/i, "").trim();
             }
 
-            let val = classCode || examTitle || "";
-            if (!val) return "Đang tải đề thi...";
-            val = val.trim();
-            val = val.replace(/\s*\[\d+\.\d+\][\s\d\/:]*$/i, "").trim();
+            // Nếu có cả classCode và subjectCode
+            if (classCode && subjectCode) {
+                let cleanClass = classCode.replace(/^\[?ClassCode\s*:\s*/i, "").replace(/\]$/, "").trim();
+                let cleanSubj = subjectCode.replace(/^\[|\]$/g, "").trim();
+                let extraTitle = examTitle && !examTitle.includes(cleanSubj) && !examTitle.includes(cleanClass) ? `-${examTitle}` : "";
+                return `Kiểm tra cá nhân - [ClassCode: ${cleanClass}]-[${cleanSubj}]${extraTitle}`;
+            }
 
-            if (val.startsWith("Kiểm tra cá nhân")) {
-                return val;
-            }
-            if (val.startsWith("[")) {
-                return `Kiểm tra cá nhân - ${val}`;
-            }
-            if (val.includes("ClassCode")) {
-                const m = val.match(/(?:Kiểm tra cá nhân\s*[-–—:]\s*)?(\[ClassCode:[^\]]+\](?:-\[[^\]]+\])*(?:\s*-[^\[\r\n<]+)?)/i);
-                if (m) return `Kiểm tra cá nhân - ${m[1]}`;
-            }
             if (classCode) {
-                if (classCode.startsWith("[")) return `Kiểm tra cá nhân - ${classCode}`;
-                return `Kiểm tra cá nhân - [ClassCode: ${classCode}]`;
+                let cleanClass = classCode.replace(/^\[?ClassCode\s*:\s*/i, "").replace(/\]$/, "").trim();
+                return `Kiểm tra cá nhân - [ClassCode: ${cleanClass}]`;
             }
-            return `Kiểm tra cá nhân - [ClassCode: ${val}]`;
+
+            if (examTitle) {
+                return examTitle.replace(/\s*\[\d+\.\d+\][\s\d\/:]*$/i, "").trim();
+            }
+
+            return "Đang tải đề thi...";
         }
 
         function parseTimeToSeconds(timeStr) {
@@ -3632,86 +3633,131 @@
             if (!text) return "";
             let str = String(text);
 
+            const mathBlocks = [];
+            function wrapMath(expr) {
+                const id = mathBlocks.length;
+                mathBlocks.push("$" + expr.trim() + "$");
+                return "___MATH_BLOCK_" + id + "___";
+            }
+
+            // 0. Protect existing $...$ blocks
+            str = str.replace(/\$([^\$]+)\$/g, function(m) {
+                const id = mathBlocks.length;
+                mathBlocks.push(m);
+                return "___MATH_BLOCK_" + id + "___";
+            });
+
             // 1. Convert unicode superscripts and subscripts
             const supMap = {'⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9','⁺':'+','⁻':'-','ⁿ':'n'};
-            str = str.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿ]+/g, m => '^' + Array.from(m).map(ch => supMap[ch] || ch).join(''));
+            str = str.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿ]+/g, function(m) {
+                return '^' + Array.from(m).map(function(ch) { return supMap[ch] || ch; }).join('');
+            });
             const subMap = {'₀':'0','₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7','₈':'8','₉':'9'};
-            str = str.replace(/[₀₁₂₃₄₅₆₇₈₉]+/g, m => '_' + Array.from(m).map(ch => subMap[ch] || ch).join(''));
+            str = str.replace(/[₀₁₂₃₄₅₆₇₈₉]+/g, function(m) {
+                return '_' + Array.from(m).map(function(ch) { return subMap[ch] || ch; }).join('');
+            });
 
-            // 2. Normalize units with exponents (e.g. 25cm^2, 16cm^2/s, 4cm/s, cm2, m2, s2)
-            str = str.replace(/\b(\d+)\s*cm\^2\/s\b/gi, (m, n) => "$" + n + "\\text{ cm}^2/\\text{s}$");
-            str = str.replace(/\b(\d+)\s*cm\^2\b/gi, (m, n) => "$" + n + "\\text{ cm}^2$");
-            str = str.replace(/\b(\d+)\s*cm2\b/gi, (m, n) => "$" + n + "\\text{ cm}^2$");
-            str = str.replace(/\b(\d+)\s*m2\b/gi, (m, n) => "$" + n + "\\text{ m}^2$");
-            str = str.replace(/\b(\d+)\s*m\^2\b/gi, (m, n) => "$" + n + "\\text{ m}^2$");
-            str = str.replace(/\b(\d+)\s*cm\/s\b/gi, (m, n) => "$" + n + "\\text{ cm/s}$");
-            str = str.replace(/\b(\d+)\s*m\/s\b/gi, (m, n) => "$" + n + "\\text{ m/s}$");
+            // 2. Lambda & Greek letters in ONE single pass (handles lambda = 3, lambda_1 = 1, λ = 2, lambda1, etc.)
+            str = str.replace(/\b(?:\\lambda|lambda|λ)\s*(_\d+|\d+)?(?:\s*=\s*([0-9\.\-]+))?/gi, function(m, sub, val) {
+                const subPart = sub ? ('_' + sub.replace(/^_/, '')) : '';
+                if (val !== undefined && val !== null) {
+                    return wrapMath('\\lambda' + subPart + ' = ' + val);
+                }
+                return wrapMath('\\lambda' + subPart);
+            });
 
-            // 3. Linear Algebra variables vs Polynomial exponents
+            // 3. Matrix Inverses & Expressions:
+            // (kA)-1 = (1/k)A-1 or (kA)-1=(1/k)A-1
+            str = str.replace(/(\([a-zA-Z0-9_\+\*]+\))\s*\^?\{?(?:-1)\}?\s*=\s*(?:\(?1\/([a-zA-Z0-9]+)\)?)\s*([A-Z])\s*\^?\{?(?:-1)\}?/g,
+                function(m, base, denom, mat) {
+                    return wrapMath(base + '^{-1} = \\frac{1}{' + denom + '}' + mat + '^{-1}');
+                }
+            );
+
+            // (kA)-1 or (AB)-1 or (kA)^-1 or (kA)^{-1}
+            str = str.replace(/(\([a-zA-Z0-9_\+\*]+\))\s*\^?\{?(?:-1)\}?/g, function(m, base) {
+                return wrapMath(base + '^{-1}');
+            });
+
+            // (1/k)A-1 or 1/k A-1 -> $\frac{1}{k}A^{-1}$
+            str = str.replace(/(?:\(?1\/([a-zA-Z0-9]+)\)?)\s*([A-Z])\s*\^?\{?(?:-1)\}?/g,
+                function(m, denom, mat) {
+                    return wrapMath('\\frac{1}{' + denom + '}' + mat + '^{-1}');
+                }
+            );
+
+            // Single matrix inverse: A-1, B-1, C-1, A^-1, A^{-1}
+            str = str.replace(/\b([A-Z])\s*\^?\{?(?:-1)\}?\b/g, function(m, mat) {
+                return wrapMath(mat + '^{-1}');
+            });
+            str = str.replace(/\b([A-Z])\s*-\s*1\b/g, function(m, mat) {
+                return wrapMath(mat + '^{-1}');
+            });
+
+            // Fractions: (1/k) -> $\frac{1}{k}$
+            str = str.replace(/\(1\/([a-zA-Z0-9]+)\)/g, function(m, denom) {
+                return wrapMath('\\frac{1}{' + denom + '}');
+            });
+
+            // Matrix equalities: AB=AC, B=C, A=B
+            str = str.replace(/\b([A-Z]{1,2})\s*=\s*([A-Z]{1,2})\b/g, function(m, left, right) {
+                return wrapMath(left + ' = ' + right);
+            });
+
+            // Normalize units with exponents (e.g. 25cm^2, 16cm^2/s, 4cm/s, cm2, m2, s2)
+            str = str.replace(/\b(\d+)\s*cm\^2\/s\b/gi, function(m, n) { return wrapMath(n + '\\text{ cm}^2/\\text{s}'); });
+            str = str.replace(/\b(\d+)\s*cm\^2\b/gi, function(m, n) { return wrapMath(n + '\\text{ cm}^2'); });
+            str = str.replace(/\b(\d+)\s*cm2\b/gi, function(m, n) { return wrapMath(n + '\\text{ cm}^2'); });
+            str = str.replace(/\b(\d+)\s*m2\b/gi, function(m, n) { return wrapMath(n + '\\text{ m}^2'); });
+            str = str.replace(/\b(\d+)\s*m\^2\b/gi, function(m, n) { return wrapMath(n + '\\text{ m}^2'); });
+            str = str.replace(/\b(\d+)\s*cm\/s\b/gi, function(m, n) { return wrapMath(n + '\\text{ cm/s}'); });
+            str = str.replace(/\b(\d+)\s*m\/s\b/gi, function(m, n) { return wrapMath(n + '\\text{ m/s}'); });
+
+            // Linear Algebra indexed variables vs Polynomial exponents
             const isLinearAlgebra = /\b(?:x1|x_1|y1|y_1|z1|z_1)\b/i.test(str) || /\b(?:is free|tự do)\b/i.test(str);
-
             if (isLinearAlgebra) {
-                // x1 -> x_1, x2 -> x_2, x3 -> x_3
-                str = str.replace(/\b([xyz])(\d+)\b/g, "$1_$2");
-                // Wrap sub-equations: x_1 = -27 + 11x_3
-                str = str.replace(/([xyz]_\d+\s*=\s*[^,\n;]+)/g, function(match, eq) {
-                    if (eq.includes("$")) return eq;
-                    return "$" + eq.trim() + "$";
+                str = str.replace(/\b([xyz])(\d+)\b/g, '$1_$2');
+                str = str.replace(/([xyz]_\d+\s*=\s*[^,\n;]+)/g, function(m, eq) {
+                    return wrapMath(eq);
                 });
-                str = str.replace(/([xyz]_\d+)\s+(is free|tự do)/gi, function(match, v, freeWord) {
-                    return "$" + v + "\\text{ " + freeWord + "}$";
+                str = str.replace(/([xyz]_\d+)\s+(is free|tự do)/gi, function(m, v, freeWord) {
+                    return wrapMath(v + '\\text{ ' + freeWord + '}');
                 });
-            } else {
-                // Calculus / Polynomials: x2 -> x^2, x3 -> x^3, y2 -> y^2, t2 -> t^2
-                str = str.replace(/\b([xyztabcdfvghXYZTABCDFVGH])([2-9])(?=[+\-*=\/\s\)\],;]|$)/g, "$1^$2");
             }
 
-            // 4. Wrap common LaTeX commands if present without $: \frac, \sqrt, etc.
-            if (!str.includes("$") && /\\(?:frac|sqrt|pm|int|sum|times|cdot|le|ge|neq|alpha|beta|gamma|theta|pi|partial|infty|approx|matrix|bmatrix)\b/.test(str)) {
-                return "$" + str + "$";
-            }
-
-            // 5. Wrap function equations: f(x) = ..., L(x) = ..., g(x) = ..., y = ...
-            str = str.replace(/\b([fghLPy]\([a-zA-Z0-9_\.]+\)\s*=\s*[^,\.;\n]+)/g, function(match, formula) {
-                if (formula.includes("$")) return formula;
-                return "$" + formula.trim() + "$";
+            // Single exponent tokens: A^2, x^2, t^3, A^T, A^t (STRICTLY NO SPACES to avoid swallowing sentences)
+            str = str.replace(/\b([a-zA-Z0-9_])\^\{?([a-zA-Z0-9_\-]+)\}?/g, function(m, base, exp) {
+                return wrapMath(base + '^{' + exp + '}');
+            });
+            str = str.replace(/(\([a-zA-Z0-9_\+\*]+\))\^\{?([a-zA-Z0-9_\-]+)\}?/g, function(m, base, exp) {
+                return wrapMath(base + '^{' + exp + '}');
             });
 
-            // 6. Wrap variable equalities: m = 1, m = -1, c = 2/3, x = 5
-            str = str.replace(/\b([a-zA-Z](?:_\d+)?)\s*=\s*(\d+)\/(\d+)\b/g, (match, v, n, d) => "$" + v + " = \\frac{" + n + "}{" + d + "}$");
-            str = str.replace(/\b([a-zA-Z](?:_\d+)?)\s*=\s*([0-9\.\-]+)\b/g, function(match, v, val) {
-                if (match.includes("$")) return match;
-                return "$" + v + " = " + val + "$";
+            // Standalone fractions in choices: 1/2, 2/3, -3/4
+            str = str.replace(/^(\-?\d+)\/(\d+)$/g, function(m, n, d) {
+                return wrapMath('\\frac{' + n + '}{' + d + '}');
             });
 
-            // 7. Standalone fractions in choices: 1/2, 2/3, -3/4
-            str = str.replace(/^(\-?\d+)\/(\d+)$/g, (match, n, d) => "$\\frac{" + n + "}{" + d + "}$");
-
-            // 8. Standalone exponent expressions: e.g. 3x^2 - 12x + 7, x^3 - 4x, (x^2 - 1)/(x + 1)
-            str = str.replace(/(\(?\s*[a-zA-Z0-9_\.\s\+\-\*]+\^[a-zA-Z0-9_\.\s\+\-\*]+\)?(?:\/\(?[a-zA-Z0-9_\.\s\+\-\*]+\)?)?)/g, function(match, poly) {
-                if (!poly.includes("$") && /[a-zA-Z0-9]\^[a-zA-Z0-9]/.test(poly)) {
-                    var fracM = poly.match(/^\((.+)\)\s*\/\s*\((.+)\)$/);
-                    if (fracM) {
-                        return "$\\frac{" + fracM[1].trim() + "}{" + fracM[2].trim() + "}$";
-                    }
-                    return "$" + poly.trim() + "$";
-                }
-                return match;
+            // Function equations: f(x) = ..., g(x) = ..., L(x) = ...
+            str = str.replace(/\b([fghLPy]\([a-zA-Z0-9_\.]+\)\s*=\s*[^,\.;\n]+)/g, function(m, formula) {
+                return wrapMath(formula);
             });
 
-            // 9. Automatically wrap standalone polynomial math in choices: e.g. x^2, x^2 + 1, e^x
-            if (!str.includes("$") && /\b[a-zA-Z0-9]\^[a-zA-Z0-9]/.test(str)) {
-                if (!/\b(?:câu|đáp án|chọn|tìm|biết|tính|cho|nào|dưới đây)\b/i.test(str)) {
-                    return "$" + str.trim() + "$";
-                }
-            }
+            // Variable equalities: m = 1, m = -1, c = 2/3, x = 5
+            str = str.replace(/\b([a-zA-Z](?:_\d+)?)\s*=\s*(\d+)\/(\d+)\b/g, function(m, v, n, d) {
+                return wrapMath(v + ' = \\frac{' + n + '}{' + d + '}');
+            });
+            str = str.replace(/\b([a-zA-Z](?:_\d+)?)\s*=\s*([0-9\.\-]+)\b/g, function(m, v, val) {
+                return wrapMath(v + ' = ' + val);
+            });
 
-            // 10. Automatically wrap any unparsed ^{...} or _{...} in $ for KaTeX
-            if ((str.includes("^{") || str.includes("_{")) && !str.includes("$")) {
-                if (str.length < 80 && !/\b(?:câu|đáp án|chọn|tìm|biết|tính|cho)\b/i.test(str)) {
-                    return "$" + str + "$";
-                }
-            }
+            // Restore protected math blocks
+            mathBlocks.forEach(function(m, idx) {
+                str = str.replace('___MATH_BLOCK_' + idx + '___', m);
+            });
+
+            // Clean duplicate dollars
+            str = str.replace(/\$\s*\$/g, " ");
 
             return str;
         }
@@ -3733,13 +3779,17 @@
                 .replace(/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?/gi, " ");
 
             // Tự động định dạng ngắt dòng mệnh đề (I), (II), (III)...
-            res = res.replace(/((?:statements|mệnh đề|khẳng định|nhận xét|biểu thức|phát biểu|sau đây|chọn)\s*[:])\s*/gi, "$1\n");
+            res = res.replace(/((?:statements|mệnh đề|khẳng định|nhận xét|biểu thức|phát biểu|sau đây|chọn)\s*[:])\s*/gi, function(m, p1) {
+                return p1 + "\n";
+            });
             res = res.replace(/(\b(?:and|or|và|hoặc|only|chỉ|both|cả)\s+)(\([IVXLCDMivxlcdm\d]+\))/gi, "$1###KEEP###$2");
             res = res.replace(/([:\.\?!;]|[^\s\n\r])\s*(\([IVXLCDMivxlcdm]+\))\s*/g, function(match, p1, p2) {
                 if (p1.indexOf("###KEEP###") !== -1) return match;
                 return p1 + "\n" + p2 + " ";
             });
-            res = res.replace(/([:\.\?!;])\s*(\(\d+\))\s*/g, "$1\n$2 ");
+            res = res.replace(/([:\.\?!;])\s*(\(\d+\))\s*/g, function(m, p1, p2) {
+                return p1 + "\n" + p2 + " ";
+            });
             res = res.replace(/###KEEP###/g, "");
 
             return res

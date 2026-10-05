@@ -470,6 +470,47 @@
                 }
             }
 
+            // 4a. Process Math & Formula images (Moodle TeX filter, WIRIS, LaTeX formulas, Lambda, etc.)
+            var mathImgs = clone.querySelectorAll("img[alt], img[data-latex], img.tex, img.Wirisformula, img[src*='filter/tex'], img[src*='mathtex']");
+            for (var mi = 0; mi < mathImgs.length; mi++) {
+                var mImg = mathImgs[mi];
+                if (!mImg.parentNode) continue;
+                var alt = (mImg.getAttribute("data-latex") || mImg.alt || mImg.title || "").trim();
+                if (!alt || /^(?:image|hinh|ảnh|blank|spacer|icon|logo|avatar)$/i.test(alt)) continue;
+
+                var cleanAlt = alt.replace(/^\$+|\$+$/g, "").trim();
+                if (cleanAlt) {
+                    if (/^\\?lambda\b/i.test(cleanAlt)) cleanAlt = "\\lambda";
+                    else if (/^\\?alpha\b/i.test(cleanAlt)) cleanAlt = "\\alpha";
+                    else if (/^\\?beta\b/i.test(cleanAlt)) cleanAlt = "\\beta";
+                    else if (/^\\?gamma\b/i.test(cleanAlt)) cleanAlt = "\\gamma";
+                    else if (/^\\?theta\b/i.test(cleanAlt)) cleanAlt = "\\theta";
+                    else if (/^\\?sigma\b/i.test(cleanAlt)) cleanAlt = "\\sigma";
+                    else if (/^\\?mu\b/i.test(cleanAlt)) cleanAlt = "\\mu";
+                    else if (/^\\?pi\b/i.test(cleanAlt)) cleanAlt = "\\pi";
+
+                    var mathNode = document.createTextNode(" $" + cleanAlt + "$ ");
+                    mImg.parentNode.replaceChild(mathNode, mImg);
+                }
+            }
+
+            // 4c. Process Word Symbol font (l -> lambda, m -> mu, a -> alpha, b -> beta, etc.)
+            var symbolEls = clone.querySelectorAll("[style*='Symbol'], [face*='Symbol'], font[face='Symbol']");
+            var symMap = {
+                'l': '\\lambda', 'm': '\\mu', 'a': '\\alpha', 'b': '\\beta',
+                'g': '\\gamma', 'd': '\\delta', 'p': '\\pi', 'q': '\\theta',
+                's': '\\sigma', 'w': '\\omega'
+            };
+            for (var si = 0; si < symbolEls.length; si++) {
+                var sEl = symbolEls[si];
+                if (!sEl.parentNode) continue;
+                var st = sEl.textContent || "";
+                var converted = st.replace(/[lmabgdpqsw]/g, function(ch) {
+                    return " $" + (symMap[ch] || ch) + "$ ";
+                });
+                sEl.parentNode.replaceChild(document.createTextNode(converted), sEl);
+            }
+
             // 4b. Preserve line breaks for <br> and block containers (div, p, tr, li)
             var brs = clone.querySelectorAll("br");
             for (var b = 0; b < brs.length; b++) {
@@ -488,8 +529,13 @@
             }
 
             var textResult = (clone.innerText || clone.textContent || "").trim();
-            // Clean extra spaces inside math delimiters
-            textResult = textResult.replace(/\$\s+/g, "$").replace(/\s+\$/g, "$").replace(/\s{2,}/g, " ");
+            // Clean extra spaces inside math delimiters while preserving word spacing outside
+            textResult = textResult
+                .replace(/\$\s+/g, "$")
+                .replace(/\s+\$/g, "$")
+                .replace(/([a-zA-Z0-9\)])\$/g, "$1 $")
+                .replace(/\$([a-zA-Z0-9\(])/g, "$ $1")
+                .replace(/[ \t]{2,}/g, " ");
             return textResult.normalize ? textResult.normalize("NFC") : textResult;
         } catch (e) {
             var fallback = (el.innerText || el.textContent || "").trim();
@@ -887,7 +933,7 @@
         };
 
         // 1. Quét các phần tử chứa tiêu đề bài thi (ưu tiên phần tử tiêu đề rõ ràng)
-        var titleNodes = document.querySelectorAll(".topbar span, .header-title, #page-header h1, h1, h2, h3, h4, .page-header-headings, .page-context-header, #page-header, .breadcrumb, [aria-label='breadcrumb'], .breadcrumb-item, .breadcrumb-nav, .title, [class*='title'], [class*='breadcrumb'], [class*='header'], [class*='sub-header'], [class*='info']");
+        var titleNodes = document.querySelectorAll(".topbar, .topbar span, #topbar, .navbar, .header, header, .header-title, #page-header h1, h1, h2, h3, h4, .page-header-headings, .page-context-header, #page-header, .breadcrumb, [aria-label='breadcrumb'], .breadcrumb-item, .breadcrumb-nav, .title, [class*='title'], [class*='breadcrumb'], [class*='header'], [class*='sub-header'], [class*='info']");
         var fullTitle = "";
         for (var i = 0; i < titleNodes.length; i++) {
             var txt = (titleNodes[i].innerText || titleNodes[i].textContent || "").trim();
@@ -904,9 +950,14 @@
         }
         if (!fullTitle) {
             var rawB = (document.body ? document.body.innerText : "") || document.title || "";
-            fullTitle = rawB
-                .replace(/Campus Exam[^\r\n<]*Phiên bản[^\r\n<]*/gi, " ")
-                .replace(/\[\s*ClassCode\s*:\s*Campus Exam[^\r\n<]*\]/gi, " ");
+            var mBody = rawB.match(/(Kiểm tra cá nhân\s*[-–—:]\s*\[\s*ClassCode\s*:\s*([^\]]+)\](?:\s*-\s*\[([^\]]+)\])?(?:\s*-\s*([^\[\r\n<]+))?)/i);
+            if (mBody) {
+                fullTitle = mBody[0];
+            } else {
+                fullTitle = rawB
+                    .replace(/Campus Exam[\s\S]*?Phiên bản[^\r\n<]*/gi, " ")
+                    .replace(/\[\s*ClassCode\s*:\s*Campus Exam[^\r\n<]*\]/gi, " ");
+            }
         }
 
         // Trích xuất chuỗi tiêu đề đầy đủ: ví dụ Kiểm tra cá nhân - [ClassCode: IC2114]-[MAE101]-Assignment 2 ở nhà
@@ -968,6 +1019,17 @@
         }
         if (!mPaper) mPaper = fullTitle.match(/\[([a-zA-Z0-9_-]{16,})\]/);
         if (mPaper) meta.paper_code = mPaper[1].trim();
+
+        // Lọc sạch rác portal cho các trường thông tin
+        if (/Campus Exam|Phiên bản|Quyền truy cập|Safe Exam Browser/i.test(meta.class_code)) {
+            meta.class_code = "";
+        }
+        if (/Campus Exam|Phiên bản|Quyền truy cập|Safe Exam Browser/i.test(meta.exam_header)) {
+            meta.exam_header = "";
+        }
+        if (/Campus Exam|Phiên bản|Quyền truy cập|Safe Exam Browser/i.test(meta.full_class_info)) {
+            meta.full_class_info = "";
+        }
 
         // 2. Quét Header để lấy thời gian thi thực tế và email tài khoản sinh viên
         var headerEls = document.querySelectorAll("header, .header, [class*='navbar'], [class*='topbar'], [class*='user'], [class*='profile'], [class*='account'], body");
