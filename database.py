@@ -238,7 +238,7 @@ def init_db():
         "external_download_url_seb": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_v2.exe",
         "external_download_url_mac": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_macOS.zip",
         "external_download_url_eos": "https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_EOS_v2.exe",
-        "github_token": "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",
+        "github_token": os.environ.get("GITHUB_TOKEN", ""),
         "github_repo": "fucnguyen/SEB",
         "github_release_tag": "v2.0",
         "r2_endpoint_url": "",
@@ -258,7 +258,6 @@ def init_db():
     cursor.execute("UPDATE settings SET value = '8902883418:AAF1rAAcEVx4gyI9gcJW5GrBjqB-PphSuf8' WHERE key = 'telegram_bot_token' AND (value = '' OR value IS NULL)")
     cursor.execute("UPDATE settings SET value = '6396371761' WHERE key = 'telegram_chat_id' AND (value = '' OR value IS NULL)")
     cursor.execute("UPDATE settings SET value = 'https://github.com/fucnguyen/SEB/releases/download/v2.0/Setup_ThiTrucTuyen_macOS.zip' WHERE key = 'external_download_url_mac' AND (value = '' OR value IS NULL)")
-    cursor.execute("UPDATE settings SET value = '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' WHERE key = 'github_token' AND (value = '' OR value IS NULL)")
     cursor.execute("UPDATE settings SET value = 'fucnguyen/SEB' WHERE key = 'github_repo' AND (value = '' OR value IS NULL)")
     cursor.execute("UPDATE settings SET value = 'v2.0' WHERE key = 'github_release_tag' AND (value = '' OR value IS NULL)")
 

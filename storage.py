@@ -12,8 +12,8 @@ LOCAL_SETUP_PATH = r"d:\File cài đặt\SEB_Licensing\Setup_ThiTrucTuyen_v2.exe
 _GITHUB_ASSET_CACHE: Dict[str, Any] = {}
 
 FALLBACK_ASSET_IDS = {
-    "Setup_ThiTrucTuyen_macOS.zip": 595456324,
-    "Setup_ThiTrucTuyen_v2.exe": 595453386
+    "Setup_ThiTrucTuyen_macOS.zip": 613054591,
+    "Setup_ThiTrucTuyen_v2.exe": 613055448
 }
 
 def get_s3_client():
@@ -38,17 +38,17 @@ def get_s3_client():
 
 def get_github_signed_asset_url(system_type: str = "SEB") -> Optional[str]:
     """
-    Tạo Pre-signed AWS S3 CDN URL trực tiếp từ GitHub Release Private Repo.
+    Tạo Pre-signed AWS S3 CDN URL trực tiếp từ GitHub Release Repo.
     Khi học sinh bấm tải, server lấy URL ký của AWS S3 từ GitHub API và redirect 302:
     - Băng thông siêu tốc độ từ GitHub/AWS S3 Edge CDN.
     - Học sinh không cần đăng nhập GitHub, không bao giờ bị lỗi 404.
     - Hỗ trợ tải tiếp (Resume HTTP 206) và tải đa luồng (IDM).
     """
-    token = (os.environ.get("GITHUB_TOKEN") or database.get_setting("github_token") or "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").strip()
+    token = (os.environ.get("GITHUB_TOKEN") or database.get_setting("github_token") or "").strip()
     repo = (os.environ.get("GITHUB_REPO") or database.get_setting("github_repo") or "fucnguyen/SEB").strip()
     tag = (database.get_setting("github_release_tag") or "v2.0").strip()
 
-    if not token or not repo:
+    if not repo:
         return None
 
     sys_upper = (system_type or "SEB").upper()
@@ -60,10 +60,11 @@ def get_github_signed_asset_url(system_type: str = "SEB") -> Optional[str]:
         target_name = "Setup_ThiTrucTuyen_v2.exe"
 
     headers = {
-        "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json",
         "User-Agent": "SEB-Licensing-Server"
     }
+    if token:
+        headers["Authorization"] = f"token {token}"
 
     global _GITHUB_ASSET_CACHE
     now = time.time()
@@ -87,10 +88,11 @@ def get_github_signed_asset_url(system_type: str = "SEB") -> Optional[str]:
     if asset_id:
         try:
             asset_headers = {
-                "Authorization": f"token {token}",
                 "Accept": "application/octet-stream",
                 "User-Agent": "SEB-Licensing-Server"
             }
+            if token:
+                asset_headers["Authorization"] = f"token {token}"
             # allow_redirects=False -> GitHub trả về 302 Found kèm header Location chứa S3 Signed URL
             with httpx.Client(follow_redirects=False, timeout=10.0) as client:
                 r_asset = client.get(
