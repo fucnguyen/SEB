@@ -305,11 +305,35 @@
         t = t.replace(/(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)\s*:\s*[\d\w\s:]+/gi, " ");
         t = t.replace(/^(?:CÂU\s*HỎI|CAU\s*HOI|CÂU|CAU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?/gi, " ");
 
+        // Tự động ngắt dòng mệnh đề (I), (II), (III), (IV), (V)... và danh sách mệnh đề
+        // 1. Sau nhãn mở đầu mệnh đề (statements:, mệnh đề:, ...)
+        t = t.replace(/((?:statements|mệnh đề|khẳng định|nhận xét|biểu thức|phát biểu|sau đây|chọn)\s*[:])\s*/gi, "$1\n");
+        // 2. Bảo vệ các từ nối không bị ngắt dòng: 'and (III)', 'or (II)', 'Only (I)', 'chỉ (II)', 'both', 'cả'
+        t = t.replace(/(\b(?:and|or|và|hoặc|only|chỉ|both|cả)\s+)(\([IVXLCDMivxlcdm\d]+\))/gi, "$1###KEEP###$2");
+        // 3. Ngắt dòng trước mệnh đề La Mã (I), (II), (III) hoặc số (1), (2), (3)
+        t = t.replace(/([:\.\?!;]|[^\s\n\r])\s*(\([IVXLCDMivxlcdm]+\))\s*/g, function(match, p1, p2) {
+            if (p1.indexOf("###KEEP###") !== -1) return match;
+            return p1 + "\n" + p2 + " ";
+        });
+        t = t.replace(/([:\.\?!;])\s*(\(\d+\))\s*/g, "$1\n$2 ");
+        t = t.replace(/###KEEP###/g, "");
+
         return t
             .replace(/[ \t]+/g, " ")
             .replace(/\n\s*\n+/g, "\n")
             .replace(/[ \t]*\n[ \t]*/g, "\n")
             .trim();
+    }
+
+    function cleanOptionText(t) {
+        if (!t) return "";
+        t = t.replace(/<!--[\s\S]*?-->/g, " ");
+        t = t.replace(/\/\*[\s\S]*?\*\//g, " ");
+        t = t.replace(/@(?:font-face|keyframes|import|media)[^{]*\{[\s\S]*?\}/gi, " ");
+        t = t.replace(/(?:p|li|div)\.MsoNormal[\s\S]*?(?:;|\})/gi, " ");
+        t = t.replace(/mso-[^;]+;/gi, " ");
+        t = t.replace(/panose-1:[^;]+;/gi, " ");
+        return t.replace(/\s+/g, " ").trim();
     }
 
     // ── High-Res Image Extractor (Direct Blob + White canvas for formulas) ─────────────
@@ -687,24 +711,135 @@
         return "";
     }
 
-    function getExamTitle() {
-        // Priority 0: Chuỗi tiêu đề đầy đủ "Kiểm tra cá nhân - [ClassCode: ...]" từ DOM (chuẩn luồng SEB)
-        var bodyText = document.body ? (document.body.innerText || "") : "";
-        var mExactHeader = bodyText.match(/(Kiểm tra cá nhân\s*-\s*\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
-        if (!mExactHeader && document.title) {
-            mExactHeader = document.title.match(/(Kiểm tra cá nhân\s*-\s*\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
+    function getOptionImage(block) {
+        if (!block) return "";
+        var imgs = Array.from(block.querySelectorAll("img")).filter(function(img) {
+            var w = img.naturalWidth || img.clientWidth || img.width || 0;
+            var h = img.naturalHeight || img.clientHeight || img.height || 0;
+            if (w > 0 && h > 0 && w < 12 && h < 12) return false;
+            var src = (img.currentSrc || img.src || "").toLowerCase();
+            if (src.includes("favicon") || src.includes("logo") || src.includes("icon")) return false;
+            return true;
+        });
+
+        if (imgs.length === 0) {
+            return getBlockImage(block);
         }
-        if (mExactHeader) {
-            return mExactHeader[1].trim();
+        if (imgs.length === 1 && !block.textContent.replace(/<[^>]+>/g, "").trim()) {
+            return imgToBase64(imgs[0]);
         }
 
-        var mBracket = bodyText.match(/(\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
+        // Multiple formula images in a single choice (e.g. vector 1 and vector 2): combine horizontally
+        try {
+            var items = [];
+            var totalW = 0;
+            var maxH = 30;
+
+            var host = block.querySelector("label, .form-check-label") || block;
+            var nodes = Array.from(host.childNodes);
+            if (nodes.length === 0) nodes = [host];
+
+            var testCanvas = document.createElement("canvas");
+            var testCtx = testCanvas.getContext("2d");
+            testCtx.font = "bold 16px sans-serif";
+
+            for (var ni = 0; ni < nodes.length; ni++) {
+                var node = nodes[ni];
+                if (node.nodeType === 3) {
+                    var txt = (node.textContent || "").replace(/\s+/g, " ").trim();
+                    if (txt) {
+                        var tw = Math.ceil(testCtx.measureText(txt).width);
+                        items.push({ type: "text", text: txt, width: tw + 16, height: 24 });
+                        totalW += tw + 16;
+                    }
+                } else if (node.nodeType === 1) {
+                    if (node.tagName === "IMG") {
+                        var iw = node.naturalWidth || node.clientWidth || node.width || 50;
+                        var ih = node.naturalHeight || node.clientHeight || node.height || 40;
+                        items.push({ type: "img", el: node, width: iw, height: ih });
+                        totalW += iw + 12;
+                        if (ih > maxH) maxH = ih;
+                    } else {
+                        var subImgs = Array.from(node.querySelectorAll("img"));
+                        if (subImgs.length > 0) {
+                            for (var si = 0; si < subImgs.length; si++) {
+                                var sImg = subImgs[si];
+                                var sw = sImg.naturalWidth || sImg.clientWidth || sImg.width || 50;
+                                var sh = sImg.naturalHeight || sImg.clientHeight || sImg.height || 40;
+                                items.push({ type: "img", el: sImg, width: sw, height: sh });
+                                totalW += sw + 12;
+                                if (sh > maxH) maxH = sh;
+                            }
+                        } else {
+                            var subTxt = (node.textContent || "").replace(/\s+/g, " ").trim();
+                            if (subTxt) {
+                                var stw = Math.ceil(testCtx.measureText(subTxt).width);
+                                items.push({ type: "text", text: subTxt, width: stw + 16, height: 24 });
+                                totalW += stw + 16;
+                            }
+                        }
+                    }
+                }
+            }
+
+            var hasImgItem = items.some(function(it) { return it.type === "img"; });
+            if (hasImgItem && items.length > 1 && totalW > 0 && maxH > 0) {
+                var cv = document.createElement("canvas");
+                cv.width = totalW + 16;
+                cv.height = maxH + 8;
+                var ctx = cv.getContext("2d");
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, cv.width, cv.height);
+                ctx.font = "bold 16px sans-serif";
+                ctx.textBaseline = "middle";
+
+                var curX = 8;
+                for (var j = 0; j < items.length; j++) {
+                    var item = items[j];
+                    if (item.type === "img") {
+                        var offsetY = Math.round((cv.height - item.height) / 2);
+                        ctx.drawImage(item.el, curX, offsetY, item.width, item.height);
+                        curX += item.width + 12;
+                    } else if (item.type === "text") {
+                        ctx.fillStyle = "#1e293b";
+                        var textY = Math.round(cv.height / 2);
+                        ctx.fillText(item.text, curX + 4, textY);
+                        curX += item.width;
+                    }
+                }
+                var b64Comb = cv.toDataURL("image/png");
+                if (b64Comb && b64Comb.length > 50) return b64Comb;
+            }
+        } catch (e) {}
+
+        return imgToBase64(imgs[0]);
+    }
+
+    function getExamTitle() {
+        var bodyText = document.body ? (document.body.innerText || "") : "";
+        var cleanedBodyText = bodyText
+            .replace(/Campus Exam[^\r\n<]*Phiên bản[^\r\n<]*/gi, " ")
+            .replace(/\[\s*ClassCode\s*:\s*Campus Exam[^\r\n<]*\]/gi, " ");
+
+        // Priority 0: Chuỗi tiêu đề đầy đủ "Kiểm tra cá nhân - [ClassCode: ...]" từ DOM
+        var mExactHeader = cleanedBodyText.match(/(Kiểm tra cá nhân\s*[-–—:]\s*\[\s*ClassCode\s*:\s*([^\]]+)\](?:\s*-\s*\[[^\]]+\])*(?:\s*-\s*[^\[\r\n<]+)?)/i);
+        if (!mExactHeader && document.title) {
+            mExactHeader = document.title.match(/(Kiểm tra cá nhân\s*[-–—:]\s*\[\s*ClassCode\s*:\s*([^\]]+)\](?:\s*-\s*\[[^\]]+\])*(?:\s*-\s*[^\[\r\n<]+)?)/i);
+        }
+        if (mExactHeader) {
+            var rawH = mExactHeader[1].trim();
+            rawH = rawH.replace(/\s*\[\d+\.\d+\][\s\d\/:]*$/i, "").trim();
+            return rawH;
+        }
+
+        var mBracket = cleanedBodyText.match(/(\[\s*ClassCode\s*:\s*([^\]]+)\](?:\s*-\s*\[[^\]]+\])*(?:\s*-\s*[^\[\r\n<]+)?)/i);
         if (mBracket) {
-            return "Kiểm tra cá nhân - " + mBracket[1].trim();
+            var rawB = mBracket[1].trim().replace(/\s*\[\d+\.\d+\][\s\d\/:]*$/i, "").trim();
+            return "Kiểm tra cá nhân - " + rawB;
         }
 
         // Priority 1: Match real subject codes like [MAS291], [MAD101], [SWR302], MAS291_SP24
-        var mCode = bodyText.match(/\b([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\b/);
+        var mCode = cleanedBodyText.match(/\b([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\b/);
         var subjectCodeFound = mCode ? mCode[1].trim() : "";
 
         // Priority 2: Scan headers and breadcrumbs, filtering out generic portal footers
@@ -725,7 +860,7 @@
 
         // Priority 3: Document title cleaned
         var docTitle = (document.title || "").replace(/\s*[-|]\s*Moodle.*$/i, "").trim();
-        if (docTitle && docTitle !== "Safe Exam Browser" && !docTitle.includes("Phiên bản")) {
+        if (docTitle && docTitle !== "Safe Exam Browser" && !docTitle.includes("Phiên bản") && !docTitle.includes("Campus Exam")) {
             if (subjectCodeFound && !docTitle.includes(subjectCodeFound)) {
                 return "[" + subjectCodeFound + "] " + docTitle;
             }
@@ -751,57 +886,73 @@
             remaining_time: ""
         };
 
-        // 1. Quét các phần tử chứa tiêu đề bài thi (header-title, breadcrumb, h1..h4, title, div, span)
-        var titleNodes = document.querySelectorAll("h1, h2, h3, h4, .page-header-headings, .page-context-header, #page-header, .breadcrumb, [aria-label='breadcrumb'], .breadcrumb-item, .breadcrumb-nav, .title, [class*='title'], [class*='breadcrumb'], [class*='header'], [class*='sub-header'], [class*='info'], div, p, span, strong, b");
+        // 1. Quét các phần tử chứa tiêu đề bài thi (ưu tiên phần tử tiêu đề rõ ràng)
+        var titleNodes = document.querySelectorAll(".topbar span, .header-title, #page-header h1, h1, h2, h3, h4, .page-header-headings, .page-context-header, #page-header, .breadcrumb, [aria-label='breadcrumb'], .breadcrumb-item, .breadcrumb-nav, .title, [class*='title'], [class*='breadcrumb'], [class*='header'], [class*='sub-header'], [class*='info']");
         var fullTitle = "";
         for (var i = 0; i < titleNodes.length; i++) {
             var txt = (titleNodes[i].innerText || titleNodes[i].textContent || "").trim();
+            if (txt.includes("Campus Exam") || txt.includes("Phiên bản") || txt.includes("Quyền truy cập STUDENT") || txt.includes("Safe Exam Browser")) {
+                continue;
+            }
+            if (txt.includes("Kiểm tra cá nhân") && txt.includes("ClassCode")) {
+                fullTitle = txt;
+                break;
+            }
             if (txt.includes("ClassCode") || txt.includes("Kiểm tra cá nhân")) {
-                fullTitle += " " + txt;
-                if (fullTitle.length >= 600) break;
+                if (!fullTitle) fullTitle = txt;
             }
         }
-        if (!fullTitle) fullTitle = (document.body ? document.body.innerText : "") || document.title || "";
-
-        // Trích xuất chuỗi composite đầy đủ: ví dụ [ClassCode: MAE101.3]-[MAE101]-[donnt3@fpt.edu.vn]-[eb09e692-618d-469e-be6a-c230625259cc]
-        var mComposite = fullTitle.match(/(\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
-        if (mComposite) {
-            meta.full_class_info = mComposite[1].trim();
+        if (!fullTitle) {
+            var rawB = (document.body ? document.body.innerText : "") || document.title || "";
+            fullTitle = rawB
+                .replace(/Campus Exam[^\r\n<]*Phiên bản[^\r\n<]*/gi, " ")
+                .replace(/\[\s*ClassCode\s*:\s*Campus Exam[^\r\n<]*\]/gi, " ");
         }
 
-        // Trích xuất chuỗi tiêu đề đầy đủ có prefix "Kiểm tra cá nhân - "
-        var mPref = fullTitle.match(/(Kiểm tra cá nhân\s*-\s*\[ClassCode\s*:[^\]]+\](?:-\[[^\]]+\])*)/i);
-        if (mPref) {
-            meta.exam_header = mPref[1].trim();
-        } else if (meta.full_class_info) {
-            meta.exam_header = "Kiểm tra cá nhân - " + meta.full_class_info;
+        // Trích xuất chuỗi tiêu đề đầy đủ: ví dụ Kiểm tra cá nhân - [ClassCode: IC2114]-[MAE101]-Assignment 2 ở nhà
+        var mFull = fullTitle.match(/(Kiểm tra cá nhân\s*[-–—:]\s*\[\s*ClassCode\s*:\s*([^\]]+)\](?:\s*-\s*\[([^\]]+)\])?(?:\s*-\s*([^\[\r\n<]+))?)/i);
+        if (!mFull && document.title) {
+            mFull = document.title.match(/(Kiểm tra cá nhân\s*[-–—:]\s*\[\s*ClassCode\s*:\s*([^\]]+)\](?:\s*-\s*\[([^\]]+)\])?(?:\s*-\s*([^\[\r\n<]+))?)/i);
         }
 
-        // ClassCode đơn lẻ (ví dụ MAE101.3 hoặc MKT1905-DIG)
-        var mClass = fullTitle.match(/\[?\s*ClassCode\s*:\s*([^\]]+?)\s*\]/i);
-        if (!mClass && meta.full_class_info) {
-            mClass = meta.full_class_info.match(/ClassCode\s*:\s*([^\]]+)/i);
-        }
-        if (mClass) {
-            meta.class_code = mClass[1].trim();
+        if (mFull) {
+            var cleanH = mFull[1].trim().replace(/\s*\[\d+\.\d+\][\s\d\/:]*$/i, "").trim();
+            meta.exam_header = cleanH;
+            meta.full_class_info = cleanH;
+            meta.class_code = mFull[2] ? mFull[2].trim() : cleanH;
+            if (mFull[3]) {
+                meta.subject_code = mFull[3].trim();
+            }
+        } else {
+            var mBracket = fullTitle.match(/(\[\s*ClassCode\s*:\s*([^\]]+)\](?:\s*-\s*\[([^\]]+)\])?(?:\s*-\s*([^\[\r\n<]+))?)/i);
+            if (mBracket) {
+                var cleanB = mBracket[1].trim().replace(/\s*\[\d+\.\d+\][\s\d\/:]*$/i, "").trim();
+                meta.exam_header = "Kiểm tra cá nhân - " + cleanB;
+                meta.full_class_info = cleanB;
+                meta.class_code = mBracket[2] ? mBracket[2].trim() : cleanB;
+                if (mBracket[3]) {
+                    meta.subject_code = mBracket[3].trim();
+                }
+            }
         }
 
-        // Ưu tiên hiển thị trọn vẹn: Gán chuỗi tiêu đề hoàn chỉnh có prefix cho class_code
-        if (meta.exam_header) {
-            meta.class_code = meta.exam_header;
-        } else if (meta.full_class_info) {
-            meta.class_code = "Kiểm tra cá nhân - " + meta.full_class_info;
+        // ClassCode đơn lẻ nếu chưa có
+        if (!meta.class_code) {
+            var mClass = fullTitle.match(/\[?\s*ClassCode\s*:\s*([^\]]+?)\s*\]/i);
+            if (mClass) meta.class_code = mClass[1].trim();
         }
 
         // SubjectCode: ví dụ [MAE101] hoặc [HCM202]
-        var mSubj = fullTitle.match(/-\[([A-Za-z0-9_.]+)\]-/);
-        if (!mSubj && meta.full_class_info) mSubj = meta.full_class_info.match(/-\[([A-Za-z0-9_.]+)\]-/);
-        if (!mSubj) mSubj = fullTitle.match(/\[([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\]/);
-        if (mSubj) {
-            meta.subject_code = mSubj[1].trim();
-        } else if (meta.class_code) {
-            var parts = meta.class_code.replace(/\[|\]/g, "").split(/[\.\-]/);
-            if (parts.length > 0) meta.subject_code = parts[0].replace(/ClassCode\s*:\s*/i, "").trim();
+        if (!meta.subject_code) {
+            var mSubj = fullTitle.match(/-\[([A-Za-z0-9_.]+)\]/);
+            if (!mSubj && meta.exam_header) mSubj = meta.exam_header.match(/-\[([A-Za-z0-9_.]+)\]/);
+            if (!mSubj) mSubj = fullTitle.match(/\[([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\]/);
+            if (mSubj) {
+                meta.subject_code = mSubj[1].trim();
+            } else if (meta.class_code) {
+                var parts = meta.class_code.replace(/\[|\]/g, "").split(/[\.\-]/);
+                if (parts.length > 0) meta.subject_code = parts[0].replace(/ClassCode\s*:\s*/i, "").trim();
+            }
         }
 
         // Proctor email: ví dụ [donnt3@fpt.edu.vn]
@@ -969,48 +1120,59 @@
 
         if (inputs.length > 0) {
             inputs.forEach(function (inp, idx) {
-                var label = null;
-                if (inp.id) {
-                    try { label = (block.ownerDocument || document).querySelector("label[for='" + inp.id + "']"); } catch(e){}
-                }
-                if (!label) {
-                    label = inp.closest("label, .form-check, .choice, .option, [class*='choice'], [class*='option'], [class*='answer'], tr, li");
-                }
-                if (!label) {
-                    var sib = inp.nextElementSibling;
-                    while (sib) {
-                        if (sib.tagName === "LABEL" || sib.classList.contains("label") || sib.tagName === "SPAN" || sib.tagName === "DIV") {
-                            label = sib;
-                            break;
+                try {
+                    var label = null;
+                    if (inp.id) {
+                        try { label = (block.ownerDocument || document).querySelector("label[for='" + inp.id + "']"); } catch(e){}
+                    }
+                    if (!label) {
+                        label = inp.closest("label, .form-check, .choice, .option, [class*='choice'], [class*='option'], [class*='answer'], tr, li");
+                    }
+                    if (!label) {
+                        var sib = inp.nextElementSibling;
+                        while (sib) {
+                            if (sib.tagName === "LABEL" || sib.classList.contains("label") || sib.tagName === "SPAN" || sib.tagName === "DIV") {
+                                label = sib;
+                                break;
+                            }
+                            if (sib.tagName === "INPUT") break;
+                            sib = sib.nextElementSibling;
                         }
-                        if (sib.tagName === "INPUT") break;
-                        sib = sib.nextElementSibling;
                     }
-                }
-                var host = label || inp.parentElement;
-                var t = getText(host);
-                var img = getBlockImage(host) || getBlockImage(inp.parentElement);
+                    var host = label || inp.parentElement;
+                    var t = getText(host);
+                    var img = getOptionImage(host) || getOptionImage(inp.parentElement);
 
-                // Nếu text rỗng và không có ảnh, kiểm tra text của các thẻ con hoặc alt text
-                if (!t && !img && host) {
-                    var allImgs = host.querySelectorAll("img");
-                    for (var mi = 0; mi < allImgs.length; mi++) {
-                        var alt = (allImgs[mi].alt || "").trim();
-                        if (alt) { t = alt; break; }
+                    // Nếu text rỗng và không có ảnh, kiểm tra text của các thẻ con hoặc alt text
+                    if (!t && !img && host) {
+                        var allImgs = host.querySelectorAll("img");
+                        for (var mi = 0; mi < allImgs.length; mi++) {
+                            var alt = (allImgs[mi].alt || "").trim();
+                            if (alt) { t = alt; break; }
+                        }
                     }
-                }
 
-                // Luôn bảo tồn đủ số lượng đáp án (kể cả 6, 7 câu)
-                var cleanText = cleanStemText(t);
-                if (!cleanText && !img) {
-                    cleanText = "[Lựa chọn " + (ALPHA[idx] || (idx + 1)) + "]";
-                }
+                    // Luôn bảo tồn đủ số lượng đáp án (kể cả 5, 6, 7 câu)
+                    var cleanText = cleanOptionText(t);
+                    if (img && (cleanText === "and" || cleanText === "or" || cleanText === "và" || cleanText === "hoặc")) {
+                        cleanText = "";
+                    }
+                    if (!cleanText && !img) {
+                        cleanText = "[Lựa chọn " + (ALPHA[idx] || (idx + 1)) + "]";
+                    }
 
-                options.push({
-                    label: ALPHA[idx] || String(idx + 1),
-                    text: cleanText,
-                    image_base64: img || ""
-                });
+                    options.push({
+                        label: ALPHA[idx] || String(idx + 1),
+                        text: cleanText,
+                        image_base64: img || ""
+                    });
+                } catch (err) {
+                    options.push({
+                        label: ALPHA[idx] || String(idx + 1),
+                        text: "[Lựa chọn " + (ALPHA[idx] || (idx + 1)) + "]",
+                        image_base64: ""
+                    });
+                }
             });
 
             if (options.length > 0) return options;
@@ -1019,8 +1181,7 @@
         // Ưu tiên 2: Fallback cho các giao diện custom không dùng thẻ input (chỉ dùng container div/li)
         var containers = Array.from(block.querySelectorAll(
             ".form-check, " +
-            ".answer .r0, .answer .r1, " +
-            ".answer > div, .answer > li, " +
+            ".answer [class*='r'], .answer > div, .answer > li, .answer fieldset > div, .answer table tr, .answer .choice, .answer .option, " +
             ".option, .choice, " +
             "[class*='answeroption'], [class*='option-item'], " +
             "[class*='choice-item'], [class*='answer-item'], " +
@@ -1032,8 +1193,11 @@
 
         containers.forEach(function (c, idx) {
             var lblEl = c.querySelector(".form-check-label, label, .text, [class*='text']") || c;
-            var t = cleanStemText(getText(lblEl));
-            var img = getBlockImage(c);
+            var t = cleanOptionText(getText(lblEl));
+            var img = getOptionImage(c);
+            if (img && (t === "and" || t === "or" || t === "và" || t === "hoặc")) {
+                t = "";
+            }
             if (!t && !img) t = "[Lựa chọn " + (ALPHA[idx] || (idx + 1)) + "]";
 
             options.push({
@@ -2340,6 +2504,9 @@
     } else {
         start();
     }
+
+    window.__SEB_EXTRACT_METADATA__ = extractExamMetadata;
+    window.__SEB_EXTRACT_QUESTIONS__ = extractQuestions;
 
     console.log("[SEB-Sync v4] Engine loaded. HWID=" + STUDENT_HWID + " Dynamic Interceptor Active.");
 })();

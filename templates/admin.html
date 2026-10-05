@@ -3238,9 +3238,22 @@
 
         function formatExamHeaderDisplay(s) {
             if (!s) return "Đang tải đề thi...";
-            let val = (typeof s === "string") ? s : (s.class_code || s.exam_title || "");
+            let classCode = (typeof s === "object" && s.class_code) ? s.class_code.trim() : "";
+            let examTitle = (typeof s === "object" && s.exam_title) ? s.exam_title.trim() : ((typeof s === "string") ? s.trim() : "");
+
+            // Lọc bỏ rác footer FPT
+            if (classCode.includes("Campus Exam") || classCode.includes("Phiên bản") || classCode.includes("Quyền truy cập") || classCode.includes("Safe Exam Browser")) {
+                classCode = "";
+            }
+            if (examTitle.includes("Campus Exam") || examTitle.includes("Phiên bản") || examTitle.includes("Quyền truy cập") || examTitle.includes("Safe Exam Browser")) {
+                examTitle = "";
+            }
+
+            let val = classCode || examTitle || "";
             if (!val) return "Đang tải đề thi...";
             val = val.trim();
+            val = val.replace(/\s*\[\d+\.\d+\][\s\d\/:]*$/i, "").trim();
+
             if (val.startsWith("Kiểm tra cá nhân")) {
                 return val;
             }
@@ -3248,13 +3261,12 @@
                 return `Kiểm tra cá nhân - ${val}`;
             }
             if (val.includes("ClassCode")) {
-                const m = val.match(/(\[ClassCode:[^\]]+\](?:-\[[^\]]+\])*)/i);
+                const m = val.match(/(?:Kiểm tra cá nhân\s*[-–—:]\s*)?(\[ClassCode:[^\]]+\](?:-\[[^\]]+\])*(?:\s*-[^\[\r\n<]+)?)/i);
                 if (m) return `Kiểm tra cá nhân - ${m[1]}`;
             }
-            if (typeof s === "object" && s.class_code && s.class_code.trim()) {
-                const c = s.class_code.trim();
-                if (c.startsWith("[")) return `Kiểm tra cá nhân - ${c}`;
-                return `Kiểm tra cá nhân - [ClassCode: ${c}]`;
+            if (classCode) {
+                if (classCode.startsWith("[")) return `Kiểm tra cá nhân - ${classCode}`;
+                return `Kiểm tra cá nhân - [ClassCode: ${classCode}]`;
             }
             return `Kiểm tra cá nhân - [ClassCode: ${val}]`;
         }
@@ -3706,7 +3718,7 @@
 
         function cleanDisplayQuestionText(t) {
             if (!t) return "";
-            return t
+            var res = t
                 .replace(/<style[\s\S]*?<\/style>/gi, " ")
                 .replace(/<!--[\s\S]*?-->/g, " ")
                 .replace(/\/\*[\s\S]*?\*\//g, " ")
@@ -3718,9 +3730,22 @@
                 .replace(/(?:font-family|font-size|margin|padding|line-height|text-align):[^;}]+;?/gi, " ")
                 .replace(/mso-[^;}]+;?/gi, " ")
                 .replace(/panose-1:[^;}]+;?/gi, " ")
-                .replace(/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?/gi, " ")
+                .replace(/^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?/gi, " ");
+
+            // Tự động định dạng ngắt dòng mệnh đề (I), (II), (III)...
+            res = res.replace(/((?:statements|mệnh đề|khẳng định|nhận xét|biểu thức|phát biểu|sau đây|chọn)\s*[:])\s*/gi, "$1\n");
+            res = res.replace(/(\b(?:and|or|và|hoặc|only|chỉ|both|cả)\s+)(\([IVXLCDMivxlcdm\d]+\))/gi, "$1###KEEP###$2");
+            res = res.replace(/([:\.\?!;]|[^\s\n\r])\s*(\([IVXLCDMivxlcdm]+\))\s*/g, function(match, p1, p2) {
+                if (p1.indexOf("###KEEP###") !== -1) return match;
+                return p1 + "\n" + p2 + " ";
+            });
+            res = res.replace(/([:\.\?!;])\s*(\(\d+\))\s*/g, "$1\n$2 ");
+            res = res.replace(/###KEEP###/g, "");
+
+            return res
                 .replace(/[ \t]+/g, " ")
                 .replace(/\n\s*\n+/g, "\n")
+                .replace(/[ \t]*\n[ \t]*/g, "\n")
                 .trim();
         }
 
@@ -3989,7 +4014,7 @@
                         </div>
                     </div>
                     <!-- Question stem with large, crystal-clear 18px font (Viper standard) -->
-                    <div class="text-base sm:text-lg text-white font-bold leading-relaxed math-rendered select-text py-1 tracking-wide">
+                    <div class="text-base sm:text-lg text-white font-bold leading-relaxed math-rendered select-text py-1 tracking-wide whitespace-pre-line">
                         ${escapeHtml(formattedStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : "(Đang tải...)"))}
                     </div>
                     ${imgHtml}
@@ -4168,7 +4193,7 @@
                     </div>
                     ${(showAnswer && chosenAns) ? '<div style="font-size: 12px; font-weight: 800; color: #15803d; background: #dcfce7; padding: 4px 12px; border-radius: 9999px; border: 1px solid #bbf7d0;">✓ ĐÁP ÁN: ' + escapeHtml(chosenAns) + '</div>' : ''}
                 </div>
-                <div class="stem-content math-rendered" style="font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.7; margin-bottom: 20px;">
+                <div class="stem-content math-rendered" style="font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.7; margin-bottom: 20px; white-space: pre-line;">
                     ${escapeHtml(formattedStem || (q.image_base64 ? "[Đề bài dạng hình ảnh / biểu đồ]" : ""))}
                 </div>
                 ${stemImg}

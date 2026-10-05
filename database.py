@@ -1117,7 +1117,24 @@ def clean_exam_stem_text(t: str) -> str:
     t = re.sub(r'panose-1:[^;}]+;?', ' ', t, flags=re.IGNORECASE)
     # Strip question number header
     t = re.sub(r'^(?:CÂU\s*HỎI|CÂU|QUESTION)\s*\d+[\s\:\.\-]*(?:\([^)]*\))?', ' ', t, flags=re.IGNORECASE)
-    t = re.sub(r'\s+', ' ', t)
+
+    # Tự động định dạng ngắt dòng cho các mệnh đề (I), (II), (III)...
+    t = re.sub(r'((?:statements|mệnh đề|khẳng định|nhận xét|biểu thức|phát biểu|sau đây|chọn)\s*[:])\s*', r'\1\n', t, flags=re.IGNORECASE)
+    t = re.sub(r'(\b(?:and|or|và|hoặc|only|chỉ|both|cả)\s+)(\([IVXLCDMivxlcdm\d]+\))', r'\1###KEEP###\2', t, flags=re.IGNORECASE)
+    def _break_roman(m):
+        prefix = m.group(1)
+        roman = m.group(2)
+        if "###KEEP###" in prefix or "###KEEP###" in roman:
+            return m.group(0)
+        return prefix + "\n" + roman + " "
+    t = re.sub(r'([:\.\?!;]|[^\s\n\r])\s*(\([IVXLCDMivxlcdm]+\))\s*', _break_roman, t)
+    t = re.sub(r'([:\.\?!;])\s*(\(\d+\))\s*', r'\1\n\2 ', t)
+    t = t.replace('###KEEP###', '')
+
+    # Bảo toàn \n, chỉ gộp khoảng trắng ngang (spaces, tabs)
+    t = re.sub(r'[ \t]+', ' ', t)
+    t = re.sub(r'\n\s*\n+', '\n', t)
+    t = re.sub(r'[ \t]*\n[ \t]*', '\n', t)
     return t.strip()
 
 def check_is_new_exam(
@@ -1223,8 +1240,29 @@ def sync_student_exam_data(
       - Khởi tạo ca thi mới tinh khôi
     """
     import json
+    import re
     now  = now_vn().strftime("%Y-%m-%d %H:%M:%S")
     hwid = hwid.strip()
+
+    # 0. Làm sạch và trích xuất chuẩn xác Tiêu đề & Mã môn & ClassCode
+    if any(k in class_code for k in ["Campus Exam", "Phiên bản", "Quyền truy cập", "Safe Exam Browser"]):
+        class_code = ""
+    if any(k in exam_title for k in ["Campus Exam", "Phiên bản", "Quyền truy cập", "Safe Exam Browser"]):
+        exam_title = ""
+
+    if exam_title:
+        exam_title = re.sub(r'\s*\[\d+\.\d+\][\s\d\/:]*$', '', exam_title).strip()
+        if not class_code:
+            m_c = re.search(r'\[ClassCode:\s*([^\]]+)\]', exam_title, re.IGNORECASE)
+            if m_c:
+                class_code = m_c.group(1).strip()
+        if not subject_code:
+            m_s = re.search(r'-\[([A-Za-z0-9_.]+)\]', exam_title)
+            if not m_s:
+                m_s = re.search(r'\[([A-Z]{2,4}\d{2,4}[a-zA-Z0-9_\.]*)\]', exam_title)
+            if m_s:
+                subject_code = m_s.group(1).strip()
+
     conn = get_connection()
     c    = conn.cursor()
 
