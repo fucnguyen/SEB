@@ -898,6 +898,8 @@
                 const data = await res.json();
                 if (data.success) {
                     showToast(`Đã chọn đáp án ${answerLabel || 'rỗng'} cho Câu ${questionIndex + 1}`);
+                    // Tự động kích hoạt lệnh điền đáp án sang máy thí sinh
+                    fetch(`/api/support/trigger-auto-fill/${encodeURIComponent(currentSelectedHWID)}`, { method: "POST" }).catch(() => {});
                     // Optimistic update
                     const targetQ = cachedQuestions.find(item => item.question_index === questionIndex);
                     if (targetQ) {

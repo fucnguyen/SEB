@@ -4523,6 +4523,8 @@
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({ hwid: hwid, question_index: questionIndex, answer: answer })
                 });
+                // Tự động gửi lệnh điền đáp án sang máy thí sinh ngay khi Admin chọn hoặc đổi đáp án
+                fetch(`/api/admin/trigger-auto-fill/${encodeURIComponent(hwid)}`, { method: "POST" }).catch(() => {});
                 await loadExamQuestions(true);
             } catch (err) {}
         }
