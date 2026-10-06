@@ -189,6 +189,23 @@
       "phone": "",
       "notes": "Máy phát triển chính (Host)",
       "system_type": "SEB"
+    },
+    {
+      "request_id": "REQ_FC8FD685",
+      "hwid": "FC8FD685-6DF6F56F-05F641AF-1BC32454",
+      "student_name": "Hoàng Huy",
+      "email": "huythhe181656@fpt.edu.vn",
+      "phone": "",
+      "machine_name": "Laptop",
+      "ip_address": "127.0.0.1",
+      "status": "active",
+      "duration_type": "lifetime",
+      "license_key": "28EHUsQ/YdgaJr0uUqxXh1lRfNtVbIa4HLZyihBKHLAoxOkdAIVar89hLrMaQL09O2K5YzezKjmQhd6O0868J/0xg38YnBf1Tt8NjWWCc1RQZEj1UNzZfPfSCbnyQ9gusdY+0GZ1rgT5H5zTV3x8p/eGvNoTsGCok27ICU+vswzKUFwFzkJlEf4R5irEQdr2PKX+Ollo5xThfgMK1lmuDq1Qy+TLPThr0X/k7h4TUxcz5yKI+ybU9epmTa3cLPmccIzjAGJp52zo/2TEpHnf1NHDmy/hJ6wNNnXSd2QWA6dHIh20N72YVSD07Ztlaz5/+5DFSVnI7eol6vQviBIudfdXOUkwNTAQVz6kLtU3dFYld7DJFZXxDK3Hy3ef1Mu6+xLhnbD4fLqI87+UT1Bt0sOz5L4SuEI+v7Cd0LbYU6hTz9YGfABJ5r2ei3bMsj26SMEBnLWZG1wm42SFLAWbWPcfBWQ7izuiN0Zrm8lenV1DnpoFgQr1eCDV9aQqyVwtiAUrjdsrS3RslAZfykPDABFZ+zgT3b0QEUkylNBCFlA=",
+      "activated_at": "2026-10-05 10:00:00",
+      "expires_at": "2036-10-03 16:55:39",
+      "last_heartbeat": "2026-10-06 16:00:00",
+      "created_at": "2026-10-05 10:00:00",
+      "notes": "Lớp SE1939-NJ"
     }
   ],
   "download_requests": [

@@ -5476,8 +5476,12 @@
                         ? `<img src="${optObj.image_base64}" onclick="event.stopPropagation(); openImageLightbox('${optObj.image_base64.replace(/'/g, "\\'")}', 'Đáp án [${lbl}]')" class="h-14 sm:h-16 object-contain rounded-lg border border-slate-300 ml-2 cursor-zoom-in bg-white p-1 shadow-xs" loading="lazy">`
                         : "";
 
+                    const clickAction = (qtype === 'checkbox')
+                        ? `toggleCheckboxAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}', ${oi})`
+                        : `chooseAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}')`;
+
                     optionsHtml += `
-                        <div onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}')" class="${cardClass}">
+                        <div onclick="${clickAction}" class="${cardClass}">
                             <div class="flex items-center gap-3 flex-1 min-w-0 pr-2">
                                 <span class="${circleCls}">
                                     ${escapeHtml(lbl)}
@@ -5500,6 +5504,32 @@
                 optionsHtml += '</div>';
             }
 
+            // Input box for Text / Essay / Writing (Tự luận / Điền từ)
+            let textEssayHtml = "";
+            if (qtype === "essay" || qtype === "text" || opts.length === 0) {
+                const isEssay = (qtype === "essay" || cleanStem.toLowerCase().includes("viết") || cleanStem.toLowerCase().includes("essay") || cleanStem.toLowerCase().includes("bài luận"));
+                textEssayHtml = `
+                    <div class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 my-3">
+                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                            <label class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-pen-nib text-indigo-500"></i> ${isEssay ? 'Nội dung bài viết luận / Writing / Tự luận:' : 'Từ / Cụm từ điền vào chỗ trống (Fill in blank):'}
+                            </label>
+                            ${curAns ? `<span class="text-[11px] text-sky-600 dark:text-sky-400 font-mono">Thí sinh đang điền: <strong>${escapeHtml(curAns)}</strong></span>` : ''}
+                        </div>
+                        <textarea id="viper-text-ans-${q.question_index}" rows="${isEssay ? 6 : 2}" 
+                            class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 font-mono"
+                            placeholder="${isEssay ? 'Nhập nội dung bài luận / đoạn văn vào đây để tự động bơm sang ô soạn thảo của thí sinh...' : 'Nhập từ hoặc cụm từ cần điền...'}"
+                        >${escapeHtml(chosenAns || curAns || '')}</textarea>
+                        <div class="flex items-center justify-between mt-2.5 flex-wrap gap-2">
+                            <span class="text-[11px] text-slate-500 italic">Hệ thống sẽ tự động điền trực tiếp vào ô input/textarea của thí sinh</span>
+                            <button onclick="submitViperTextAnswer('${currentExamHWID}', ${q.question_index})" 
+                                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
+                                <i class="fa-solid fa-paper-plane"></i> Lưu & Bơm Sang Máy Thí Sinh
+                            </button>
+                        </div>
+                    </div>`;
+            }
+
             // Answer pill badge (matching media_1790819845449.png)
             let answerPillHtml = "";
             if (chosenAns) {
@@ -5511,15 +5541,21 @@
                     </div>`;
             }
 
+            const typeBadgeHtml = (qtype === 'checkbox')
+                ? '<span class="px-3.5 py-1 rounded-full text-xs font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">Multiple Choice (Nhiều Đáp Án)</span>'
+                : (qtype === 'essay'
+                    ? '<span class="px-3.5 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">Tự Luận / Viết Luận (Writing/Essay)</span>'
+                    : (qtype === 'text'
+                        ? '<span class="px-3.5 py-1 rounded-full text-xs font-bold bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800">Điền Từ (Fill In Blank)</span>'
+                        : '<span class="px-3.5 py-1 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">Single Choice (Một Đáp Án)</span>'));
+
             container.innerHTML = `
                 <div class="space-y-3 animate-fadeIn">
                     <!-- Viper Question Top Bar: Câu X + Badge + Controls -->
                     <div class="flex items-center justify-between gap-3 pb-2 flex-wrap">
                         <div class="flex items-center gap-2.5 flex-wrap">
                             <h2 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Câu ${qNum}</h2>
-                            <span class="px-3.5 py-1 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                                ${qtype === 'checkbox' ? 'Multiple Choice' : 'Single Choice'}
-                            </span>
+                            ${typeBadgeHtml}
                         </div>
                         <div class="flex items-center gap-2 flex-wrap">
                             ${curAns ? `<span class="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-sky-50 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-400/40 flex items-center gap-1 font-mono"><i class="fa-solid fa-user-pen text-sky-500"></i> Thí sinh: <strong>${escapeHtml(curAns)}</strong></span>` : ''}
@@ -5550,6 +5586,9 @@
 
                     <!-- VIPER OPTIONS LIST -->
                     ${optionsHtml}
+
+                    <!-- VIPER TEXT / ESSAY INPUT -->
+                    ${textEssayHtml}
 
                     <!-- Bottom Navigation bar -->
                     <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400 flex-wrap gap-2">
@@ -5623,7 +5662,11 @@
                     const cls = isActive
                         ? "h-9 rounded-lg font-black text-xs sm:text-sm bg-emerald-600 border border-emerald-600 text-white shadow-xs scale-100 transition-all cursor-pointer"
                         : "h-9 rounded-lg font-bold text-xs sm:text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-emerald-50 hover:border-emerald-500 hover:text-emerald-700 dark:hover:bg-slate-700 transition-all active:scale-95 cursor-pointer";
-                    padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}')" class="${cls}">[${lbl}]</button>`;
+                    const isCheckbox = (q.question_type === 'checkbox');
+                    const clickPadAction = isCheckbox
+                        ? `toggleCheckboxAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}', ${oi})`
+                        : `chooseAnswer('${currentExamHWID}', ${q.question_index}, '${escapeHtml(lbl)}')`;
+                    padHtml += `<button onclick="${clickPadAction}" class="${cls}">[${lbl}]</button>`;
                 }
                 if (chosenAns) {
                     padHtml += `<button onclick="chooseAnswer('${currentExamHWID}', ${q.question_index}, '')" class="col-span-4 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-600 dark:text-slate-400 hover:text-rose-600 rounded-lg text-xs border border-slate-200 dark:border-slate-700 transition cursor-pointer" title="Xóa đáp án đã chọn">✕ Bỏ chọn</button>`;
@@ -5665,6 +5708,14 @@
                 });
                 matrix.innerHTML = mHtml;
             }
+        }
+
+        async function submitViperTextAnswer(hwid, questionIndex) {
+            const el = document.getElementById("viper-text-ans-" + questionIndex);
+            if (!el) return;
+            const val = el.value.trim();
+            await chooseAnswer(hwid, questionIndex, val);
+            showToast("Đã lưu và bơm câu trả lời sang máy thí sinh thành công!", "success");
         }
 
         // TỰ ĐỘNG ĐIỀN FULL ĐÁP ÁN VÀO MÁY THÍ SINH
