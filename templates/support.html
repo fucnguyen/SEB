@@ -207,6 +207,9 @@
                     <button onclick="loadCurrentQuestions(true)" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-purple-600/20 cursor-pointer">
                         <i class="fa-solid fa-arrows-rotate"></i> Làm Mới Đề
                     </button>
+                    <button id="btn-support-chat" onclick="openSupportChatModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-blue-600/20 cursor-pointer" title="Nhắn tin trực tiếp với thí sinh khi thí sinh nhấn F3">
+                        <i class="fa-solid fa-comments"></i> 💬 Chat Với Thí Sinh
+                    </button>
                 </div>
             </div>
 
@@ -1185,8 +1188,147 @@
             return div.innerHTML;
         }
 
+        // ── Support Chat Functions ──────────────────────────────────────────
+        let supportChatPollInterval = null;
+
+        function openSupportChatModal() {
+            if (!currentSelectedHWID) {
+                alert("Vui lòng chọn một thí sinh trong danh sách bên trái trước khi mở chat!");
+                return;
+            }
+            const modal = document.getElementById("support-chat-modal");
+            const item = allAssignedSessions.find(s => s.hwid === currentSelectedHWID);
+            const studentName = item ? item.student_name : "Thí sinh";
+            
+            document.getElementById("support-chat-student-title").innerText = `💬 Chat Với: ${studentName}`;
+            document.getElementById("support-chat-hwid-subtitle").innerText = `Mã máy: ${currentSelectedHWID}`;
+            modal.classList.remove("hidden");
+            
+            loadSupportChatMessages();
+            if (supportChatPollInterval) clearInterval(supportChatPollInterval);
+            supportChatPollInterval = setInterval(loadSupportChatMessages, 2500);
+
+            setTimeout(() => {
+                const inp = document.getElementById("support-chat-input");
+                if (inp) inp.focus();
+            }, 100);
+        }
+
+        function closeSupportChatModal() {
+            const modal = document.getElementById("support-chat-modal");
+            if (modal) modal.classList.add("hidden");
+            if (supportChatPollInterval) {
+                clearInterval(supportChatPollInterval);
+                supportChatPollInterval = null;
+            }
+        }
+
+        async function loadSupportChatMessages() {
+            if (!currentSelectedHWID) return;
+            try {
+                const res = await fetch(`/api/chat/messages?session_id=${encodeURIComponent(currentSelectedHWID)}`);
+                if (!res.ok) return;
+                const msgs = await res.json();
+                const container = document.getElementById("support-chat-messages");
+                if (!container) return;
+
+                if (msgs.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center text-xs text-slate-500 py-12">
+                            <i class="fa-solid fa-comments text-3xl mb-2 text-slate-600 block"></i>
+                            Chưa có tin nhắn nào.<br>Thí sinh nhấn <strong>F3</strong> trên máy tính để gửi tin nhắn đến bạn!
+                        </div>`;
+                    return;
+                }
+
+                let html = "";
+                msgs.forEach(m => {
+                    const isStudent = (m.sender === "student");
+                    const timeStr = m.created_at ? m.created_at.substring(11, 16) : "";
+                    if (isStudent) {
+                        html += `
+                            <div class="flex flex-col items-start max-w-[85%]">
+                                <span class="text-[10px] font-bold text-sky-400 mb-0.5 ml-1">🎓 Thí sinh (${escapeHtml(m.sender_name || 'Học sinh')}):</span>
+                                <div class="bg-slate-800 text-slate-100 border border-slate-700/80 rounded-2xl rounded-tl-sm px-3.5 py-2 text-xs leading-relaxed shadow-xs whitespace-pre-line">
+                                    ${escapeHtml(m.message)}
+                                </div>
+                                <span class="text-[9px] text-slate-500 mt-0.5 ml-1">${timeStr}</span>
+                            </div>`;
+                    } else {
+                        html += `
+                            <div class="flex flex-col items-end max-w-[85%] ml-auto">
+                                <span class="text-[10px] font-bold text-emerald-400 mb-0.5 mr-1">🛡️ ${escapeHtml(m.sender_name || 'Người Hỗ Trợ')}:</span>
+                                <div class="bg-blue-600 text-white rounded-2xl rounded-tr-sm px-3.5 py-2 text-xs leading-relaxed shadow-xs whitespace-pre-line">
+                                    ${escapeHtml(m.message)}
+                                </div>
+                                <span class="text-[9px] text-slate-500 mt-0.5 mr-1">${timeStr}</span>
+                            </div>`;
+                    }
+                });
+                container.innerHTML = html;
+                container.scrollTop = container.scrollHeight;
+            } catch (e) {}
+        }
+
+        async function sendSupportChatMessage() {
+            const inp = document.getElementById("support-chat-input");
+            if (!inp) return;
+            const text = inp.value.trim();
+            if (!text || !currentSelectedHWID) return;
+
+            inp.value = "";
+            try {
+                const assignedName = document.getElementById("support-assigned-name")?.innerText || "Người Hỗ Trợ";
+                await fetch("/api/chat/send", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        session_id: currentSelectedHWID,
+                        sender: "support",
+                        sender_name: assignedName,
+                        message: text
+                    })
+                });
+                await loadSupportChatMessages();
+            } catch (e) {}
+        }
+
         // Initialize on page load
         window.addEventListener("DOMContentLoaded", initSupportConsole);
     </script>
+
+    <!-- Support Chat Modal -->
+    <div id="support-chat-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+        <div class="glass-card rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl flex flex-col h-[520px] overflow-hidden bg-slate-900/95">
+            <!-- Modal Header -->
+            <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-comments"></i>
+                    </span>
+                    <div>
+                        <h3 id="support-chat-student-title" class="font-bold text-sm text-white">Chat Với Thí Sinh</h3>
+                        <p id="support-chat-hwid-subtitle" class="text-[11px] text-slate-400 font-mono">HWID: —</p>
+                    </div>
+                </div>
+                <button onclick="closeSupportChatModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center text-sm transition cursor-pointer">
+                    ✕
+                </button>
+            </div>
+            <!-- Messages Container -->
+            <div id="support-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-950/30">
+                <div class="text-center text-xs text-slate-500 py-10">Đang tải tin nhắn...</div>
+            </div>
+            <!-- Input Area -->
+            <div class="p-3 border-t border-slate-800 bg-slate-950/60 flex items-center gap-2">
+                <input type="text" id="support-chat-input" placeholder="Nhập tin nhắn trả lời thí sinh (Enter để gửi)..."
+                    class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendSupportChatMessage();}">
+                <button onclick="sendSupportChatMessage()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-blue-600/20 cursor-pointer">
+                    <i class="fa-solid fa-paper-plane"></i> Gửi
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
