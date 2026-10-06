@@ -295,9 +295,9 @@
         t = t.replace(/<!--[\s\S]*?-->/g, " ");
         t = t.replace(/\/\*[\s\S]*?\*\//g, " ");
         t = t.replace(/@(?:font-face|keyframes|import|media)[^{]*\{[\s\S]*?\}/gi, " ");
-        t = t.replace(/(?:p|li|div)\.MsoNormal[\s\S]*?(?:;|\})/gi, " ");
-        // NOTE: Destructive regex removed to preserve math piecewise formulas and LaTeX!
-        t = t.replace(/mso-[^;]+;/gi, " ");
+        // Only strip CSS class definitions that contain a rule block { ... }, never plain text
+        t = t.replace(/(?:p|li|div)\.MsoNormal\s*\{[^}]*\}/gi, " ");
+        t = t.replace(/mso-[^;:]+:[^;]+;/gi, " ");
         t = t.replace(/panose-1:[^;]+;/gi, " ");
 
         t = t.replace(/(?:Thời gian còn lại|Thời gian làm bài|Time remaining|Time left)[\s\S]*?(?:quá trình thi|suốt quá trình thi|hết giờ|làm bài thi)[,\.\s]*/gi, " ");
@@ -330,10 +330,13 @@
         t = t.replace(/<!--[\s\S]*?-->/g, " ");
         t = t.replace(/\/\*[\s\S]*?\*\//g, " ");
         t = t.replace(/@(?:font-face|keyframes|import|media)[^{]*\{[\s\S]*?\}/gi, " ");
-        t = t.replace(/(?:p|li|div)\.MsoNormal[\s\S]*?(?:;|\})/gi, " ");
-        t = t.replace(/mso-[^;]+;/gi, " ");
+        // Only strip CSS class definitions that contain a rule block { ... }, never plain text
+        t = t.replace(/(?:p|li|div)\.MsoNormal\s*\{[^}]*\}/gi, " ");
+        t = t.replace(/mso-[^;:]+:[^;]+;/gi, " ");
         t = t.replace(/panose-1:[^;]+;/gi, " ");
-        return t.replace(/\s+/g, " ").trim();
+        // Xóa nhãn A. B. C. D. ở đầu đáp án nếu có
+        t = t.replace(/^[A-Z0-9][\.\)\:\-]\s+/i, "");
+        return t.replace(/[ \t]+/g, " ").trim();
     }
 
     // ── High-Res Image Extractor (Direct Blob + White canvas for formulas) ─────────────
@@ -1199,12 +1202,13 @@
         if (inputs.length > 0) {
             inputs.forEach(function (inp, idx) {
                 try {
+                    var container = inp.closest("label, .form-check, .choice, .option, [class*='choice'], [class*='option'], [class*='answer'], tr, li") || inp.parentElement;
                     var label = null;
                     if (inp.id) {
                         try { label = (block.ownerDocument || document).querySelector("label[for='" + inp.id + "']"); } catch(e){}
                     }
-                    if (!label) {
-                        label = inp.closest("label, .form-check, .choice, .option, [class*='choice'], [class*='option'], [class*='answer'], tr, li");
+                    if (!label && container) {
+                        label = container.querySelector("label");
                     }
                     if (!label) {
                         var sib = inp.nextElementSibling;
@@ -1217,9 +1221,23 @@
                             sib = sib.nextElementSibling;
                         }
                     }
-                    var host = label || inp.parentElement;
-                    var t = getText(host);
-                    var img = getOptionImage(host) || getOptionImage(inp.parentElement);
+
+                    // Lấy text đầy đủ nhất: Ưu tiên bóc tách toàn bộ container của lựa chọn (loại bỏ input)
+                    // để không bao giờ bị cụt nếu đáp án chứa nhiều thẻ con (span, font, b, i, p) nằm ngoài thẻ label
+                    var tContainer = "";
+                    if (container) {
+                        try {
+                            var cClone = container.cloneNode(true);
+                            var inpsInClone = cClone.querySelectorAll("input, [type='radio'], [type='checkbox']");
+                            for (var ic = 0; ic < inpsInClone.length; ic++) inpsInClone[ic].remove();
+                            tContainer = getText(cClone);
+                        } catch (e) {}
+                    }
+                    var tLabel = label ? getText(label) : "";
+                    var host = container || label || inp.parentElement;
+                    var t = (tContainer && tContainer.length >= tLabel.length) ? tContainer : (tLabel || getText(host));
+
+                    var img = getOptionImage(host) || (label ? getOptionImage(label) : "") || getOptionImage(inp.parentElement);
 
                     // Nếu text rỗng và không có ảnh, kiểm tra text của các thẻ con hoặc alt text
                     if (!t && !img && host) {
@@ -1414,61 +1432,73 @@
     function extractQuestionStem(block) {
         if (!block) return "";
 
-        // Priority 1: FPT specific stem container
-        var fptStemEl = block.querySelector(".card-body.border-bottom");
-        if (fptStemEl) {
-            var stemClone = fptStemEl.cloneNode(true);
-            var noise1 = stemClone.querySelectorAll("style, script");
-            for (var i = 0; i < noise1.length; i++) noise1[i].remove();
-
-            var mathImgs = stemClone.querySelectorAll("img");
+        // Priority 1: FPT specific stem containers (hỗ trợ tất cả các khối đề bài liên tiếp)
+        var fptStemEls = Array.from(block.querySelectorAll(".card-body.border-bottom, .card-body.stem, [class*='stem-content']"));
+        if (fptStemEls.length > 0) {
+            var stemParts = [];
             var altTexts = [];
-            for (var m = 0; m < mathImgs.length; m++) {
-                var alt = (mathImgs[m].alt || "").trim();
-                if (alt && alt.length > 1 && !/^(?:image|hinh|ảnh)$/i.test(alt)) {
-                    altTexts.push(alt);
-                }
-            }
+            fptStemEls.forEach(function (fptEl) {
+                var stemClone = fptEl.cloneNode(true);
+                var noise1 = stemClone.querySelectorAll("style, script, .btn-mark, .timer, [class*='timer']");
+                for (var i = 0; i < noise1.length; i++) noise1[i].remove();
 
-            var s = cleanStemText(getText(stemClone));
+                var mathImgs = stemClone.querySelectorAll("img");
+                for (var m = 0; m < mathImgs.length; m++) {
+                    var alt = (mathImgs[m].alt || "").trim();
+                    if (alt && alt.length > 1 && !/^(?:image|hinh|ảnh)$/i.test(alt)) {
+                        altTexts.push(alt);
+                    }
+                }
+                var partText = cleanStemText(getText(stemClone));
+                if (partText) stemParts.push(partText);
+            });
+
+            var s = stemParts.join("\n").trim();
             if (altTexts.length > 0 && (!s || s.length < 5)) {
                 s = (s ? s + " " : "") + altTexts.join(" ");
             }
             if (s.length >= 2) return s;
 
-            if (fptStemEl.querySelector("img, canvas, svg")) {
+            if (block.querySelector(".card-body.border-bottom img, .card-body.border-bottom canvas, .card-body.border-bottom svg")) {
                 return "[Đề bài dạng hình ảnh / biểu đồ]";
             }
         }
 
-        // Priority 2: Moodle qtext
-        var qtEl = block.querySelector(".qtext, .question-text, .formulation .qtext, .stem, [class*='qtext'], [class*='question-text']");
-        if (qtEl) {
-            var qs = cleanStemText(getText(qtEl));
+        // Priority 2: Moodle qtext (hỗ trợ mọi khối qtext / question-text liên tiếp)
+        var qtEls = Array.from(block.querySelectorAll(".qtext, .question-text, .formulation .qtext, .stem, [class*='qtext'], [class*='question-text']"));
+        if (qtEls.length > 0) {
+            var qParts = [];
+            qtEls.forEach(function (qtEl) {
+                var qtClone = qtEl.cloneNode(true);
+                var noiseQt = qtClone.querySelectorAll("style, script");
+                for (var i = 0; i < noiseQt.length; i++) noiseQt[i].remove();
+                var partQs = cleanStemText(getText(qtClone));
+                if (partQs) qParts.push(partQs);
+            });
+            var qs = qParts.join("\n").trim();
             if (qs.length >= 2) return qs;
-            if (qtEl.querySelector("img, canvas, svg")) return "[Đề bài dạng hình ảnh / biểu đồ]";
+            if (block.querySelector(".qtext img, .question-text img, canvas, svg")) return "[Đề bài dạng hình ảnh / biểu đồ]";
         }
 
-        // Priority 3: General card clone
+        // Priority 3: General card clone - bóc tách toàn bộ card trừ khu vực options
         try {
             var clone = block.cloneNode(true);
             var noise = clone.querySelectorAll(".btn-mark, .timer, [class*='timer'], [id*='timer'], [class*='countdown'], .notice, [class*='notice'], .instruction, [class*='instruction'], style, script, noscript, xml, meta, link");
             for (var n = 0; n < noise.length; n++) noise[n].remove();
 
-            var allHeaders = clone.querySelectorAll("h1, h2, h3, h4, h5, h6, span, strong, b, div, p");
+            var allHeaders = clone.querySelectorAll("h1, h2, h3, h4, h5, h6, .card-header, [class*='card-header']");
             for (var h = 0; h < allHeaders.length; h++) {
                 var ht = getText(allHeaders[h]);
-                if (/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*\d+/i.test(ht) && allHeaders[h].children.length <= 3) {
+                if (/(?:CÂU\s*HỎI|CAU\s*HOI|QUESTION)\s*\d+/i.test(ht)) {
                     allHeaders[h].remove();
-                    break;
                 }
             }
 
             var inputsInClone = clone.querySelectorAll(
                 "input, textarea, button, " +
-                ".form-check, .answer, .options, [class*='choice'], [class*='option'], " +
+                ".form-check, .answer, .options, .choices, [class*='choice'], [class*='option'], [class*='answer'], " +
                 "[class*='radio'], [role='radio'], [role='checkbox'], " +
-                ".ant-radio-wrapper, .el-radio, label"
+                ".ant-radio-wrapper, .el-radio"
             );
             for (var k = 0; k < inputsInClone.length; k++) {
                 inputsInClone[k].remove();
@@ -2361,8 +2391,7 @@
             var qIdx = getQuestionIndex(block, bIdx);
             var ans = supportAnswers[qIdx] !== undefined ? supportAnswers[qIdx]
                     : supportAnswers[String(qIdx)] !== undefined ? supportAnswers[String(qIdx)]
-                    : supportAnswers[qIdx + 1] !== undefined ? supportAnswers[qIdx + 1]
-                    : supportAnswers[String(qIdx + 1)];
+                    : undefined;
             if (ans !== undefined && ans !== null && String(ans).trim() !== "") {
                 var qtype = detectQuestionType(block);
                 

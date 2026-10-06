@@ -669,10 +669,13 @@
                 const realQIndex = (q.question_index !== undefined ? q.question_index : idx);
                 const hasSupportAnswer = !!(q.support_answer && q.support_answer.trim());
                 const hasStudentAnswer = !!(q.current_answer && q.current_answer.trim());
+                const isMismatch = hasSupportAnswer && hasStudentAnswer && q.support_answer.trim().toUpperCase() !== q.current_answer.trim().toUpperCase();
                 if (hasSupportAnswer) solvedCount++;
 
                 let btnCls = 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white';
-                if (hasSupportAnswer) {
+                if (isMismatch) {
+                    btnCls = 'bg-amber-600 border border-amber-400 text-white font-bold shadow-sm';
+                } else if (hasSupportAnswer) {
                     btnCls = 'bg-emerald-600 text-white font-bold shadow-sm';
                 } else if (hasStudentAnswer) {
                     btnCls = 'bg-sky-600/40 border border-sky-400 text-sky-300 font-semibold';
@@ -680,8 +683,8 @@
 
                 const btn = document.createElement("button");
                 btn.className = `w-8 h-8 rounded-lg text-xs font-mono transition flex items-center justify-center ${btnCls}`;
-                btn.innerText = qNum;
-                btn.title = `Chuyển tới câu ${qNum}${hasSupportAnswer ? ' (Đã hỗ trợ: ' + q.support_answer + ')' : (hasStudentAnswer ? ' (Thí sinh chọn: ' + q.current_answer + ')' : '')}`;
+                btn.innerText = qNum + (isMismatch ? '!' : '');
+                btn.title = `Chuyển tới câu ${qNum}${isMismatch ? ' [LỆCH: Support ' + q.support_answer + ' vs Thí sinh ' + q.current_answer + ']' : (hasSupportAnswer ? ' (Đã hỗ trợ: ' + q.support_answer + ')' : (hasStudentAnswer ? ' (Thí sinh chọn: ' + q.current_answer + ')' : ''))}`;
                 btn.onclick = () => {
                     const el = document.getElementById(`q-item-${realQIndex}`);
                     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });

@@ -5636,12 +5636,17 @@
                 cachedCurrentQuestions.forEach((item, idx) => {
                     const qNum = idx + 1;
                     const isCurrent = idx === currentViperQuestionIndex;
-                    const hasSupport = !!item.support_answer;
-                    const hasStudent = !!item.current_answer;
+                    const hasSupport = !!(item.support_answer && item.support_answer.trim());
+                    const hasStudent = !!(item.current_answer && item.current_answer.trim());
+                    const isMismatch = hasSupport && hasStudent && item.support_answer.trim().toUpperCase() !== item.current_answer.trim().toUpperCase();
 
                     let bgCls = "";
                     if (isCurrent) {
-                        bgCls = "bg-emerald-500 text-white font-black shadow-xs ring-2 ring-emerald-400 scale-105 z-10";
+                        bgCls = isMismatch 
+                            ? "bg-amber-500 text-white font-black shadow-xs ring-2 ring-amber-300 scale-105 z-10"
+                            : "bg-emerald-500 text-white font-black shadow-xs ring-2 ring-emerald-400 scale-105 z-10";
+                    } else if (isMismatch) {
+                        bgCls = "bg-amber-600 text-white font-bold border border-amber-400 shadow-sm";
                     } else if (hasSupport) {
                         bgCls = "bg-emerald-600 text-white font-bold border border-emerald-600";
                     } else if (hasStudent) {
@@ -5650,9 +5655,10 @@
                         bgCls = "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700";
                     }
 
+                    const mismatchTitle = isMismatch ? ` (LỆCH ĐÁP ÁN: Admin chọn [${item.support_answer}], Thí sinh tick [${item.current_answer}])` : '';
                     mHtml += `
-                        <button onclick="renderViperQuestion(${idx})" class="h-7 rounded-md text-xs font-mono font-bold flex items-center justify-center transition-all cursor-pointer ${bgCls}">
-                            ${qNum}
+                        <button onclick="renderViperQuestion(${idx})" title="Câu ${qNum}${mismatchTitle}" class="h-7 rounded-md text-xs font-mono font-bold flex items-center justify-center transition-all cursor-pointer ${bgCls}">
+                            ${qNum}${isMismatch ? '!' : ''}
                         </button>`;
                 });
                 matrix.innerHTML = mHtml;
