@@ -183,6 +183,8 @@ def init_db():
         ("class_code", "TEXT DEFAULT ''"),
         ("campus", "TEXT DEFAULT ''"),
         ("auto_fill_requested", "INTEGER DEFAULT 0"),
+        ("solution_zip_path", "TEXT DEFAULT ''"),
+        ("solution_zip_name", "TEXT DEFAULT ''"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE live_exam_sessions ADD COLUMN {_col} {_def}")
@@ -1566,6 +1568,45 @@ def get_live_exam_questions(hwid: str) -> List[Dict[str, Any]]:
         rows.append(d)
     conn.close()
     return rows
+
+
+def save_student_solution_zip(hwid: str, file_bytes: bytes, filename: str) -> bool:
+    """Lưu tệp Solution ZIP cho ca thi của học sinh để tự động kéo về Desktop"""
+    hwid = hwid.strip()
+    sol_dir = os.path.join(DB_DIR, "solution_zips")
+    os.makedirs(sol_dir, exist_ok=True)
+    safe_name = os.path.basename(filename)
+    dest_path = os.path.join(sol_dir, f"{hwid}_{safe_name}")
+    with open(dest_path, "wb") as f:
+        f.write(file_bytes)
+    
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE live_exam_sessions
+        SET solution_zip_path = ?, solution_zip_name = ?
+        WHERE hwid = ?
+    """, (dest_path, safe_name, hwid))
+    affected = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return affected
+
+
+def get_student_solution_zip(hwid: str) -> Optional[Dict[str, Any]]:
+    """Lấy thông tin và đường dẫn tệp Solution ZIP của học sinh"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT solution_zip_path, solution_zip_name FROM live_exam_sessions WHERE hwid = ?", (hwid.strip(),))
+    row = c.fetchone()
+    conn.close()
+    if row and row["solution_zip_path"] and os.path.exists(row["solution_zip_path"]):
+        return {
+            "path": row["solution_zip_path"],
+            "filename": row["solution_zip_name"] or "PEA_Solution.zip"
+        }
+    return None
+
 
 
 def get_exam_questions_version(hwid: str) -> str:

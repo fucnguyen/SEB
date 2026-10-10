@@ -762,6 +762,10 @@
                             <button id="btn-generate-pea-src" onclick="triggerPeaSourceGen()" class="w-full text-left px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-2 transition border border-slate-200 dark:border-slate-800 hover:border-slate-300">
                                 <i class="fa-solid fa-code text-cyan-500 w-4"></i> Tạo Source Code PEA
                             </button>
+                            <button id="btn-upload-solution-zip" onclick="triggerUploadSolutionZip()" class="w-full text-left px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-semibold flex items-center gap-2 transition border border-indigo-200 dark:border-indigo-800">
+                                <i class="fa-solid fa-cloud-arrow-up text-indigo-500 w-4"></i> Gửi ZIP Bài Giải (PEA)
+                            </button>
+                            <input type="file" id="pea-zip-file-input" accept=".zip" style="display: none;" onchange="handleSolutionZipSelected(event)" />
                             <button id="btn-copy-formatted-ans" onclick="triggerCopyFormattedAnswers()" class="w-full text-left px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-2 transition border border-slate-200 dark:border-slate-800 hover:border-slate-300">
                                 <i class="fa-solid fa-copy text-amber-500 w-4"></i> Copy Toàn Bộ Đáp Án
                             </button>
@@ -3122,7 +3126,7 @@
                         alert(`Khôi phục thành công!\n- Máy & Key: ${result.stats.licenses}\n- Yêu cầu tải: ${result.stats.download_requests}`);
                         loadLicenses();
                         loadDownloadRequests();
-                        loadStats();
+                        loadDashboardStats();
                     } else {
                         alert("Khôi phục thất bại: " + (result.detail || "Lỗi không xác định"));
                     }
@@ -3135,6 +3139,10 @@
             reader.readAsText(file);
         }
 
+        function loadStats() {
+            return loadDashboardStats();
+        }
+
         async function restoreSeedData() {
             if (!confirm("Khôi phục lại toàn bộ danh sách máy và key lịch sử gốc?")) return;
             try {
@@ -3144,7 +3152,7 @@
                     alert(`Đã nạp lại thành công danh sách gốc!\n- Máy & Key: ${result.stats.licenses}`);
                     loadLicenses();
                     loadDownloadRequests();
-                    loadStats();
+                    loadDashboardStats();
                 } else {
                     alert("Thất bại: " + (result.detail || "Lỗi không xác định"));
                 }
@@ -3438,6 +3446,44 @@
             if (!currentExamHWID) return;
             window.location.href = `/api/admin/pea/download-template/${encodeURIComponent(currentExamHWID)}`;
         }
+
+        function triggerUploadSolutionZip() {
+            if (!currentExamHWID) {
+                alert("Vui lòng chọn một ca thi đang diễn ra trước khi gửi bài giải!");
+                return;
+            }
+            const input = document.getElementById("pea-zip-file-input");
+            if (input) {
+                input.value = "";
+                input.click();
+            }
+        }
+
+        async function handleSolutionZipSelected(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file || !currentExamHWID) return;
+            if (!file.name.toLowerCase().endswith && !file.name.toLowerCase().endsWith(".zip")) {
+                alert("⚠️ Chỉ hỗ trợ tệp bài giải định dạng .zip!");
+                return;
+            }
+            const formData = new FormData();
+            formData.append("file", file);
+            try {
+                const res = await fetch(`/api/admin/pea/upload-solution-zip/${encodeURIComponent(currentExamHWID)}`, {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`✅ ${data.message}\n\nTệp ZIP sẽ được phần mềm chạy ngầm tự động tải về Màn hình chính (Desktop) của thí sinh!`);
+                } else {
+                    alert("❌ Lỗi gửi bài giải: " + (data.detail || "Không rõ"));
+                }
+            } catch (err) {
+                alert("❌ Lỗi kết nối: " + err.message);
+            }
+        }
+
 
         async function triggerCopyFormattedAnswers() {
             if (!currentExamHWID) return;

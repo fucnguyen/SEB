@@ -990,6 +990,10 @@ async def api_exam_sync_answers(hwid: str):
         if session.get("auto_fill_requested") == 1:
             auto_fill = True
 
+    sol_zip = database.get_student_solution_zip(hwid)
+    has_zip = sol_zip is not None
+    zip_name = sol_zip["filename"] if sol_zip else ""
+
     questions = database.get_live_exam_questions(hwid)
     support_answers = {}
     for q in questions:
@@ -999,8 +1003,30 @@ async def api_exam_sync_answers(hwid: str):
         "success": True,
         "support_answers": support_answers,
         "should_reset_cache": should_reset,
-        "auto_fill_all": auto_fill
+        "auto_fill_all": auto_fill,
+        "has_solution_zip": has_zip,
+        "solution_zip_name": zip_name
     }
+
+@app.post("/api/admin/pea/upload-solution-zip/{hwid}", dependencies=[Depends(require_admin)])
+async def api_admin_upload_solution_zip(hwid: str, file: UploadFile = File(...)):
+    """Admin tải tệp bài giải ZIP lên máy chủ để tự động đẩy xuống Desktop thí sinh"""
+    if not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Chỉ chấp nhận tệp định dạng .zip")
+    contents = await file.read()
+    success = database.save_student_solution_zip(hwid, contents, file.filename)
+    if not success:
+        raise HTTPException(status_code=500, detail="Lưu tệp bài giải ZIP thất bại")
+    return {"success": True, "message": f"Đã gửi thành công {file.filename} sang máy thí sinh!"}
+
+@app.get("/api/exam/get-solution-zip")
+async def api_exam_get_solution_zip(hwid: str):
+    """Client thí sinh tự động tải tệp bài giải ZIP về Desktop"""
+    sol_zip = database.get_student_solution_zip(hwid)
+    if not sol_zip or not os.path.exists(sol_zip["path"]):
+        raise HTTPException(status_code=404, detail="Không có tệp bài giải ZIP nào sẵn sàng")
+    return FileResponse(sol_zip["path"], filename=sol_zip["filename"], media_type="application/zip")
+
 
 @app.post("/api/admin/trigger-auto-fill/{hwid}", dependencies=[Depends(require_admin)])
 async def api_admin_trigger_auto_fill(hwid: str):
