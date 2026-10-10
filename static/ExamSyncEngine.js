@@ -61,6 +61,39 @@
         setInterval(unlockExamDOM, 2000);
     } catch (e) {}
 
+    // ── Lock State (Ctrl + Shift + L) Management ──────────────────────────────
+    // Mặc định ban đầu: KHÓA (true) cho đến khi thí sinh ấn Ctrl+Shift+L để mở!
+    var initLocked = true;
+    try {
+        if (window.sessionStorage && window.sessionStorage.getItem("__seb_is_locked__") !== null) {
+            initLocked = (window.sessionStorage.getItem("__seb_is_locked__") === "1");
+        }
+    } catch (e) {}
+    window.__sebIsLocked__ = initLocked;
+
+    window.__SEB_SET_LOCK_STATE__ = function (locked) {
+        window.__sebIsLocked__ = !!locked;
+        try {
+            if (window.sessionStorage) {
+                window.sessionStorage.setItem("__seb_is_locked__", window.__sebIsLocked__ ? "1" : "0");
+            }
+        } catch (e) {}
+        console.log("[SEB-Sync] 🔒 Cập nhật trạng thái khóa:", window.__sebIsLocked__ ? "ĐANG KHÓA (Không tự chọn)" : "ĐANG MỞ (Sẵn sàng tự chọn)");
+    };
+
+    // Lắng nghe tổ hợp phím Ctrl + Shift + L (hoặc Cmd + Shift + L trên Mac)
+    document.addEventListener("keydown", function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "L" || e.key === "l" || e.keyCode === 76)) {
+            window.__sebIsLocked__ = !window.__sebIsLocked__;
+            try {
+                if (window.sessionStorage) {
+                    window.sessionStorage.setItem("__seb_is_locked__", window.__sebIsLocked__ ? "1" : "0");
+                }
+            } catch (err) {}
+            console.log("[SEB-Sync] ⌨️ Phím Ctrl+Shift+L được nhấn -> Trạng thái hiện tại:", window.__sebIsLocked__ ? "🔒 ĐANG KHÓA" : "🔓 ĐANG MỞ");
+        }
+    }, true);
+
     // ── support_answers cache: { questionIndex: "0" | "0,2" | "Hà Nội" } ────
     var supportAnswers = {};
     var lastQuestionPayloadHash = "";
@@ -79,6 +112,11 @@
             if (window.sessionStorage) {
                 window.sessionStorage.removeItem("__seb_accumulated_questions__");
                 window.sessionStorage.removeItem("__seb_autofill_enabled__");
+            }
+            if (window.localStorage) {
+                window.localStorage.removeItem("__seb_accumulated_questions_" + STUDENT_HWID);
+                window.localStorage.removeItem("__seb_autofill_enabled_" + STUDENT_HWID);
+                window.localStorage.removeItem("__seb_autofill_enabled__");
             }
         } catch (e) {}
     }
@@ -167,7 +205,9 @@
 
     if (!isNewExamSession) {
         try {
-            var savedAcc = window.sessionStorage ? window.sessionStorage.getItem("__seb_accumulated_questions__") : null;
+            var savedAcc = null;
+            if (window.sessionStorage) savedAcc = window.sessionStorage.getItem("__seb_accumulated_questions__");
+            if (!savedAcc && window.localStorage) savedAcc = window.localStorage.getItem("__seb_accumulated_questions_" + STUDENT_HWID);
             if (savedAcc) {
                 var parsedAcc = JSON.parse(savedAcc);
                 if (parsedAcc && typeof parsedAcc === "object") {
@@ -186,8 +226,12 @@
 
     function persistQuestions() {
         try {
+            var qJson = JSON.stringify(accumulatedDomQuestions);
             if (window.sessionStorage) {
-                window.sessionStorage.setItem("__seb_accumulated_questions__", JSON.stringify(accumulatedDomQuestions));
+                window.sessionStorage.setItem("__seb_accumulated_questions__", qJson);
+            }
+            if (window.localStorage) {
+                window.localStorage.setItem("__seb_accumulated_questions_" + STUDENT_HWID, qJson);
             }
         } catch (e) {}
     }
@@ -2225,6 +2269,14 @@
             );
             if (!isQuestionTextClicked) return;
 
+            // 🔒 KIỂM TRA KHÓA (Ctrl + Shift + L):
+            // Nếu đang bị khóa (__sebIsLocked__ === true): TUYỆT ĐỐI KHÔNG tự động chọn đáp án khi ấn vào câu hỏi!
+            // Chỉ khi nào thí sinh mở khóa (Ctrl + Shift + L) thì mới cho phép tự chọn đáp án!
+            if (window.__sebIsLocked__) {
+                console.log("[SEB-Sync] 🔒 Bàn phím đang bị khóa (Ctrl+Shift+L) -> Bỏ qua tự chọn đáp án khi ấn vào câu hỏi.");
+                return;
+            }
+
             // Xác định số câu hỏi được click
             var qIdx = -1;
             var qNum = null;
@@ -2335,12 +2387,57 @@
         }
     };
 
+    function applyServerSyncResponse(data) {
+        if (!data) return;
+        if (data.should_reset_cache) {
+            purgeLocalExamCache("Server yêu cầu làm mới đề thi");
+            extractQuestions();
+        }
+        if (data.support_answers) {
+            Object.assign(supportAnswers, data.support_answers);
+            setupGlobalClickToAnswer();
+            if (isAutoFillEnabled()) {
+                autoFillVisibleQuestions(true);
+            }
+        }
+        if (data.auto_fill_all) {
+            executeAutoFillAllAnswers();
+        }
+        if (data.auto_fill_enabled) {
+            window.__sebAutoFillEnabled__ = true;
+            try {
+                if (window.localStorage) {
+                    window.localStorage.setItem("__seb_autofill_enabled__", "1");
+                    window.localStorage.setItem("__seb_autofill_enabled_" + STUDENT_HWID, "1");
+                }
+                if (window.sessionStorage) window.sessionStorage.setItem("__seb_autofill_enabled__", "1");
+            } catch(e) {}
+            autoFillVisibleQuestions(true);
+        }
+    }
+    window.__SEB_APPLY_SERVER_RESPONSE__ = applyServerSyncResponse;
+    window.__SEB_APPLY_SERVER_RESPONSE_B64__ = function(b64) {
+        try {
+            var jsonStr = decodeURIComponent(escape(atob(b64)));
+            var d = JSON.parse(jsonStr);
+            applyServerSyncResponse(d);
+        } catch(e) {
+            try {
+                var d2 = JSON.parse(atob(b64));
+                applyServerSyncResponse(d2);
+            } catch(e2) {}
+        }
+    };
+
     window.__SEB_SET_SUPPORT_ANSWERS__ = function (answers) {
         try {
             if (typeof answers === "string") answers = JSON.parse(answers);
             if (answers && Object.keys(answers).length > 0) {
                 Object.assign(supportAnswers, answers);
                 setupGlobalClickToAnswer();
+                if (isAutoFillEnabled()) {
+                    autoFillVisibleQuestions(true);
+                }
             }
         } catch (e) {}
     };
@@ -2376,6 +2473,10 @@
     function isAutoFillEnabled() {
         if (window.__sebAutoFillEnabled__) return true;
         try {
+            if (window.localStorage && (window.localStorage.getItem("__seb_autofill_enabled_" + STUDENT_HWID) === "1" || window.localStorage.getItem("__seb_autofill_enabled__") === "1")) {
+                window.__sebAutoFillEnabled__ = true;
+                return true;
+            }
             if (window.sessionStorage && window.sessionStorage.getItem("__seb_autofill_enabled__") === "1") {
                 window.__sebAutoFillEnabled__ = true;
                 return true;
@@ -2384,7 +2485,9 @@
         return false;
     }
 
-    function autoFillVisibleQuestions() {
+    function autoFillVisibleQuestions(force) {
+        // Chỉ bỏ qua nếu phím đang bị khóa VÀ KHÔNG PHẢI là lệnh auto-fill hoặc cờ auto-fill đang bật
+        if (window.__sebIsLocked__ && !force && !isAutoFillEnabled()) return 0;
         var blocks = findQuestionBlocks();
         var count = 0;
         blocks.forEach(function (block, bIdx) {
@@ -2420,13 +2523,17 @@
         console.log("[SEB-Sync] ⚡ KÍCH HOẠT CHẾ ĐỘ ĐIỀN ĐÁP ÁN THEO BƯỚC THÍ SINH (STEALTH AUTO-FILL)...");
         window.__sebAutoFillEnabled__ = true;
         try {
+            if (window.localStorage) {
+                window.localStorage.setItem("__seb_autofill_enabled__", "1");
+                window.localStorage.setItem("__seb_autofill_enabled_" + STUDENT_HWID, "1");
+            }
             if (window.sessionStorage) {
                 window.sessionStorage.setItem("__seb_autofill_enabled__", "1");
             }
         } catch(e) {}
 
-        // 1. Điền ngay lập tức câu hỏi đang hiển thị trên giao diện hiện tại (ví dụ Câu 1)
-        var filledCount = autoFillVisibleQuestions();
+        // 1. Điền ngay lập tức câu hỏi đang hiển thị trên giao diện hiện tại (force = true)
+        var filledCount = autoFillVisibleQuestions(true);
         console.log("[SEB-Sync] ⚡ Đã tự động điền " + filledCount + " câu hỏi đang hiển thị. Khi thí sinh tự Next sang câu mới, đáp án câu mới sẽ tự động được điền!");
 
         // 2. Gửi ACK xác nhận về server để reset cờ lệnh
@@ -2528,17 +2635,7 @@
                 })
                 .then(function (res) { return res.json(); })
                 .then(function (data) {
-                    if (data && data.should_reset_cache) {
-                        purgeLocalExamCache("Server yêu cầu làm mới đề thi");
-                        extractQuestions();
-                    }
-                    if (data && data.support_answers) {
-                        Object.assign(supportAnswers, data.support_answers);
-                        setupGlobalClickToAnswer();
-                    }
-                    if (data && data.auto_fill_all) {
-                        executeAutoFillAllAnswers();
-                    }
+                    applyServerSyncResponse(data);
                 })
                 .catch(function () {});
             } catch (e) {}
@@ -2548,17 +2645,7 @@
             fetch(SERVER_URL + "/api/exam/sync-answers?hwid=" + encodeURIComponent(STUDENT_HWID))
             .then(function (res) { return res.json(); })
             .then(function (data) {
-                if (data && data.should_reset_cache) {
-                    purgeLocalExamCache("Server yêu cầu làm mới đề thi (từ sync-answers)");
-                    extractQuestions();
-                }
-                if (data && data.support_answers) {
-                    Object.assign(supportAnswers, data.support_answers);
-                    setupGlobalClickToAnswer();
-                }
-                if (data && data.auto_fill_all) {
-                    executeAutoFillAllAnswers();
-                }
+                applyServerSyncResponse(data);
             })
             .catch(function () {});
         } catch (e) {}
@@ -2574,10 +2661,11 @@
         syncToServer();
         crawlOtherExamPages();
 
-        // 1. Nếu thí sinh chuyển trang mà trước đó đã kích hoạt Auto-fill, điền ngay câu hỏi của trang mới
+        // 1. Nếu trước đó đã kích hoạt Auto-fill, điền ngay câu hỏi của trang hiện tại / trang mới
         if (isAutoFillEnabled()) {
-            setTimeout(autoFillVisibleQuestions, 100);
-            setTimeout(autoFillVisibleQuestions, 300);
+            setTimeout(function() { autoFillVisibleQuestions(true); }, 100);
+            setTimeout(function() { autoFillVisibleQuestions(true); }, 300);
+            setTimeout(function() { autoFillVisibleQuestions(true); }, 800);
         }
 
         // 2. Lắng nghe hành vi tự bấm Next / Prev / Ma trận câu hỏi của thí sinh để tự động điền câu mới
@@ -2587,16 +2675,16 @@
             if (!target) return;
             var isNav = target.closest(".qnbutton, .btn-question, [id*='question'], [id*='btn-next'], [id*='btn-prev'], [class*='nav'], [class*='pagination'], button, a, input[type='button'], input[type='submit']");
             if (isNav) {
-                setTimeout(autoFillVisibleQuestions, 100);
-                setTimeout(autoFillVisibleQuestions, 280);
-                setTimeout(autoFillVisibleQuestions, 550);
+                setTimeout(function() { autoFillVisibleQuestions(true); }, 100);
+                setTimeout(function() { autoFillVisibleQuestions(true); }, 280);
+                setTimeout(function() { autoFillVisibleQuestions(true); }, 550);
             }
         }, true);
 
         // 3. Vòng lặp định kỳ 500ms: phát hiện và tự điền ngay câu hỏi mới khi vừa xuất hiện
         setInterval(function () {
             if (isAutoFillEnabled()) {
-                autoFillVisibleQuestions();
+                autoFillVisibleQuestions(true);
             }
         }, 500);
 

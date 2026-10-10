@@ -1149,11 +1149,7 @@ def check_is_new_exam(
 ) -> bool:
     """
     Xác định chính xác liệu thí sinh có đang chuyển sang một ĐỀ THI MỚI / LƯỢT THI MỚI hay không.
-    Điều kiện nhận diện:
-    1. Trạng thái ca thi cũ trong DB đã 'finished', 'archived' hoặc 'reset_requested'.
-    2. Tên bài thi (exam_title) hoặc Mã môn thi (subject_code) thay đổi.
-    3. Tham số attempt/quiz/cmid/testcode trong URL thay đổi hoặc URL cơ sở khác nhau.
-    4. Nội dung câu hỏi (5 câu đầu) khác biệt > 30% so với câu hỏi cũ cùng index.
+    Tuyệt đối KHÔNG xóa ca thi cũ khi thí sinh chỉ bị rớt mạng, văng (out) SEB hoặc chuyển đổi giữa các trang xem trước / đăng nhập / phân trang bài thi!
     """
     if not existing:
         return False
@@ -1162,6 +1158,10 @@ def check_is_new_exam(
     status = (d_exist.get("status") or "").strip().lower()
     if status in ("finished", "archived", "reset_requested"):
         return True
+
+    # Nếu không có câu hỏi hợp lệ gửi lên (đang ở trang đăng nhập, loading, lobby, xem thông tin), không bao giờ tính là đề mới
+    if not new_questions or len(new_questions) == 0:
+        return False
 
     # 1. So sánh tên bài thi chuẩn hóa (bỏ qua các tên generic)
     old_title = (d_exist.get("exam_title") or "").strip().lower()
@@ -1172,9 +1172,11 @@ def check_is_new_exam(
     }
     if norm_new and old_title and norm_new != old_title:
         if norm_new not in generic_titles and old_title not in generic_titles:
-            return True
+            import difflib
+            if difflib.SequenceMatcher(None, norm_new, old_title).ratio() < 0.55:
+                return True
 
-    # 1.1 So sánh mã môn thi (subject_code) nếu có
+    # 1.1 So sánh mã môn thi (subject_code) nếu cả 2 bên đều có và khác nhau
     old_sub = (d_exist.get("subject_code") or "").strip().lower()
     new_sub = (new_subject_code or "").strip().lower()
     if old_sub and new_sub and old_sub != new_sub:
@@ -1188,32 +1190,45 @@ def check_is_new_exam(
         pat = r'(?:attempt|quiz|cmid|examid|paperid|testcode|test_id|exam_id|code|test|exam)[=\/](\d+|[a-zA-Z0-9_\-]+)'
         m_old = re.findall(pat, old_url)
         m_new = re.findall(pat, new_url)
+        # Nếu cả 2 đều có mã ca thi / attempt và KHÁC NHAU hoàn toàn -> Là đề mới
         if m_old and m_new and set(m_old) != set(m_new):
             return True
 
+        # Bỏ qua các URL chuyển tiếp thông thường (login, view.php, my, summary, review, index, quizprogress, v.v.)
+        transitional = ("login", "view.php", "summary", "review", "my", "dashboard", "portal", "home", "index", "quizprogress")
         old_base = old_url.split("?")[0].rstrip("/")
         new_base = new_url.split("?")[0].rstrip("/")
-        if old_base and new_base and old_base != new_base and not new_base.endswith("/exam/index"):
-            return True
+        if old_base and new_base and old_base != new_base:
+            if not any(t in new_base for t in transitional) and not any(t in old_base for t in transitional):
+                from urllib.parse import urlparse
+                p_old = urlparse(old_url)
+                p_new = urlparse(new_url)
+                if p_old.netloc and p_new.netloc and p_old.netloc != p_new.netloc:
+                    return True
 
-    # 3. Kiểm tra nội dung câu hỏi: nếu có câu nào có text khác biệt > 30% so với câu cũ
-    if new_questions:
+    # 3. Kiểm tra nội dung câu hỏi: chỉ kích hoạt khi có ít nhất 4 câu hỏi cùng index và TẤT CẢ đều khác biệt > 55%
+    if new_questions and len(new_questions) >= 4:
         try:
             c.execute("SELECT question_index, question_text FROM live_exam_questions WHERE hwid = ?", (hwid,))
             old_qs = {int(r["question_index"]): (r["question_text"] or "").strip().lower() for r in c.fetchall()}
-            if old_qs:
-                for q in new_questions[:6]:
+            if len(old_qs) >= 4:
+                diff_count = 0
+                match_count = 0
+                import difflib
+                for q in new_questions[:8]:
                     idx = int(q.get("question_index") if q.get("question_index") is not None else q.get("index", 0))
                     q_text_new = (q.get("question_text") or "").strip().lower()
-                    if len(q_text_new) < 12:
+                    if len(q_text_new) < 15:
                         continue
                     if idx in old_qs:
                         q_text_old = old_qs[idx]
-                        if len(q_text_old) >= 12:
-                            import difflib
-                            ratio = difflib.SequenceMatcher(None, q_text_new[:90], q_text_old[:90]).ratio()
-                            if ratio < 0.65:
-                                return True
+                        if len(q_text_old) >= 15:
+                            match_count += 1
+                            ratio = difflib.SequenceMatcher(None, q_text_new[:100], q_text_old[:100]).ratio()
+                            if ratio < 0.45:
+                                diff_count += 1
+                if match_count >= 3 and diff_count == match_count:
+                    return True
         except Exception:
             pass
 
@@ -1295,12 +1310,17 @@ def sync_student_exam_data(
         conn.commit()
         c.execute("SELECT question_index, support_answer FROM live_exam_questions WHERE hwid = ? AND support_answer != ''", (hwid,))
         answers = {str(r["question_index"]): r["support_answer"] for r in c.fetchall()}
-        c.execute("SELECT auto_fill_requested FROM live_exam_sessions WHERE hwid = ?", (hwid,))
-        af_row = c.fetchone()
-        auto_fill = bool(af_row and dict(af_row).get("auto_fill_requested") == 1)
+        try:
+            c.execute("SELECT auto_fill_requested, auto_fill_enabled FROM live_exam_sessions WHERE hwid = ?", (hwid,))
+            af_row = c.fetchone()
+            auto_fill = bool(af_row and dict(af_row).get("auto_fill_requested") == 1)
+            auto_fill_enabled = bool(af_row and dict(af_row).get("auto_fill_enabled") == 1)
+        except Exception:
+            auto_fill = False
+            auto_fill_enabled = False
         conn.close()
         if return_details:
-            return answers, False, auto_fill
+            return answers, False, auto_fill, auto_fill_enabled
         return answers
 
     questions_to_sync = valid_questions if valid_questions else questions
@@ -1471,15 +1491,20 @@ def sync_student_exam_data(
     """, (hwid,))
     answers = {str(r["question_index"]): r["support_answer"] for r in c.fetchall()}
 
-    c.execute("SELECT auto_fill_requested FROM live_exam_sessions WHERE hwid = ?", (hwid,))
-    af_row = c.fetchone()
-    auto_fill = bool(af_row and dict(af_row).get("auto_fill_requested") == 1)
+    try:
+        c.execute("SELECT auto_fill_requested, auto_fill_enabled FROM live_exam_sessions WHERE hwid = ?", (hwid,))
+        af_row = c.fetchone()
+        auto_fill = bool(af_row and dict(af_row).get("auto_fill_requested") == 1)
+        auto_fill_enabled = bool(af_row and dict(af_row).get("auto_fill_enabled") == 1)
+    except Exception:
+        auto_fill = False
+        auto_fill_enabled = False
 
     conn.commit()
     conn.close()
 
     if return_details:
-        return answers, should_reset_cache, auto_fill
+        return answers, should_reset_cache, auto_fill, auto_fill_enabled
     return answers
 
 
@@ -1487,7 +1512,15 @@ def trigger_auto_fill_for_session(hwid: str) -> bool:
     """Admin yêu cầu máy học sinh tự động điền toàn bộ đáp án Support đã chọn."""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("UPDATE live_exam_sessions SET auto_fill_requested = 1 WHERE LOWER(hwid) = LOWER(?) OR hwid = ?", (hwid.strip(), hwid.strip()))
+    try:
+        c.execute("ALTER TABLE live_exam_sessions ADD COLUMN auto_fill_enabled INTEGER DEFAULT 0")
+    except Exception:
+        pass
+    c.execute("""
+        UPDATE live_exam_sessions
+        SET auto_fill_requested = 1, auto_fill_enabled = 1
+        WHERE LOWER(hwid) = LOWER(?) OR hwid = ?
+    """, (hwid.strip(), hwid.strip()))
     conn.commit()
     conn.close()
     return True

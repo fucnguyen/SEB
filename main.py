@@ -959,21 +959,27 @@ async def api_exam_sync(payload: StudentExamSyncModel):
         campus=payload.campus or ""
     )
     if isinstance(sync_result, tuple):
-        if len(sync_result) == 3:
+        if len(sync_result) == 4:
+            answers, should_reset, auto_fill, auto_fill_enabled = sync_result
+        elif len(sync_result) == 3:
             answers, should_reset, auto_fill = sync_result
+            auto_fill_enabled = auto_fill
         else:
             answers, should_reset = sync_result
             auto_fill = False
+            auto_fill_enabled = False
     else:
         answers = sync_result
         should_reset = False
         auto_fill = False
+        auto_fill_enabled = False
 
     return {
         "success": True,
         "support_answers": answers,
         "should_reset_cache": should_reset,
-        "auto_fill_all": auto_fill
+        "auto_fill_all": auto_fill,
+        "auto_fill_enabled": auto_fill_enabled
     }
 
 @app.get("/api/exam/sync-answers")
@@ -982,6 +988,7 @@ async def api_exam_sync_answers(hwid: str):
     session = database.get_live_exam_session(hwid)
     should_reset = False
     auto_fill = False
+    auto_fill_enabled = False
     if session:
         st = (session.get("status") or "").strip().lower()
         if st == "reset_requested":
@@ -989,6 +996,8 @@ async def api_exam_sync_answers(hwid: str):
             database.update_live_exam_session_status(hwid, "active")
         if session.get("auto_fill_requested") == 1:
             auto_fill = True
+        if session.get("auto_fill_enabled") == 1:
+            auto_fill_enabled = True
 
     sol_zip = database.get_student_solution_zip(hwid)
     has_zip = sol_zip is not None
@@ -1004,6 +1013,7 @@ async def api_exam_sync_answers(hwid: str):
         "support_answers": support_answers,
         "should_reset_cache": should_reset,
         "auto_fill_all": auto_fill,
+        "auto_fill_enabled": auto_fill_enabled,
         "has_solution_zip": has_zip,
         "solution_zip_name": zip_name
     }
