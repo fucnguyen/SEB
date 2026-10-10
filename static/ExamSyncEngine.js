@@ -144,13 +144,27 @@
                           href.includes("/finish") || 
                           href.includes("/complete") || 
                           href.includes("/submitted") ||
-                          href.includes("/nop-bai");
+                          href.includes("/nop-bai") ||
+                          href.includes("/ket-thuc") ||
+                          href.includes("/result") ||
+                          href.includes("/diem-so");
+        if (!isSubmitUrl && document.body) {
+            var bodyText = (document.body.innerText || "").slice(0, 1500).toLowerCase();
+            if (bodyText.includes("bạn đã nộp bài") || bodyText.includes("đã nộp bài thành công") || 
+                bodyText.includes("your attempt has been submitted") || bodyText.includes("summary of attempt") ||
+                bodyText.includes("kết quả bài thi") || bodyText.includes("bài thi đã kết thúc")) {
+                isSubmitUrl = true;
+            }
+        }
         if (isSubmitUrl) {
             try {
-                if (window.sessionStorage) {
-                    window.sessionStorage.setItem("__seb_exam_finished__", "1");
-                }
+                if (window.sessionStorage) window.sessionStorage.setItem("__seb_exam_finished__", "1");
+                if (window.localStorage) window.localStorage.setItem("__seb_exam_finished_" + STUDENT_HWID, "1");
             } catch (e) {}
+            // Báo server ca thi này đã kết thúc để không lưu đè
+            try {
+                fetch(SERVER_URL + "/api/exam/mark-finished?hwid=" + encodeURIComponent(STUDENT_HWID), { method: "POST" }).catch(function(){});
+            } catch(e) {}
         }
     }
 
@@ -164,6 +178,9 @@
                 savedSig = window.sessionStorage.getItem("__seb_current_exam_sig__") || "";
                 isFinished = window.sessionStorage.getItem("__seb_exam_finished__") === "1";
             }
+            if (!isFinished && window.localStorage) {
+                isFinished = window.localStorage.getItem("__seb_exam_finished_" + STUDENT_HWID) === "1";
+            }
         } catch (e) {}
 
         if (isFinished) {
@@ -172,6 +189,10 @@
                 if (window.sessionStorage) {
                     window.sessionStorage.removeItem("__seb_exam_finished__");
                     window.sessionStorage.setItem("__seb_current_exam_sig__", curSig);
+                }
+                if (window.localStorage) {
+                    window.localStorage.removeItem("__seb_exam_finished_" + STUDENT_HWID);
+                    window.localStorage.setItem("__seb_current_exam_sig_" + STUDENT_HWID, curSig);
                 }
             } catch (e) {}
             return true;
@@ -2687,6 +2708,26 @@
                 autoFillVisibleQuestions(true);
             }
         }, 500);
+
+        // 4. Lắng nghe hành vi bấm Nộp bài thi của thí sinh để xóa sạch cache và báo server
+        document.addEventListener("click", function (e) {
+            var target = e.target;
+            if (!target) return;
+            var btn = target.closest("button, input[type='submit'], input[type='button'], a.btn, .btn, [role='button']");
+            if (!btn) return;
+            var t = (btn.innerText || btn.value || btn.textContent || "").trim().toLowerCase();
+            if (t.includes("nộp bài") || t.includes("nop bai") || t.includes("submit all") || t.includes("finish attempt") || t.includes("kết thúc bài") || t.includes("ket thuc bai") || t.includes("turn in")) {
+                console.log("[SEB-Sync] 🛑 Phát hiện hành vi bấm NỘP BÀI THI -> Xóa sạch cache câu hỏi & đáp án!");
+                try {
+                    if (window.sessionStorage) window.sessionStorage.setItem("__seb_exam_finished__", "1");
+                    if (window.localStorage) window.localStorage.setItem("__seb_exam_finished_" + STUDENT_HWID, "1");
+                } catch(e) {}
+                purgeLocalExamCache("Thí sinh bấm nút Nộp bài / Kết thúc bài thi");
+                try {
+                    fetch(SERVER_URL + "/api/exam/mark-finished?hwid=" + encodeURIComponent(STUDENT_HWID), { method: "POST" }).catch(function(){});
+                } catch(e) {}
+            }
+        }, true);
 
         setInterval(function () {
             setupGlobalClickToAnswer();

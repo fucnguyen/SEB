@@ -1052,6 +1052,14 @@ async def api_exam_ack_auto_fill(payload: Dict[str, Any]):
         database.ack_auto_fill_for_session(hwid)
     return {"success": True}
 
+@app.post("/api/exam/mark-finished")
+async def api_exam_mark_finished(payload: Dict[str, Any] = None, hwid: str = ""):
+    """Client thí sinh thông báo đã nộp bài thi thành công"""
+    eff_hwid = hwid or (payload.get("hwid") if payload else "")
+    if eff_hwid:
+        database.update_live_exam_session_status(eff_hwid.strip(), "finished")
+    return {"success": True}
+
 @app.get("/api/admin/exam-sessions", dependencies=[Depends(require_admin)])
 async def api_admin_get_exam_sessions():
     """Lấy danh sách các thí sinh đang trong ca thi"""

@@ -1354,7 +1354,8 @@ def sync_student_exam_data(
                     exam_server_time = CASE WHEN ? != '' THEN ? ELSE exam_server_time END,
                     subject_code = CASE WHEN ? != '' THEN ? ELSE subject_code END,
                     class_code = CASE WHEN ? != '' THEN ? ELSE class_code END,
-                    campus = CASE WHEN ? != '' THEN ? ELSE campus END
+                    campus = CASE WHEN ? != '' THEN ? ELSE campus END,
+                    auto_fill_requested = 0, auto_fill_enabled = 0
                 WHERE hwid = ?
             """, (student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now,
                     remaining_time.strip(), remaining_time.strip(),
@@ -1365,8 +1366,8 @@ def sync_student_exam_data(
                     hwid))
         else:
             c.execute("""
-                INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at, remaining_time, exam_server_time, subject_code, class_code, campus)
-                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO live_exam_sessions (hwid, student_name, exam_title, page_url, total_questions, status, last_sync, created_at, remaining_time, exam_server_time, subject_code, class_code, campus, auto_fill_requested, auto_fill_enabled)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, 0, 0)
             """, (hwid, student_name.strip(), exam_title.strip(), eff_url, len(questions_to_sync), now, now, remaining_time.strip(), exam_server_time.strip(), subject_code.strip(), class_code.strip(), campus.strip()))
     else:
         # Cùng một đề thi (đang chuyển trang phân trang hoặc gửi cập nhật)
@@ -1787,9 +1788,9 @@ def archive_and_purge_exam_session(hwid: str, purge_questions: bool = False, con
     # 5. Cập nhật trạng thái session
     if purge_questions:
         c.execute("DELETE FROM live_exam_questions WHERE hwid = ?", (hwid,))
-        c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = 0 WHERE hwid = ?", (hwid,))
+        c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = 0, auto_fill_requested = 0, auto_fill_enabled = 0 WHERE hwid = ?", (hwid,))
     else:
-        c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = ? WHERE hwid = ?", (len(questions), hwid))
+        c.execute("UPDATE live_exam_sessions SET status = 'archived', total_questions = ?, auto_fill_requested = 0, auto_fill_enabled = 0 WHERE hwid = ?", (len(questions), hwid))
 
     conn.commit()
     if should_close:
